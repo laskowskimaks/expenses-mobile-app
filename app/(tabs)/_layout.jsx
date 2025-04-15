@@ -2,7 +2,11 @@ import { Tabs } from 'expo-router';
 
 export default function TabsLayout() {
   return (
-    <Tabs>
+    <Tabs
+      screenOptions={{
+        headerShown: true
+      }}
+    >
       <Tabs.Screen name="home" />
       <Tabs.Screen name="details" />
       <Tabs.Screen name="add" />

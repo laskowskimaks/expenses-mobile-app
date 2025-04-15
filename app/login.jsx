@@ -13,9 +13,9 @@ export default function LoginScreen() {
   const handleLogin = async () => {
     const success = await login(email, password);
     if (success) {
-      alert('Zalogowano!');
-      router.replace('/(tabs)/home')
-
+      //alert('Zalogowano!');
+      router.dismissAll();
+      router.replace('/(tabs)/home');
     } else {
       alert('Nieprawidłowe dane!');
     }
