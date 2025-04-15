@@ -34,7 +34,7 @@ export const getUserByEmail = async (db, email) => {
     }
     return user;
   } catch (error) {
-    console.error('[authService]  user faiGetled:', error);
+    console.error('[authService] Get user failed:', error);
     return null;
   }
 };
