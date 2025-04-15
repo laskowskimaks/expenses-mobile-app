@@ -27,7 +27,7 @@ export const AuthProvider = ({ children }) => {
         console.log('[AUTO LOGIN] Logged in from storage:', loadedUser.email);
         setUser(loadedUser);
 
-        router.replace('(tabs)/home');
+        router.replace('/(tabs)/home');
         return true;
       }
     }
@@ -78,9 +78,10 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     await SecureStore.deleteItemAsync(USER_ID_KEY);
-    router.replace('/');
     setUser(null);
     console.log('[LOGOUT] Logged out');
+    router.replace('/');
+    alert('Wylogowano');
   };
 
   return (

@@ -9,7 +9,14 @@ export const createUser = async (db, email, hashedPassword, salt) => {
     console.log('[authService] User created:', email);
     return true;
   } catch (error) {
-    console.error('[authService] Create user failed:', error);
+    console.log('[authService] Create user failed:', error);
+    if (error.message.includes('UNIQUE constraint failed')) {
+      console.log('[authService] Email already registered:', email);
+      alert('Nazwa użytkownika już zajęta');
+    } else {
+      console.log('[authService] Create user error:', error);
+      alert('Wystąpił błąd podczas rejestracji.');
+    }
     return false;
   }
 };
@@ -20,10 +27,14 @@ export const getUserByEmail = async (db, email) => {
       'SELECT * FROM users WHERE email = ?;',
       email
     );
-    console.log('[authService] User fetched:', email);
+    if (!user) {
+      console.log('[authService] No user found with email:', email);
+    } else {
+      console.log('[authService] User fetched:', email);
+    }
     return user;
   } catch (error) {
-    console.error('[authService] Get user failed:', error);
+    console.error('[authService]  user faiGetled:', error);
     return null;
   }
 };

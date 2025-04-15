@@ -7,12 +7,12 @@ export default function TabsLayout() {
   const router = useRouter();
 
   useEffect(() => {
-    if (user === null) {
+    if (!user) {
       console.log('[TabsLayout] User not logged in. Redirecting to login.');
       router.replace('/login');
     }
   }, [user]);
-  
+
   return (
     <Tabs
       screenOptions={{
