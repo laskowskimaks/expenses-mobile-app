@@ -1,6 +1,6 @@
 import { View, Text } from 'react-native';
 
-export default function DetailsScreen() {
+export default function AddScreen() {
   return (
     <View style={{
       flex: 1,

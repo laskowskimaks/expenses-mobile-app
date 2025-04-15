@@ -11,11 +11,22 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
 
   const handleLogin = async () => {
+    if (!email && !password) {
+      alert('Podaj login i hasło!');
+      return;
+    } else if (!email) {
+      alert('Wprowadź adres e-mail!');
+      return; 
+    } else if (!password) { 
+      alert('Wprowadź hasło!');
+      return; 
+    }
+
     const success = await login(email, password);
     if (success) {
-      alert('Zalogowano!');
-      router.replace('/(tabs)/home')
-
+      //alert('Zalogowano!');
+      router.dismissAll();
+      router.replace('/(tabs)/home');
     } else {
       alert('Nieprawidłowe dane!');
     }

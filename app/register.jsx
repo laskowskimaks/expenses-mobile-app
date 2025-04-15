@@ -11,13 +11,22 @@ export default function RegisterScreen() {
   const [password, setPassword] = useState('');
 
   const handleRegister = async () => {
+    if (!email && !password) {
+      alert('Podaj login i hasło!');
+      return;
+    } else if (!email) {
+      alert('Wprowadź adres e-mail!');
+      return;
+    } else if (!password) {
+      alert('Wprowadź hasło!');
+      return;
+    }
+
     const success = await register(email, password);
     if (success) {
       alert('Zarejestrowano!');
       router.replace('/login');
-    } else {
-      alert('Błąd rejestracji!');
-    }
+    } 
   };
 
   return (
@@ -29,16 +38,16 @@ export default function RegisterScreen() {
     }}>
       <View style={{ width: "80%", marginBottom: 20 }}>
         <Text style={{ fontSize: 16, marginBottom: 10 }}>Rejestracja</Text>
-        <TextInput placeholder="Email" onChangeText={setEmail} 
-        style={{
-          height: 40,
-          borderColor: 'gray',
-          borderWidth: 1,
-          padding: 10,
-          borderRadius: 5,
-          backgroundColor: '#fff',
-          marginBottom: 10,
-        }}/>
+        <TextInput placeholder="Email" onChangeText={setEmail}
+          style={{
+            height: 40,
+            borderColor: 'gray',
+            borderWidth: 1,
+            padding: 10,
+            borderRadius: 5,
+            backgroundColor: '#fff',
+            marginBottom: 10,
+          }} />
         <TextInput
           placeholder="Hasło"
           secureTextEntry

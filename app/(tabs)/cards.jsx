@@ -1,6 +1,6 @@
 import { View, Text } from 'react-native';
 
-export default function DetailsScreen() {
+export default function CardsScreen() {
   return (
     <View style={{
       flex: 1,
