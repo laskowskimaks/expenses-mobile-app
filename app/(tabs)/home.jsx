@@ -5,7 +5,6 @@ export default function HomeScreen() {
 
   const { user, logout } = useAuth();
 
-
   return (
     <View>
       <View style={{
