@@ -5,10 +5,7 @@ import { AuthProvider } from '../context/AuthContext';
 
 export default function RootLayout() {
   return (
-    <SQLiteProvider
-      databaseName="app.db"
-      onInit={runMigrations}
-    >
+    <SQLiteProvider databaseName='app.db' onInit={runMigrations}>
       <AuthProvider>
         <Stack screenOptions={{ headerShown: true }} />
       </AuthProvider>

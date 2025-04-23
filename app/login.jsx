@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, TextInput, Button } from 'react-native';
+import { View, Text, TextInput, Button, StyleSheet } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { useRouter } from 'expo-router';
 
@@ -16,10 +16,10 @@ export default function LoginScreen() {
       return;
     } else if (!email) {
       alert('Wprowadź adres e-mail!');
-      return; 
-    } else if (!password) { 
+      return;
+    } else if (!password) {
       alert('Wprowadź hasło!');
-      return; 
+      return;
     }
 
     const success = await login(email, password);
@@ -33,42 +33,53 @@ export default function LoginScreen() {
   };
 
   return (
-    <View style={{
-      flex: 1,
-      justifyContent: "center",
-      alignItems: "center",
-      margin: 20,
-    }}>
-      <View style={{ width: "80%", marginBottom: 20 }}>
-        <Text style={{ fontSize: 16, marginBottom: 10 }}>Wprowadź dane logowania:</Text>
+    <View style={styles.container}>
+      <View style={styles.formContainer}>
+        <Text style={styles.formTitle}>Wprowadź dane logowania:</Text>
         <TextInput
-          placeholder="Email" onChangeText={setEmail}
-          style={{
-            height: 40,
-            borderColor: 'gray',
-            borderWidth: 1,
-            padding: 10,
-            borderRadius: 5,
-            backgroundColor: '#fff',
-            marginBottom: 10,
-          }}
+          placeholder="Email"
+          onChangeText={setEmail}
+          style={styles.input}
         />
         <TextInput
           placeholder="Hasło"
           secureTextEntry
           onChangeText={setPassword}
-          style={{
-            height: 40,
-            borderColor: 'gray',
-            borderWidth: 1,
-            padding: 10,
-            borderRadius: 5,
-            backgroundColor: '#fff',
-            marginBottom: 10,
-          }}
+          style={styles.input}
         />
-        <Button title="Zaloguj" onPress={handleLogin} />
+        <Button style={styles.button} title="Zaloguj" onPress={handleLogin} />
       </View>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    margin: 20,
+  },
+  formContainer: {
+    width: '80%',
+    marginBottom: 20,
+  },
+  formTitle: {
+    fontSize: 16,
+    marginBottom: 10,
+  },
+  input: {
+    height: 40,
+    borderColor: 'gray',
+    borderWidth: 1,
+    padding: 10,
+    borderRadius: 5,
+    backgroundColor: '#fff',
+    marginBottom: 10,
+  },
+  button: {
+    backgroundColor: '#007BFF',
+    padding: 10,
+    borderRadius: 5,
+  },
+});
