@@ -25,7 +25,7 @@ export const AuthProvider = ({ children }) => {
       if (storedId) {
         const loadedUser = await getUserById(db, parseInt(storedId));
         if (loadedUser) {
-          console.log('[AuthContext] Logged in from storage:', loadedUser.email);
+          console.log('[AuthContext] Logged in from storage:', loadedUser.username);
           setUser(loadedUser);
 
           router.replace('/(tabs)/home');
