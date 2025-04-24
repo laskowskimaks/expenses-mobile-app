@@ -7,28 +7,32 @@ export default function LoginScreen() {
   const { login } = useAuth();
   const router = useRouter();
 
-  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-
+  const [username, setUsername] = useState('');
+  
   const handleLogin = async () => {
-    if (!email && !password) {
+    if (!username && !password) {
       alert('Podaj login i hasło!');
       return;
-    } else if (!email) {
-      alert('Wprowadź adres e-mail!');
+    } else if (!username) {
+      alert('Wprowadź nazwę użytkownika!');
       return;
     } else if (!password) {
       alert('Wprowadź hasło!');
       return;
     }
 
-    const success = await login(email, password);
-    if (success) {
-      //alert('Zalogowano!');
-      router.dismissAll();
-      router.replace('/(tabs)/home');
-    } else {
-      alert('Nieprawidłowe dane!');
+    try {
+      const success = await login(username, password);
+      if (success) {
+        router.dismissAll();
+        router.replace('/(tabs)/home');
+      } else {
+        alert('Nieprawidłowe dane!');
+      }
+    } catch (error) {
+      console.log('[Login] Login error:', error);
+      alert('Wystąpił błąd podczas logowania. Spróbuj ponownie później.');
     }
   };
 
@@ -37,8 +41,8 @@ export default function LoginScreen() {
       <View style={styles.formContainer}>
         <Text style={styles.formTitle}>Wprowadź dane logowania:</Text>
         <TextInput
-          placeholder="Email"
-          onChangeText={setEmail}
+          placeholder="Nazwa użytkownika"
+          onChangeText={setUsername}
           style={styles.input}
         />
         <TextInput
