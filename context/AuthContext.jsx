@@ -4,14 +4,20 @@ import { generateSalt, hashPassword } from '../hooks/useHash';
 import { createUser, getUserById, getUserByUsername } from '../services/authService';
 import * as SecureStore from 'expo-secure-store';
 import { router } from 'expo-router';
+import { drizzle } from 'drizzle-orm/expo-sqlite';
+import * as schema from '@/database/schema';
+import { useDrizzleStudio } from "expo-drizzle-studio-plugin";
 
 const USER_ID_KEY = 'loggedUserId';
 
 export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const db = useSQLiteContext();
   const [user, setUser] = useState(null);
+  
+  const db = useSQLiteContext();
+  const drizzleDb = drizzle(db, { schema });
+  useDrizzleStudio(db);
 
   useEffect(() => {
     void loadUserFromStorage();
@@ -23,7 +29,7 @@ export const AuthProvider = ({ children }) => {
       console.log('[AuthContext] Loaded user ID from storage:', storedId);
 
       if (storedId) {
-        const loadedUser = await getUserById(db, parseInt(storedId));
+        const loadedUser = await getUserById(drizzleDb, parseInt(storedId));
         if (loadedUser) {
           console.log('[AuthContext] Logged in from storage:', loadedUser.username);
           setUser(loadedUser);
@@ -37,12 +43,13 @@ export const AuthProvider = ({ children }) => {
       console.error('[AuthContext] Error loading user from storage:', error);
     }
   };
+  
   const register = async (username, password) => {
     try {
       const salt = generateSalt();
       const hashed = await hashPassword(password, salt);
-      const success = await createUser(db, username, hashed, salt);
-  
+      const success = await createUser(drizzleDb, username, hashed, salt);
+
       if (success) {
         console.log('[AuthContext] Registration success');
         return true;
@@ -55,21 +62,21 @@ export const AuthProvider = ({ children }) => {
       return false;
     }
   };
-  
+
   const login = async (username, password) => {
     try {
-      const userFromDB = await getUserByUsername(db, username);  
+      const userFromDB = await getUserByUsername(drizzleDb, username);
       if (!userFromDB) {
         console.log('[AuthContext] Login failed: user not found');
         return false;
       }
-  
+
       const hashedInput = await hashPassword(password, userFromDB.salt);
-  
+
       if (hashedInput === userFromDB.password) {
         setUser(userFromDB);
         await SecureStore.setItemAsync(USER_ID_KEY, userFromDB.id.toString());
-  
+
         console.log('[AuthContext] Login success:', username);
         return true;
       } else {
