@@ -17,7 +17,6 @@ export const AuthProvider = ({ children }) => {
   
   const db = useSQLiteContext();
   const drizzleDb = drizzle(db, { schema });
-  useDrizzleStudio(db);
 
   useEffect(() => {
     void loadUserFromStorage();
