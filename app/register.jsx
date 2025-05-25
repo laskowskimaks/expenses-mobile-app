@@ -8,29 +8,49 @@ export default function RegisterScreen() {
   const router = useRouter();
 
   const [password, setPassword] = useState('');
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
+
+  const validateEmail = (email) => {
+    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return re.test(email.toLowerCase());
+  };
 
   const handleRegister = async () => {
-    if (!username && !password) {
-      alert('Podaj login i hasło!');
+    if (!email && !password) {
+      alert('Podaj e-mail i hasło!');
       return;
-    } else if (!username) {
-      alert('Wprowadź nazwę użytkownika!');
+    } else if (!email) {
+      alert('Wprowadź adres e-mail!');
+      return;
+    } else if (!validateEmail(email)) {
+      alert('Niepoprawny adres e-mail!');
       return;
     } else if (!password) {
       alert('Wprowadź hasło!');
       return;
+    } else if (password.length < 6) {
+      alert('Hasło musi mieć co najmniej 6 znaków!');
+      return;
     }
 
     try {
-      const success = await register(username, password);
-      if (success) {
-        alert('Zarejestrowano!');
+      const result = await register(email, password);
+
+      if (result === true) {
+        alert('Zarejestrowano pomyślnie!');
         router.replace('/login');
+      } else if (result.code === 'auth/email-already-in-use') {
+        alert('Ten adres e-mail jest już używany!');
+      } else if (result.code === 'auth/invalid-email') {
+        alert('Niepoprawny adres e-mail!');
+      } else if (result.code === 'auth/weak-password') {
+        alert('Hasło jest zbyt słabe!');
+      } else {
+        alert('Wystąpił błąd. Spróbuj ponownie.');
       }
     } catch (error) {
-      alert('Wystąpił błąd podczas rejestracji. Spróbuj ponownie.');
-      console.log('[Registration] Registration error:', error);
+      alert('Wystąpił błąd podczas rejestracji.');
+      console.log('[Registration] Firebase error:', error);
     }
   };
 
@@ -39,8 +59,9 @@ export default function RegisterScreen() {
       <View style={styles.formContainer}>
         <Text style={styles.text}>Rejestracja</Text>
         <TextInput
-          placeholder='Nazwa użytkownika'
-          onChangeText={setUsername}
+          placeholder='Adres e-mail'
+          autoCapitalize='none'
+          onChangeText={setEmail}
           style={styles.input}
         />
         <TextInput

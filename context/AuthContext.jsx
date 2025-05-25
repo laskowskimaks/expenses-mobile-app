@@ -6,15 +6,16 @@ import * as SecureStore from 'expo-secure-store';
 import { router } from 'expo-router';
 import { drizzle } from 'drizzle-orm/expo-sqlite';
 import * as schema from '@/database/schema';
-import { useDrizzleStudio } from "expo-drizzle-studio-plugin";
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "firebase/auth";
+import { auth as firebaseAuth } from '../FirebaseConfig';
 
-const USER_ID_KEY = 'loggedUserId';
+const USER_KEY = 'loggedUserId';
 
 export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  
+
   const db = useSQLiteContext();
   const drizzleDb = drizzle(db, { schema });
 
@@ -24,79 +25,57 @@ export const AuthProvider = ({ children }) => {
 
   const loadUserFromStorage = async () => {
     try {
-      const storedId = await SecureStore.getItemAsync(USER_ID_KEY);
-      console.log('[AuthContext] Loaded user ID from storage:', storedId);
-
-      if (storedId) {
-        const loadedUser = await getUserById(drizzleDb, parseInt(storedId));
-        if (loadedUser) {
-          console.log('[AuthContext] Logged in from storage:', loadedUser.username);
-          setUser(loadedUser);
-
-          router.replace('/(tabs)/home');
-        }
-      }
-
-      console.log('[AuthContext] No user found in storage');
-    } catch (error) {
-      console.error('[AuthContext] Error loading user from storage:', error);
-    }
-  };
-  
-  const register = async (username, password) => {
-    try {
-      const salt = generateSalt();
-      const hashed = await hashPassword(password, salt);
-      const success = await createUser(drizzleDb, username, hashed, salt);
-
-      if (success) {
-        console.log('[AuthContext] Registration success');
-        return true;
-      } else {
-        console.log('[AuthContext] Registration failed');
-        return false;
+      const storedUser = await SecureStore.getItemAsync(USER_KEY);
+      if (storedUser) {
+        setUser(JSON.parse(storedUser));
+        router.replace('/(tabs)/home');
       }
     } catch (error) {
-      console.error('[AuthContext] Registration error:', error);
-      return false;
+      console.error('[AuthContext] Load user error:', error);
     }
   };
 
-  const login = async (username, password) => {
+  const register = async (email, password) => {
     try {
-      const userFromDB = await getUserByUsername(drizzleDb, username);
-      if (!userFromDB) {
-        console.log('[AuthContext] Login failed: user not found');
-        return false;
-      }
+      const firebaseAuthResult = await createUserWithEmailAndPassword(firebaseAuth, email, password);
+      const firebaseUser = firebaseAuthResult.user;
 
-      const hashedInput = await hashPassword(password, userFromDB.salt);
+      await SecureStore.setItemAsync(USER_KEY, firebaseUser.uid);
+      setUser({ uid: firebaseUser.uid, email: firebaseUser.email });
 
-      if (hashedInput === userFromDB.password) {
-        setUser(userFromDB);
-        await SecureStore.setItemAsync(USER_ID_KEY, userFromDB.id.toString());
-
-        console.log('[AuthContext] Login success:', username);
-        return true;
-      } else {
-        console.log('[AuthContext] Login failed: incorrect password');
-        return false;
-      }
+      console.log('[AuthContext] Firebase registration success:', firebaseUser.email);
+      return true;
     } catch (error) {
-      console.log('[AuthContext] Login error:', error);
-      return false;
+      console.log('[AuthContext] Firebase registration error:', error);
+      return error;
+    }
+  };
+
+  const login = async (email, password) => {
+    try {
+      const result = await signInWithEmailAndPassword(firebaseAuth, email, password);
+      const user = result.user;
+      const userData = { uid: user.uid, email: user.email };
+
+      await SecureStore.setItemAsync(USER_KEY, JSON.stringify(userData));
+      setUser(userData);
+      return true;
+    } catch (error) {
+      console.error('[Auth] Firebase login error:', error.code);
+      throw error; // obsłużony w ekranie
     }
   };
 
   const logout = async () => {
     try {
-      await SecureStore.deleteItemAsync(USER_ID_KEY);
+      await SecureStore.deleteItemAsync(USER_KEY);
+      await signOut(firebaseAuth);
+
       setUser(null);
-      console.log('[AuthContext] Logged out');
       router.replace('/');
-      alert('Wylogowano');
+      console.log('[AuthContext] Firebase logout success');
     } catch (error) {
-      console.log('[AuthContext] Error during logout:', error);
+      console.log('[AuthContext] Firebase logout error:', error);
     }
   };
 
