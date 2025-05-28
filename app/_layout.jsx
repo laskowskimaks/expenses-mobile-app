@@ -7,7 +7,7 @@ import { drizzle } from 'drizzle-orm/expo-sqlite';
 import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator';
 import migrations from '@/drizzle/migrations';
 
-export const DATABASE_NAME = 'test1.db';
+export const DATABASE_NAME = 'database.db';
 
 export default function RootLayout() {
   const expoDb = openDatabaseSync(DATABASE_NAME);

@@ -16,7 +16,7 @@ export default function HomeScreen() {
         <Text>Home</Text>
       </View>
       <View>
-        <Text>Witaj asdas, {user.email}!</Text>
+        <Text>Witaj, {user.email}!</Text>
         <Button title="Wyloguj" onPress={logout} />
       </View>
     </View>

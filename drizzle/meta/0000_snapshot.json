@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "24389760-82b6-4511-a94b-36501ab17463",
+  "id": "d5db5d7e-7521-4bc3-8bb2-a2abcc1c81e5",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "users": {
@@ -14,8 +14,8 @@
           "notNull": true,
           "autoincrement": true
         },
-        "name": {
-          "name": "name",
+        "email": {
+          "name": "email",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -37,10 +37,10 @@
         }
       },
       "indexes": {
-        "users_name_unique": {
-          "name": "users_name_unique",
+        "users_email_unique": {
+          "name": "users_email_unique",
           "columns": [
-            "name"
+            "email"
           ],
           "isUnique": true
         }

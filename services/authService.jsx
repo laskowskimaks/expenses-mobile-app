@@ -1,20 +1,20 @@
-import { users } from "@/database/schema";
+import { user } from "@/database/schema";
 import { eq } from 'drizzle-orm';
 
-export const createUser = async (db, username, hashedPassword, salt) => {
+export const createUser = async (db, email, hashedPassword, salt) => {
 
   try {
-    await db.insert(users).values({
-      username,
+    await db.insert(user).values({
+      email,
       password: hashedPassword,
       salt,
     });
-    console.log('[authService] User created:', username);
+    console.log('[authService] User created:', email);
     return true;
   } catch (error) {
     console.error('[authService] Create user failed:', error);
     if (error.message.includes('UNIQUE constraint failed')) {
-      console.log('[authService] Username already registered:', username);
+      console.log('[authService] email already registered:', email);
       alert('Nazwa użytkownika już zajęta');
     } else {
       console.log('[authService] Create user error:', error);
@@ -24,15 +24,15 @@ export const createUser = async (db, username, hashedPassword, salt) => {
   }
 };
 
-export const getUserByUsername = async (db, username) => {
+export const getUserByemail = async (db, email) => {
   try {
-    const user = await db.select().from(users).where(eq(users.username, username)).get();
+    const user = await db.select().from(users).where(eq(users.email, email)).get();
 
 
     if (!user) {
-      console.log('[authService] No user found with username:', username);
+      console.log('[authService] No user found with email:', email);
     } else {
-      console.log('[authService] User fetched:', username);
+      console.log('[authService] User fetched:', email);
     }
     return user;
   } catch (error) {

@@ -2,10 +2,24 @@ import { useState } from 'react';
 import { View, Text, TextInput, Button, StyleSheet } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { useRouter } from 'expo-router';
+import { uploadBackup } from '../services/backupService';
 
 const validateEmail = (email) => {
   return /\S+@\S+\.\S+/.test(email);
 };
+
+async function performUpload() {
+  try {
+    const result = await uploadBackup();
+    if (result) {
+      console.log("Upload zakończony. Informacje:", result);
+    } else {
+      console.log("Upload nie powiódł się.");
+    }
+  } catch (e) {
+    console.error("Całkowity błąd procesu uploadu:", e);
+  }
+}
 
 export default function LoginScreen() {
   const { login } = useAuth();
@@ -35,6 +49,7 @@ export default function LoginScreen() {
     try {
       const success = await login(email, password);
       if (success) {
+        uploadBackup();
         router.dismissAll();
         router.replace('/(tabs)/home');
       } else {

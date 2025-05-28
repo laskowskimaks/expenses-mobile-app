@@ -34,22 +34,39 @@ export const AuthProvider = ({ children }) => {
       console.error('[AuthContext] Load user error:', error);
     }
   };
-
   const register = async (email, password) => {
     try {
       const firebaseAuthResult = await createUserWithEmailAndPassword(firebaseAuth, email, password);
       const firebaseUser = firebaseAuthResult.user;
 
-      await SecureStore.setItemAsync(USER_KEY, firebaseUser.uid);
-      setUser({ uid: firebaseUser.uid, email: firebaseUser.email });
+      const salt = generateSalt();
+      const hashedPassword = await hashPassword(password, salt);
 
-      console.log('[AuthContext] Firebase registration success:', firebaseUser.email);
+      await createUser(drizzleDb, email, hashedPassword, salt);
+      console.log('[AuthContext] Firebase & local registration success:', firebaseUser.email);
+
       return true;
     } catch (error) {
-      console.log('[AuthContext] Firebase registration error:', error);
+      console.log('[AuthContext] Registration error:', error);
       return error;
     }
   };
+
+  // const register = async (email, password) => {
+  //   try {
+  //     const firebaseAuthResult = await createUserWithEmailAndPassword(firebaseAuth, email, password);
+  //     const firebaseUser = firebaseAuthResult.user;
+
+  //     await SecureStore.setItemAsync(USER_KEY, firebaseUser.uid);
+  //     setUser({ uid: firebaseUser.uid, email: firebaseUser.email });
+
+  //     console.log('[AuthContext] Firebase registration success:', firebaseUser.email);
+  //     return true;
+  //   } catch (error) {
+  //     console.log('[AuthContext] Firebase registration error:', error);
+  //     return error;
+  //   }
+  // };
 
   const login = async (email, password) => {
     try {
