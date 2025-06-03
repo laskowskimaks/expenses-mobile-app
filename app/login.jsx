@@ -1,25 +1,12 @@
 import { useState } from 'react';
-import { View, Text, TextInput, Button, StyleSheet } from 'react-native';
+import { View, Text, TextInput, Button, StyleSheet, ActivityIndicator } from 'react-native'; // Dodano ActivityIndicator
 import { useAuth } from '../context/AuthContext';
 import { useRouter } from 'expo-router';
-import { uploadBackup } from '../services/backupService';
+import { checkAndRestoreBackup, uploadBackupIfOlderThan } from '../services/backupService';
 
 const validateEmail = (email) => {
   return /\S+@\S+\.\S+/.test(email);
 };
-
-async function performUpload() {
-  try {
-    const result = await uploadBackup();
-    if (result) {
-      console.log("Upload zakończony. Informacje:", result);
-    } else {
-      console.log("Upload nie powiódł się.");
-    }
-  } catch (e) {
-    console.error("Całkowity błąd procesu uploadu:", e);
-  }
-}
 
 export default function LoginScreen() {
   const { login } = useAuth();
@@ -27,6 +14,7 @@ export default function LoginScreen() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleLogin = async () => {
     if (!email && !password) {
@@ -46,20 +34,63 @@ export default function LoginScreen() {
       return;
     }
 
+    setIsLoading(true);
+
     try {
       const success = await login(email, password);
       if (success) {
-        uploadBackup();
+        console.log("[LoginScreen] Pomyślnie zalogowano. Rozpoczynam operacje na bazie danych...");
+
+        //sprawdź i przywróć backup (krytyczne, więc await)
+        try {
+          console.log("[LoginScreen] Sprawdzanie i przywracanie backupu...");
+          const restored = await checkAndRestoreBackup();
+          if (restored) {
+            console.log("[LoginScreen] Baza danych została przywrócona z chmury.");
+            // w przyszłości tutaj ustawić jakiś stan globalny lub przekazać informację,
+            // że baza została zmieniona, aby inne części aplikacji mogły na to zareagować - odświeżyć dane
+          } else {
+            console.log("[LoginScreen] Lokalna baza danych jest aktualna lub nie było backupu do przywrócenia.");
+          }
+        } catch (restoreError) {
+          console.error("[LoginScreen] Błąd podczas sprawdzania/przywracania backupu:", restoreError);
+        }
+
+        console.log("[LoginScreen] Nawigacja do /tabs/home");
         router.dismissAll();
         router.replace('/(tabs)/home');
+
+        // czy trzeba wysłać nowy backup
+        const SEVEN_DAYS_IN_MS = 7 * 24 * 60 * 60 * 1000;
+        uploadBackupIfOlderThan(SEVEN_DAYS_IN_MS)
+          .then(uploadStatus => {
+            if (uploadStatus.uploaded) {
+              console.log("[LoginScreen] Nowy backup został wysłany do chmury (w tle).", uploadStatus.reason);
+            } else {
+              console.log("[LoginScreen] Nie było potrzeby wysyłania nowego backupu (w tle).", uploadStatus.reason);
+            }
+          })
+          .catch(uploadError => {
+            console.error("[LoginScreen] Błąd podczas próby warunkowego uploadu backupu (w tle):", uploadError);
+          });
+
       } else {
-        alert('Nieprawidłowe dane!');
+        alert('Nieprawidłowe dane logowania!');
       }
     } catch (error) {
       console.log('[Login] Login error:', error);
       alert('Niepoprawne dane.');
     }
   };
+
+  if (isLoading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center' }]}>
+        <ActivityIndicator size="large" color="#0000ff" />
+        <Text style={{ marginTop: 10 }}>Logowanie i synchronizacja danych...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -68,6 +99,7 @@ export default function LoginScreen() {
         <TextInput
           placeholder="E-mail"
           onChangeText={setEmail}
+          value={email}
           autoCapitalize="none"
           keyboardType="email-address"
           style={styles.input}
@@ -76,14 +108,14 @@ export default function LoginScreen() {
           placeholder="Hasło"
           secureTextEntry
           onChangeText={setPassword}
+          value={password}
           style={styles.input}
         />
-        <Button title="Zaloguj" onPress={handleLogin} />
+        <Button title="Zaloguj" onPress={handleLogin} disabled={isLoading} />
       </View>
     </View>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
