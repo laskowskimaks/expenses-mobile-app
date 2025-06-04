@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { View, Text, TextInput, Button, StyleSheet } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { useRouter } from 'expo-router';
+import { performUpload } from '../services/backupService';
 
 export default function RegisterScreen() {
   const { register } = useAuth();
@@ -38,7 +39,8 @@ export default function RegisterScreen() {
 
       if (result === true) {
         alert('Zarejestrowano pomyślnie!');
-        router.replace('/login');
+        performUpload();
+        router.replace('/(tabs)/home');
       } else if (result.code === 'auth/email-already-in-use') {
         alert('Ten adres e-mail jest już używany!');
       } else if (result.code === 'auth/invalid-email') {
@@ -57,7 +59,7 @@ export default function RegisterScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.formContainer}>
-        <Text style={styles.text}>Rejestracja</Text>
+        <Text style={styles.text}>Rejestracja i logowanie</Text>
         <TextInput
           placeholder='Adres e-mail'
           autoCapitalize='none'
@@ -70,7 +72,7 @@ export default function RegisterScreen() {
           onChangeText={setPassword}
           style={styles.input}
         />
-        <Button style={styles.button} title='Zarejestruj' onPress={handleRegister} />
+        <Button style={styles.button} title='Zarejestruj i zaloguj' onPress={handleRegister} />
       </View>
     </View>
   );

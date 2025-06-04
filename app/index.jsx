@@ -30,7 +30,7 @@ export default function Index() {
 
       <View style={{ width: "80%" }}>
         <Button
-          title="Zarejestruj"
+          title="Zarejestruj i zaloguj"
           onPress={() => {
             router.navigate("/register");
           }}

@@ -16,7 +16,7 @@ async function ensureDbDirectoryExists() {
 }
 
 //funkcja wykonująca faktyczny upload lokalnej bazy danych do Firebase Storage.
-async function performUpload() {
+export async function performUpload() {
     console.log("[BackupService:performUpload] Rozpoczynanie...");
     const storage = getStorage();
     const userId = auth.currentUser?.uid;
@@ -39,7 +39,7 @@ async function performUpload() {
     let fileData = null;
 
     try {
-        const response = await fetch(LOCAL_DB_PATH); 
+        const response = await fetch(LOCAL_DB_PATH);
         if (!response.ok) {
             console.error(`[BackupService:performUpload] Nie udało się odczytać pliku lokalnego: ${response.statusText}`);
             return undefined;
@@ -61,10 +61,10 @@ async function performUpload() {
             contentType: 'application/octet-stream'
         });
         console.log("[BackupService:performUpload] Upload zakończony sukcesem. Plik:", uploadResult.ref.fullPath);
-        
+
         // opcjonalnie: Usuń stare backupy, jeśli jest ich za dużo
         await cleanupOldBackups(userId, MAX_BACKUPS_TO_KEEP);
-        
+
         return uploadResult;
     } catch (error) {
         console.error("[BackupService:performUpload] Błąd podczas uploadu pliku .db do Storage:", error);
@@ -81,7 +81,7 @@ async function cleanupOldBackups(userId, backupsToKeep) {
 
     try {
         const listResult = await listAll(userBackupsRef);
-        
+
         const backups = listResult.items.map(itemRef => {
             const nameParts = itemRef.name.split('_');
             let timestamp = 0;
@@ -143,7 +143,7 @@ export async function uploadBackupIfOlderThan(thresholdInMilliseconds = 7 * 24 *
             if (newestRemoteTimestamp > 0) {
                 console.log(`[ConditionalBackup] Najnowszy znaleziony zdalny backup ma timestamp: ${newestRemoteTimestamp} (${new Date(newestRemoteTimestamp).toISOString()})`);
             } else {
-                 console.log("[ConditionalBackup] Nie znaleziono poprawnie sformatowanych backupów.");
+                console.log("[ConditionalBackup] Nie znaleziono poprawnie sformatowanych backupów.");
             }
         } else {
             console.log("[ConditionalBackup] Brak zdalnych backupów. Należy utworzyć pierwszy backup.");
@@ -164,7 +164,7 @@ export async function uploadBackupIfOlderThan(thresholdInMilliseconds = 7 * 24 *
         console.log(`[ConditionalBackup] Najnowszy backup (lub brak) jest starszy niż próg (lub nie istnieje). Timestamp: ${newestRemoteTimestamp} vs ${thresholdTimestamp}. Rozpoczynam upload.`);
         const uploadResult = await performUpload();
         if (uploadResult) {
-            return { uploaded: true, reason: `Backup was older than threshold (${thresholdInMilliseconds / (1000*60*60*24)} days) or missing.` };
+            return { uploaded: true, reason: `Backup was older than threshold (${thresholdInMilliseconds / (1000 * 60 * 60 * 24)} days) or missing.` };
         } else {
             return { uploaded: false, reason: "Upload process failed." };
         }
@@ -247,7 +247,7 @@ export async function checkAndRestoreBackup() {
                     console.error("[RestoreService] Błąd podczas usuwania starej lokalnej bazy danych:", deleteError);
                 }
             }
-            
+
             await FileSystem.moveAsync({
                 from: downloadResult.uri,
                 to: LOCAL_DB_PATH
@@ -261,7 +261,7 @@ export async function checkAndRestoreBackup() {
 
     } catch (error) {
         if (error.code === 'storage/object-not-found' || (error.message && error.message.includes("No object found"))) {
-             console.warn(`[RestoreService] Katalog dla użytkownika ${userId} jeszcze nie istnieje lub jest pusty. To normalne dla nowych użytkowników lub jeśli nie ma backupów.`);
+            console.warn(`[RestoreService] Katalog dla użytkownika ${userId} jeszcze nie istnieje lub jest pusty. To normalne dla nowych użytkowników lub jeśli nie ma backupów.`);
         } else {
             console.error("[RestoreService] Błąd podczas sprawdzania/przywracania backupu:", error);
         }

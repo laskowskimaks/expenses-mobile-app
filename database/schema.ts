@@ -1,6 +1,6 @@
 import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
 
-export const user = sqliteTable('users', {
+export const users = sqliteTable('users', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   email: text('email').notNull().unique(),
   password: text('password').notNull(),
@@ -8,4 +8,4 @@ export const user = sqliteTable('users', {
 });
 
 // eksportuje typ userów, aby można było go używać w innych częściach aplikacji
-export type User = typeof user.$inferSelect;
+export type User = typeof users.$inferSelect;
