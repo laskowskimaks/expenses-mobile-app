@@ -1,12 +1,11 @@
 import { useState } from 'react';
 import { View, Text, TextInput, Button, StyleSheet } from 'react-native';
 import { useAuth } from '../context/AuthContext';
-import { useRouter } from 'expo-router';
-import { performUpload } from '../services/backupService';
+import { useDb } from '../context/DbContext';
 
 export default function RegisterScreen() {
   const { register } = useAuth();
-  const router = useRouter();
+  const { handleNewRegistration } = useDb();
 
   const [password, setPassword] = useState('');
   const [email, setEmail] = useState('');
@@ -37,22 +36,22 @@ export default function RegisterScreen() {
     try {
       const result = await register(email, password);
 
-      if (result === true) {
+      if (result.success) {
+        console.log("[RegisterScreen] Rejestracja w Firebase udana. Tworzenie nowej lokalnej bazy...");
+        await handleNewRegistration(email, password);
+
         alert('Zarejestrowano pomyślnie!');
-        performUpload();
-        router.replace('/(tabs)/home');
-      } else if (result.code === 'auth/email-already-in-use') {
-        alert('Ten adres e-mail jest już używany!');
-      } else if (result.code === 'auth/invalid-email') {
-        alert('Niepoprawny adres e-mail!');
-      } else if (result.code === 'auth/weak-password') {
-        alert('Hasło jest zbyt słabe!');
+
       } else {
-        alert('Wystąpił błąd. Spróbuj ponownie.');
+        if (result.error.code === 'auth/email-already-in-use') {
+          alert('Ten adres e-mail jest już używany!');
+        } else {
+          alert('Wystąpił błąd rejestracji.');
+        }
       }
     } catch (error) {
-      alert('Wystąpił błąd podczas rejestracji.');
-      console.log('[Registration] Firebase error:', error);
+      alert('Wystąpił błąd krytyczny podczas rejestracji.');
+      console.error('[RegisterScreen] Błąd krytyczny podczas rejestracji:', error);
     }
   };
 

@@ -1,8 +1,6 @@
 import { useState } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, ActivityIndicator } from 'react-native'; // Dodano ActivityIndicator
+import { View, Text, TextInput, Button, StyleSheet, ActivityIndicator } from 'react-native';
 import { useAuth } from '../context/AuthContext';
-import { useRouter } from 'expo-router';
-import { checkAndRestoreBackup, uploadBackupIfOlderThan } from '../services/backupService';
 
 const validateEmail = (email) => {
   return /\S+@\S+\.\S+/.test(email);
@@ -10,7 +8,6 @@ const validateEmail = (email) => {
 
 export default function LoginScreen() {
   const { login } = useAuth();
-  const router = useRouter();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -36,58 +33,23 @@ export default function LoginScreen() {
 
     setIsLoading(true);
 
-    try {
+     try {
       const success = await login(email, password);
       if (success) {
-        console.log("[LoginScreen] Pomyślnie zalogowano. Rozpoczynam operacje na bazie danych...");
-
-        //sprawdź i przywróć backup (krytyczne, więc await)
-        try {
-          console.log("[LoginScreen] Sprawdzanie i przywracanie backupu...");
-          const restored = await checkAndRestoreBackup();
-          if (restored) {
-            console.log("[LoginScreen] Baza danych została przywrócona z chmury.");
-            // w przyszłości tutaj ustawić jakiś stan globalny lub przekazać informację,
-            // że baza została zmieniona, aby inne części aplikacji mogły na to zareagować - odświeżyć dane
-          } else {
-            console.log("[LoginScreen] Lokalna baza danych jest aktualna lub nie było backupu do przywrócenia.");
-          }
-        } catch (restoreError) {
-          console.error("[LoginScreen] Błąd podczas sprawdzania/przywracania backupu:", restoreError);
-        }
-
-        console.log("[LoginScreen] Nawigacja do /tabs/home");
-        router.dismissAll();
-        router.replace('/(tabs)/home');
-
-        // czy trzeba wysłać nowy backup
-        const SEVEN_DAYS_IN_MS = 7 * 24 * 60 * 60 * 1000;
-        uploadBackupIfOlderThan(SEVEN_DAYS_IN_MS)
-          .then(uploadStatus => {
-            if (uploadStatus.uploaded) {
-              console.log("[LoginScreen] Nowy backup został wysłany do chmury (w tle).", uploadStatus.reason);
-            } else {
-              console.log("[LoginScreen] Nie było potrzeby wysyłania nowego backupu (w tle).", uploadStatus.reason);
-            }
-          })
-          .catch(uploadError => {
-            console.error("[LoginScreen] Błąd podczas próby warunkowego uploadu backupu (w tle):", uploadError);
-          });
-
+        console.log("[LoginScreen] Logowanie w Firebase udane. Przekierowuję...");
       } else {
         alert('Nieprawidłowe dane logowania!');
       }
     } catch (error) {
-      console.log('[Login] Login error:', error);
-      alert('Niepoprawne dane.');
+      alert('Wystąpił błąd logowania.');
     }
+    setIsLoading(false);
   };
 
   if (isLoading) {
     return (
       <View style={[styles.container, { justifyContent: 'center' }]}>
         <ActivityIndicator size="large" color="#0000ff" />
-        <Text style={{ marginTop: 10 }}>Logowanie i synchronizacja danych...</Text>
       </View>
     );
   }

@@ -63,7 +63,7 @@ export async function performUpload() {
         console.log("[BackupService:performUpload] Upload zakończony sukcesem. Plik:", uploadResult.ref.fullPath);
 
         // opcjonalnie: Usuń stare backupy, jeśli jest ich za dużo
-        await cleanupOldBackups(userId, MAX_BACKUPS_TO_KEEP);
+        // await cleanupOldBackups(userId, MAX_BACKUPS_TO_KEEP);
 
         return uploadResult;
     } catch (error) {
@@ -89,7 +89,7 @@ async function cleanupOldBackups(userId, backupsToKeep) {
                 timestamp = parseInt(nameParts[2].split('.')[0], 10);
             }
             return { ref: itemRef, name: itemRef.name, timestamp: isNaN(timestamp) ? 0 : timestamp };
-        }).sort((a, b) => b.timestamp - a.timestamp); // sortuj od najnowszego do najstarszego
+        }).sort((a, b) => b.timestamp - a.timestamp); 
 
         if (backups.length > backupsToKeep) {
             const backupsToDelete = backups.slice(backupsToKeep);
@@ -111,8 +111,6 @@ async function cleanupOldBackups(userId, backupsToKeep) {
 }
 
 //sprawdza datę ostatniego zdalnego backupu i jeśli jest starszy niż tydzień (lub nie istnieje), wykonuje nowy backup
-//zwraca: uploaded: boolean, reason: string
-
 export async function uploadBackupIfOlderThan(thresholdInMilliseconds = 7 * 24 * 60 * 60 * 1000) {
     const storage = getStorage();
     const userId = auth.currentUser?.uid;
@@ -175,10 +173,9 @@ export async function uploadBackupIfOlderThan(thresholdInMilliseconds = 7 * 24 *
 }
 
 //sprawdza, czy w Firebase Storage istnieje nowsza wersja bazy danych niż lokalna. Jeśli tak, pobiera ją i zastępuje lokalną bazę
-export async function checkAndRestoreBackup() {
+export async function checkAndRestoreBackup(userIdOverride) {
     const storage = getStorage();
-    const userId = auth.currentUser?.uid;
-
+    const userId = userIdOverride || auth.currentUser?.uid;
     if (!userId) {
         console.error("[RestoreService] Użytkownik nie jest zalogowany. Nie można sprawdzić/przywrócić backupu.");
         return false;

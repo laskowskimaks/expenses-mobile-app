@@ -2,22 +2,26 @@ import { useAuth } from '@/context/AuthContext';
 import { Tabs, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { useDb } from '@/context/DbContext';
 
 export default function TabsLayout() {
-  const { user } = useAuth();
+  const { user, isAuthLoading } = useAuth();
+  const { isLoading: isDbLoading } = useDb();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) {
-      alert('Podaj login i hasło!');
-      console.log('[TabsLayout] User not logged in. Redirecting to login.');
-      router.replace('/login');
+    if (!isAuthLoading && !isDbLoading) {
+      if (!user) {
+        alert('Podaj login i hasło!');
+        console.log('[TabsLayout] User not logged in. Redirecting to login.');
+        router.replace('/login');
+      }
+      setIsLoading(false);
     }
-    setIsLoading(false);
-  }, [user]);
+  }, [user, isAuthLoading, isDbLoading]);
 
-  if (isLoading) {
+  if (isLoading || isAuthLoading) {
     console.log('[TabsLayout] Loading user data...');
     return (
       <View style={styles.loaderContainer}>

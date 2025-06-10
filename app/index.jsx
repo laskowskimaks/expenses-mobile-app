@@ -1,12 +1,8 @@
 import { useRouter } from "expo-router";
-import { Button, Text, View } from "react-native";
-import { useDrizzleStudio } from 'expo-drizzle-studio-plugin';
-import { useSQLiteContext } from "expo-sqlite";
+import { Button, View } from "react-native";
 
 export default function Index() {
   const router = useRouter();
-  const db = useSQLiteContext();
-  useDrizzleStudio(db);
 
   return (
     <View

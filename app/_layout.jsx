@@ -1,30 +1,71 @@
-import { AuthProvider } from '../context/AuthContext';
-import { Stack } from 'expo-router';
-import { Suspense } from 'react';
-import { ActivityIndicator } from 'react-native';
-import { SQLiteProvider, openDatabaseSync } from 'expo-sqlite';
-import { drizzle } from 'drizzle-orm/expo-sqlite';
-import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator';
-import migrations from '@/drizzle/migrations';
+import React, { useEffect } from 'react';
+import { AuthProvider, useAuth } from '../context/AuthContext';
+import { DbProvider, useDb } from '../context/DbContext';
+import { Stack, SplashScreen, useRouter } from 'expo-router';
+import { ActivityIndicator, View } from 'react-native';
 
-export const DATABASE_NAME = 'database.db';
+SplashScreen.preventAutoHideAsync();
 
-export default function RootLayout() {
-  const expoDb = openDatabaseSync(DATABASE_NAME);
-  const db = drizzle(expoDb);
-  const { success, error } = useMigrations(db, migrations);
+function RootLayoutNav() {
+  const { user, isAuthLoading } = useAuth();
+  const { initializeDatabase, clearDatabase, isLoading: isDbLoading } = useDb();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (isAuthLoading) {
+      return;
+    }
+
+    if (isDbLoading) {
+      return;
+    }
+
+    if (user) {
+      console.log('[RootLayoutNav] Użytkownik i baza gotowi. Przekierowuję do /home...');
+      router.replace('/(tabs)/home');
+    } else {
+      console.log('[RootLayoutNav] Użytkownik niezalogowany. Stan nawigacji jest poprawny.');
+    }
+
+  }, [user, isAuthLoading, isDbLoading, router]);
+
+  useEffect(() => {
+    if (!isAuthLoading) {
+      if (user) {
+        console.log('[RootLayoutNav] Stan użytkownika: zalogowany. Inicjalizuję bazę...');
+        initializeDatabase();
+      } else {
+        console.log('[RootLayoutNav] Stan użytkownika: wylogowany. Czyszczę bazę...');
+        clearDatabase();
+      }
+    }
+  }, [user, isAuthLoading, initializeDatabase, clearDatabase]);
+
+  useEffect(() => {
+    if (!isAuthLoading && !isDbLoading) {
+      SplashScreen.hideAsync();
+    }
+  }, [isAuthLoading, isDbLoading]);
+
+  if (isAuthLoading || isDbLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#0000ff" />
+      </View>
+    );
+  }
 
   return (
-    <Suspense fallback={<ActivityIndicator size="large" />}>
-      <SQLiteProvider
-        databaseName={DATABASE_NAME}
-        options={{ enableChangeListener: true }}
-        // onInit={runMigrations}
-        useSuspense>
-        <AuthProvider>
-          <Stack screenOptions={{ headerShown: true }} />
-        </AuthProvider>
-      </SQLiteProvider>
-    </Suspense>
+    <Stack />
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <DbProvider>
+      <AuthProvider>
+        <RootLayoutNav />
+      </AuthProvider>
+    </DbProvider>
   );
 }

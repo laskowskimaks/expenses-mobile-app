@@ -1,14 +1,28 @@
-import { user } from "@/database/schema";
+import { users } from "@/database/schema";
 import { eq } from 'drizzle-orm';
+import { generateSalt, hashPassword } from '../hooks/useHash';
 
-export const createUser = async (db, email, hashedPassword, salt) => {
-
+export const getAllUsers = async (db) => {
   try {
-    await db.insert(user).values({
+    const usersList = await db.select().from(users).all();
+    return usersList;
+  } catch (error) {
+    console.error('[authService] Get all users failed:', error);
+    return [];
+  }
+};
+
+export const createUser = async (db, email, plainPassword) => {
+  try {
+    const salt = generateSalt();
+    const hashedPassword = hashPassword(plainPassword, salt);
+
+    await db.insert(users).values({
       email,
       password: hashedPassword,
       salt,
-    });
+    }).execute();
+
     console.log('[authService] User created:', email);
     return true;
   } catch (error) {
@@ -27,7 +41,6 @@ export const createUser = async (db, email, hashedPassword, salt) => {
 export const getUserByemail = async (db, email) => {
   try {
     const user = await db.select().from(users).where(eq(users.email, email)).get();
-
 
     if (!user) {
       console.log('[authService] No user found with email:', email);

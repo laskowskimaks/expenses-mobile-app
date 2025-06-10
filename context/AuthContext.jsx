@@ -1,102 +1,69 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import { useSQLiteContext } from 'expo-sqlite';
-import { generateSalt, hashPassword } from '../hooks/useHash';
-import { createUser, getUserById, getUserByUsername } from '../services/authService';
 import * as SecureStore from 'expo-secure-store';
 import { router } from 'expo-router';
-import { drizzle } from 'drizzle-orm/expo-sqlite';
-import * as schema from '@/database/schema';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "firebase/auth";
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
 import { auth as firebaseAuth } from '../FirebaseConfig';
-
-const USER_KEY = 'loggedUserId';
 
 export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-
-  const db = useSQLiteContext();
-  const drizzleDb = drizzle(db, { schema });
+  const [isAuthLoading, setAuthIsLoading] = useState(true);
 
   useEffect(() => {
-    void loadUserFromStorage();
+    const unsubscribe = onAuthStateChanged(firebaseAuth, async (firebaseUser) => {
+      // Zalogowany online
+      if (firebaseUser) {
+        console.log('[AuthContext] Użytkownik zalogowany (Firebase):', firebaseUser.email);
+        const userData = { uid: firebaseUser.uid, email: firebaseUser.email };
+        setUser(userData);
+        await SecureStore.setItemAsync('lastUser', JSON.stringify(userData));
+      } else {
+        await SecureStore.deleteItemAsync('lastUser');
+        setUser(null);
+      }
+      setAuthIsLoading(false);
+    });
+
+    return () => unsubscribe(); // Sprzątanie po odmontowaniu komponentu
   }, []);
 
-  const loadUserFromStorage = async () => {
-    try {
-      const storedUser = await SecureStore.getItemAsync(USER_KEY);
-      if (storedUser) {
-        setUser(JSON.parse(storedUser));
-        router.replace('/(tabs)/home');
-      }
-    } catch (error) {
-      console.error('[AuthContext] Load user error:', error);
-    }
-  };
   const register = async (email, password) => {
     try {
       const firebaseAuthResult = await createUserWithEmailAndPassword(firebaseAuth, email, password);
-      const firebaseUser = firebaseAuthResult.user;
-
-      const salt = generateSalt();
-      const hashedPassword = await hashPassword(password, salt);
-
-      await createUser(drizzleDb, email, hashedPassword, salt);
-      console.log('[AuthContext] Firebase & local registration success:', firebaseUser.email);
-
-      return true;
+      return { success: true, user: firebaseAuthResult.user };
     } catch (error) {
-      console.log('[AuthContext] Registration error:', error);
-      return error;
+      console.log('[AuthContext] Błąd rejestracji Firebase:', error);
+      return { success: false, error };
     }
   };
 
-  // const register = async (email, password) => {
-  //   try {
-  //     const firebaseAuthResult = await createUserWithEmailAndPassword(firebaseAuth, email, password);
-  //     const firebaseUser = firebaseAuthResult.user;
-
-  //     await SecureStore.setItemAsync(USER_KEY, firebaseUser.uid);
-  //     setUser({ uid: firebaseUser.uid, email: firebaseUser.email });
-
-  //     console.log('[AuthContext] Firebase registration success:', firebaseUser.email);
-  //     return true;
-  //   } catch (error) {
-  //     console.log('[AuthContext] Firebase registration error:', error);
-  //     return error;
-  //   }
-  // };
-
   const login = async (email, password) => {
+    // loguje w Firebase.
     try {
-      const result = await signInWithEmailAndPassword(firebaseAuth, email, password);
-      const user = result.user;
-      const userData = { uid: user.uid, email: user.email };
-
-      await SecureStore.setItemAsync(USER_KEY, JSON.stringify(userData));
-      setUser(userData);
+      await signInWithEmailAndPassword(firebaseAuth, email, password);
       return true;
     } catch (error) {
-      console.error('[Auth] Firebase login error:', error.code);
-      throw error; // obsłużony w ekranie
+      console.error('[AuthContext] Błąd logowania Firebase:', error.code);
+      return false;
     }
   };
 
   const logout = async () => {
     try {
-      await SecureStore.deleteItemAsync(USER_KEY);
       await signOut(firebaseAuth);
-
+      await SecureStore.deleteItemAsync('lastUser');
       setUser(null);
+      console.log('[AuthContext] Użytkownik wylogowany');
       router.replace('/');
-      console.log('[AuthContext] Firebase logout success');
     } catch (error) {
-      console.log('[AuthContext] Firebase logout error:', error);
+      console.log('[AuthContext] Błąd wylogowania Firebase:', error);
     }
   };
 
-  return <AuthContext.Provider value={{ user, register, login, logout }}>{children}</AuthContext.Provider>;
+  const value = { user, isAuthLoading, register, login, logout };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
 export const useAuth = () => useContext(AuthContext);
