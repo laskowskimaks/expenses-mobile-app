@@ -1,100 +1,115 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import { useSQLiteContext } from 'expo-sqlite';
-import { generateSalt, hashPassword } from '../hooks/useHash';
-import { createUser, getUserById, getUserByUsername } from '../services/authService';
 import * as SecureStore from 'expo-secure-store';
-import { router } from 'expo-router';
-
-const USER_ID_KEY = 'loggedUserId';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail } from "firebase/auth";
+import { auth as firebaseAuth } from '../FirebaseConfig';
+import { performUpload } from '@/services/backupService';
 
 export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const db = useSQLiteContext();
   const [user, setUser] = useState(null);
+  const [isAuthLoading, setAuthIsLoading] = useState(true);
+  const [isLocked, setIsLocked] = useState(true);
+  const [needsPinSetup, setNeedsPinSetup] = useState(false);
 
   useEffect(() => {
-    void loadUserFromStorage();
+    const unsubscribe = onAuthStateChanged(firebaseAuth, async (firebaseUser) => {
+      if (firebaseUser) {
+        console.log('[AuthContext] Użytkownik zalogowany (Firebase):', firebaseUser.email);
+        const userData = { uid: firebaseUser.uid, email: firebaseUser.email };
+        setUser(userData);
+        await SecureStore.setItemAsync('lastUser', JSON.stringify(userData));
+      } else {
+        await SecureStore.deleteItemAsync('lastUser');
+        setNeedsPinSetup(false);
+        setUser(null);
+      }
+      setAuthIsLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
-  const loadUserFromStorage = async () => {
-    try {
-      const storedId = await SecureStore.getItemAsync(USER_ID_KEY);
-      console.log('[AuthContext] Loaded user ID from storage:', storedId);
-
-      if (storedId) {
-        const loadedUser = await getUserById(db, parseInt(storedId));
-        if (loadedUser) {
-          console.log('[AuthContext] Logged in from storage:', loadedUser.username);
-          setUser(loadedUser);
-
-          router.replace('/(tabs)/home');
-        }
-      }
-
-      console.log('[AuthContext] No user found in storage');
-    } catch (error) {
-      console.error('[AuthContext] Error loading user from storage:', error);
+  const lockApp = () => {
+    if (user) {
+      console.log('[AuthContext] Aplikacja zablokowana.');
+      setIsLocked(true);
     }
   };
-  const register = async (username, password) => {
+
+  const unlockApp = () => {
+    console.log('[AuthContext] Aplikacja odblokowana.');
+    setIsLocked(false);
+  };
+
+  const register = async (email, password) => {
     try {
-      const salt = generateSalt();
-      const hashed = await hashPassword(password, salt);
-      const success = await createUser(db, username, hashed, salt);
-  
-      if (success) {
-        console.log('[AuthContext] Registration success');
-        return true;
-      } else {
-        console.log('[AuthContext] Registration failed');
-        return false;
-      }
+      const firebaseAuthResult = await createUserWithEmailAndPassword(firebaseAuth, email, password);
+      setNeedsPinSetup(true);
+
+      return { success: true, user: firebaseAuthResult.user };
     } catch (error) {
-      console.error('[AuthContext] Registration error:', error);
-      return false;
+      let message = 'Wystąpił błąd podczas rejestracji.';
+      if (error.code === 'auth/email-already-in-use') {
+        message = 'Ten adres e-mail jest już używany!';
+      } else {
+        alert('Wystąpił błąd podczas rejestracji.');
+      }
+      console.log('[AuthContext] Błąd rejestracji Firebase:', error);
+      return { success: false, error, message };
     }
   };
-  
-  const login = async (username, password) => {
+
+  const completeRegistration = () => {
+    setNeedsPinSetup(false);
+  };
+
+  const login = async (email, password) => {
     try {
-      const userFromDB = await getUserByUsername(db, username);  
-      if (!userFromDB) {
-        console.log('[AuthContext] Login failed: user not found');
-        return false;
-      }
-  
-      const hashedInput = await hashPassword(password, userFromDB.salt);
-  
-      if (hashedInput === userFromDB.password) {
-        setUser(userFromDB);
-        await SecureStore.setItemAsync(USER_ID_KEY, userFromDB.id.toString());
-  
-        console.log('[AuthContext] Login success:', username);
-        return true;
-      } else {
-        console.log('[AuthContext] Login failed: incorrect password');
-        return false;
-      }
+      await signInWithEmailAndPassword(firebaseAuth, email, password);
+      unlockApp();
+      return { success: true };
     } catch (error) {
-      console.log('[AuthContext] Login error:', error);
-      return false;
+      let message = 'Nieprawidłowe dane logowania.';
+      if (error.code === 'auth/invalid-email') {
+        message = 'Niepoprawny adres e-mail!';
+      } else if (error.code === 'auth/wrong-password') {
+        message = 'Nieprawidłowe hasło!';
+      } else if (error.code === 'auth/user-not-found') {
+        message = 'Nie znaleziono użytkownika o podanym adresie e-mail!';
+      }
+      console.log('[AuthContext] Błąd logowania Firebase:', error.code);
+      return { success: false, error, message };
+    }
+  };
+  const forgotPassword = async (email) => {
+    try {
+      await sendPasswordResetEmail(firebaseAuth, email);
+
+    } catch (error) {
+      console.error("[AuthContext] Błąd wysyłania e-maila resetującego hasło:", error.code);
+      throw error;
     }
   };
 
   const logout = async () => {
     try {
-      await SecureStore.deleteItemAsync(USER_ID_KEY);
-      setUser(null);
-      console.log('[AuthContext] Logged out');
-      router.replace('/');
-      alert('Wylogowano');
+      await performUpload();
+      await signOut(firebaseAuth);
+      await SecureStore.deleteItemAsync('lastUser');
+      console.log('[AuthContext] Użytkownik wylogowany');
     } catch (error) {
-      console.log('[AuthContext] Error during logout:', error);
+      console.log('[AuthContext] Błąd wylogowania Firebase:', error);
+    } finally {
+      setUser(null);
+      setIsLocked(true);
+      setNeedsPinSetup(false);
     }
   };
 
-  return <AuthContext.Provider value={{ user, register, login, logout }}>{children}</AuthContext.Provider>;
+  const value = { user, isAuthLoading, needsPinSetup, register, login, logout, isLocked, lockApp, unlockApp, completeRegistration, forgotPassword };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
 export const useAuth = () => useContext(AuthContext);

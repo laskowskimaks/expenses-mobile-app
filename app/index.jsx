@@ -1,21 +1,12 @@
 import { useRouter } from "expo-router";
-import { Button, Text, View } from "react-native";
+import { Button, View, StyleSheet } from "react-native";
 
 export default function Index() {
   const router = useRouter();
 
   return (
-    <View
-      style={{
-        flex: 1,
-        width: "100%",
-        justifyContent: "center",
-        alignItems: "center",
-        padding: 20,
-        backgroundColor: "#f4f4f4",
-      }}
-    >
-      <View style={{ width: "80%", marginBottom: 20 }}>
+    <View style={styles.container}>
+      <View style={styles.buttonWrapper}>
         <Button
           title="Zaloguj"
           onPress={() => {
@@ -24,9 +15,9 @@ export default function Index() {
         />
       </View>
 
-      <View style={{ width: "80%" }}>
+      <View style={styles.buttonWrapper}>
         <Button
-          title="Zarejestruj"
+          title="Zarejestruj i zaloguj"
           onPress={() => {
             router.navigate("/register");
           }}
@@ -35,3 +26,18 @@ export default function Index() {
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    width: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+    backgroundColor: "#f4f4f4",
+  },
+  buttonWrapper: {
+    width: "80%",
+    marginBottom: 20,
+  },
+});
