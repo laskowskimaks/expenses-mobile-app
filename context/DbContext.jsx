@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useCallback, useRef } from 'react';
+import React, { createContext, useState, useContext, useCallback, useRef, useMemo } from 'react';
 import { drizzle } from 'drizzle-orm/expo-sqlite';
 import * as FileSystem from 'expo-file-system';
 import * as schema from '@/database/schema';
@@ -18,46 +18,77 @@ export const DbProvider = ({ children }) => {
     const [isLoading, setIsLoading] = useState(false);
 
     const sqliteConnectionRef = useRef(null);
+    const isClearingRef = useRef(false);
 
     const clearDatabase = useCallback(async () => {
-        setIsLoading(true);
-        console.log('[DbContext] Zamykanie i czyszczenie bazy danych...');
-
-        if (sqliteConnectionRef.current) {
-            sqliteConnectionRef.current.closeSync();
-            console.log('[DbContext] Połączenie z bazą zostało zamknięte.');
+        if (!db) {
+            console.log('[DbContext] Brak instancji DB do wyczyszczenia, operacja pominięta.');
+            return;
         }
-        setDb(null);
-        sqliteConnectionRef.current = null;
+
+        if (isClearingRef.current) {
+            console.log('[DbContext] clearDatabase już trwa, pomijam.');
+            return;
+        }
+        isClearingRef.current = true;
+        setIsLoading(true);
 
         try {
+            if (sqliteConnectionRef.current) {
+                console.log('[DbContext] Zamykanie istniejącego połączenia z bazą...');
+                try {
+                    sqliteConnectionRef.current.closeSync();
+                    console.log('[DbContext] Połączenie z bazą zostało zamknięte.');
+                } catch (e) {
+                    console.error('[DbContext] Błąd podczas zamykania połączenia (lub było już zamknięte):', e.message);
+                }
+            } else {
+                console.log('[DbContext] Brak aktywnego połączenia do zamknięcia, kontynuuję.');
+            }
+            
+            setDb(null);
+            sqliteConnectionRef.current = null;
+
             await FileSystem.deleteAsync(DB_PATH, { idempotent: true });
             console.log('[DbContext] Lokalny plik bazy danych usunięty.');
+
         } catch (e) {
-            console.error('[DbContext] Błąd podczas usuwania pliku bazy:', e);
+            console.error('[DbContext] Błąd podczas czyszczenia bazy:', e);
+        } finally {
+            setIsLoading(false);
+            isClearingRef.current = false;
         }
+    }, [db]);
 
-        setIsLoading(false);
-    }, []);
+    const isInitializingRef = useRef(false);
 
-    const initializeDatabase = useCallback(async () => {
+    const initializeDatabase = useCallback(async (uid, skipRestore = false) => {
+        if (isInitializingRef.current) {
+            console.log('[DbContext] initializeDatabase już trwa, pomijam.');
+            return;
+        }
+        isInitializingRef.current = true;
+
         setIsLoading(true);
         console.log('[DbContext] Inicjalizacja bazy danych po logowaniu...');
 
         if (sqliteConnectionRef.current) {
-            sqliteConnectionRef.current.closeSync();
+            try {
+                sqliteConnectionRef.current.closeSync();
+            } catch (e) {
+                console.log("[DbContext] Nie udało się zamknąć starego połączenia:", e);
+            }
         }
         setDb(null);
         sqliteConnectionRef.current = null;
 
         try {
-            await checkAndRestoreBackup();
-            const newSqliteConn = openDatabaseSync(DATABASE_NAME);
-            const newDrizzleDb = drizzle(newSqliteConn, { schema });
+            if (!skipRestore) {
+                console.log('[DbContext] Sprawdzanie i przywracanie kopii zapasowej bazy danych...');
+                await checkAndRestoreBackup(uid);
+            }
 
-            console.log('[DbContext] Uruchamianie migracji...');
-            await migrate(newDrizzleDb, migrations);
-            console.log('[DbContext] Migracje zakończone sukcesem.');
+            const { newSqliteConn, newDrizzleDb } = await _openAndMigrateDb();
 
             sqliteConnectionRef.current = newSqliteConn;
             setDb(newDrizzleDb);
@@ -68,6 +99,7 @@ export const DbProvider = ({ children }) => {
             await clearDatabase();
         }
         setIsLoading(false);
+        isInitializingRef.current = false;
     }, [clearDatabase]);
 
     const handleNewRegistration = useCallback(async (email, password) => {
@@ -77,12 +109,7 @@ export const DbProvider = ({ children }) => {
         await clearDatabase();
 
         try {
-            const newSqliteConn = openDatabaseSync(DATABASE_NAME);
-            const newDrizzleDb = drizzle(newSqliteConn, { schema });
-
-            console.log('[DbContext] Uruchamianie migracji na nowej bazie...');
-            await migrate(newDrizzleDb, migrations);
-            console.log('[DbContext] Migracje zakończone sukcesem, tabele utworzone.');
+            const { newDrizzleDb, newSqliteConn } = await _openAndMigrateDb();
 
             const created = await createUser(newDrizzleDb, email, password);
             if (!created) {
@@ -95,15 +122,42 @@ export const DbProvider = ({ children }) => {
             console.log('[DbContext] Nowa, pusta baza danych utworzona i uzupełniona.');
 
             await performUpload();
+
         } catch (e) {
             console.error('[DbContext] Krytyczny błąd podczas tworzenia nowej bazy:', e);
             setDb(null);
             sqliteConnectionRef.current = null;
+        } finally {
+            setIsLoading(false);
         }
-        setIsLoading(false);
+
     }, [clearDatabase]);
 
-    const value = { db, isLoading, initializeDatabase, clearDatabase, handleNewRegistration };
+
+    const _openAndMigrateDb = async () => {
+        console.log('[DbContext-Helper] Otwieranie połączenia i uruchamianie migracji...');
+        try {
+            const newSqliteConn = openDatabaseSync(DATABASE_NAME);
+            const newDrizzleDb = drizzle(newSqliteConn, { schema });
+
+            console.log('[DbContext-Helper] Uruchamianie migracji...');
+            await migrate(newDrizzleDb, migrations);
+            console.log('[DbContext-Helper] Migracje zakończone sukcesem.');
+
+            return { newSqliteConn, newDrizzleDb };
+        } catch (e) {
+            console.error('[DbContext-Helper] Błąd podczas otwierania/migracji bazy:', e);
+            throw e;
+        }
+    };
+
+    const value = useMemo(() => ({
+        db,
+        isLoading,
+        initializeDatabase,
+        clearDatabase,
+        handleNewRegistration
+    }), [db, isLoading, initializeDatabase, clearDatabase, handleNewRegistration]);
 
     return <DbContext.Provider value={value}>{children}</DbContext.Provider>;
 };

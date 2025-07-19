@@ -1,58 +1,48 @@
 import { useState } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, Button, StyleSheet, Alert, Pressable } from 'react-native';
 import { useAuth } from '../context/AuthContext';
-
-const validateEmail = (email) => {
-  return /\S+@\S+\.\S+/.test(email);
-};
+import { validateCredentials } from '@/utils/validation';
+import { useNetworkStatus } from '../context/NetworkContext';
+import { useRouter } from 'expo-router';
 
 export default function LoginScreen() {
   const { login } = useAuth();
+  const { isConnected } = useNetworkStatus();
+  const router = useRouter();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const handleLogin = async () => {
-    if (!email && !password) {
-      alert('Podaj e-mail i hasło!');
+    if (!isConnected) {
+      alert('Brak połączenia z internetem. Sprawdź ustawienia sieci i spróbuj ponownie.');
       return;
-    } else if (!email) {
-      alert('Wprowadź adres e-mail!');
-      return;
-    } else if (!validateEmail(email)) {
-      alert('Niepoprawny adres e-mail!');
-      return;
-    } else if (!password) {
-      alert('Wprowadź hasło!');
-      return;
-    } else if (password.length < 6) {
-      alert('Hasło musi mieć co najmniej 6 znaków!');
+    }
+
+    const validationResult = validateCredentials(email, password);
+    if (!validationResult.isValid) {
+      Alert.alert('Błąd walidacji: ', validationResult.message);
       return;
     }
 
     setIsLoading(true);
 
-     try {
-      const success = await login(email, password);
-      if (success) {
-        console.log("[LoginScreen] Logowanie w Firebase udane. Przekierowuję...");
+    try {
+      const result = await login(email, password);
+      if (result.success) {
+        console.log("[LoginScreen] Logowanie udane. Czekam na przekierowanie z _layout...");
       } else {
-        alert('Nieprawidłowe dane logowania!');
+        alert(result.message || 'Nieprawidłowe dane logowania!');
       }
     } catch (error) {
-      alert('Wystąpił błąd logowania.');
+      alert('Nieprawidłowe dane logowania.');
+      console.log("[LoginScreen] Błąd logowania:", error);
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
-  };
 
-  if (isLoading) {
-    return (
-      <View style={[styles.container, { justifyContent: 'center' }]}>
-        <ActivityIndicator size="large" color="#0000ff" />
-      </View>
-    );
-  }
+  };
 
   return (
     <View style={styles.container}>
@@ -73,7 +63,11 @@ export default function LoginScreen() {
           value={password}
           style={styles.input}
         />
-        <Button title="Zaloguj" onPress={handleLogin} disabled={isLoading} />
+        <Button title="Zaloguj" onPress={handleLogin} disabled={isLoading || !isConnected} />
+        <Pressable onPress={() => router.push('/forgotPassword')} style={styles.forgotPasswordContainer}>
+          <Text style={styles.forgotPasswordText}>Zapomniałem hasła</Text>
+        </Pressable>
+        {!isConnected && <Text style={styles.offlineText}>Logowanie niemożliwe w trybie offline.</Text>}
       </View>
     </View>
   );
@@ -107,4 +101,17 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 5,
   },
+  offlineText: {
+    textAlign: 'center',
+    color: 'gray',
+    marginTop: 10
+  },
+  forgotPasswordContainer: {
+    marginTop: 15,
+    alignItems: 'center',
+  },
+  forgotPasswordText: {
+    color: '#007BFF',
+    textDecorationLine: 'underline',
+  }
 });

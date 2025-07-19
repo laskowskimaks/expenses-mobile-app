@@ -1,55 +1,58 @@
 import { useState } from 'react';
-import { View, Text, TextInput, Button, StyleSheet } from 'react-native';
+import { View, Text, TextInput, Button, StyleSheet, Alert } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { useDb } from '../context/DbContext';
+import { useNetworkStatus } from '../context/NetworkContext';
+import { validateCredentials } from '@/utils/validation';
+
 
 export default function RegisterScreen() {
   const { register } = useAuth();
   const { handleNewRegistration } = useDb();
+  const { isConnected } = useNetworkStatus();
 
   const [password, setPassword] = useState('');
   const [email, setEmail] = useState('');
-
-  const validateEmail = (email) => {
-    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return re.test(email.toLowerCase());
-  };
+  const [isRegistering, setIsRegistering] = useState(false);
 
   const handleRegister = async () => {
-    if (!email && !password) {
-      alert('Podaj e-mail i hasło!');
-      return;
-    } else if (!email) {
-      alert('Wprowadź adres e-mail!');
-      return;
-    } else if (!validateEmail(email)) {
-      alert('Niepoprawny adres e-mail!');
-      return;
-    } else if (!password) {
-      alert('Wprowadź hasło!');
-      return;
-    } else if (password.length < 6) {
-      alert('Hasło musi mieć co najmniej 6 znaków!');
+    if (!isConnected) {
+      alert('Brak połączenia z internetem. Sprawdź ustawienia sieci i spróbuj ponownie.');
       return;
     }
 
+    const validationResult = validateCredentials(email, password);
+    if (!validationResult.isValid) {
+      Alert.alert('Błąd walidacji', validationResult.message);
+      return;
+    }
+
+    setIsRegistering(true);
     try {
-      const result = await register(email, password);
+      const firebaseResult  = await register(email, password);
 
-      if (result.success) {
+      if (firebaseResult.success) {
         console.log("[RegisterScreen] Rejestracja w Firebase udana. Tworzenie nowej lokalnej bazy...");
-        await handleNewRegistration(email, password);
+            try {
+            await handleNewRegistration(email, password);
+            } catch (err) {
+            setIsRegistering(false);
+            alert('Błąd podczas inicjalizacji lokalnej bazy.');
+            console.error('[RegisterScreen] Błąd podczas handleNewRegistration:', err);
+            return;
+            }
 
-        alert('Zarejestrowano pomyślnie!');
-
+        console.log("[RegisterScreen] Rejestracja i inicjalizacja bazy zakończona. _layout.jsx przejmuje nawigację.");
       } else {
-        if (result.error.code === 'auth/email-already-in-use') {
+        if (firebaseResult.error.code === 'auth/email-already-in-use') {
           alert('Ten adres e-mail jest już używany!');
         } else {
           alert('Wystąpił błąd rejestracji.');
         }
+        setIsRegistering(false);
       }
     } catch (error) {
+      setIsRegistering(false);
       alert('Wystąpił błąd krytyczny podczas rejestracji.');
       console.error('[RegisterScreen] Błąd krytyczny podczas rejestracji:', error);
     }
@@ -71,7 +74,8 @@ export default function RegisterScreen() {
           onChangeText={setPassword}
           style={styles.input}
         />
-        <Button style={styles.button} title='Zarejestruj i zaloguj' onPress={handleRegister} />
+        <Button style={styles.button} title='Zarejestruj i zaloguj' onPress={handleRegister} disabled={isRegistering || !isConnected} />
+        {!isConnected && <Text style={styles.offlineText}>Rejestracja niemożliwa w trybie offline.</Text>}
       </View>
     </View>
   );
@@ -106,4 +110,9 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 5,
   },
+  offlineText: {
+    textAlign: 'center',
+    color: 'gray',
+    marginTop: 10
+  }
 });

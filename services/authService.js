@@ -1,37 +1,38 @@
 import { users } from "@/database/schema";
 import { eq } from 'drizzle-orm';
-import { generateSalt, hashPassword } from '../hooks/useHash';
+import { generateSalt, hashData } from '../utils/hashUtils';
 
 export const getAllUsers = async (db) => {
   try {
     const usersList = await db.select().from(users).all();
     return usersList;
   } catch (error) {
-    console.error('[authService] Get all users failed:', error);
+    console.error('[authService] Pobieranie wszystkich użytkowników nie powiodło się:', error);
     return [];
   }
 };
 
 export const createUser = async (db, email, plainPassword) => {
   try {
-    const salt = generateSalt();
-    const hashedPassword = hashPassword(plainPassword, salt);
+    const passwordSalt = generateSalt();
+    const hashedPassword = await hashData(plainPassword, passwordSalt);
 
     await db.insert(users).values({
       email,
       password: hashedPassword,
-      salt,
+      passwordSalt,
     }).execute();
 
-    console.log('[authService] User created:', email);
+    console.log('[authService] Użytkownik utworzony:', email);
     return true;
   } catch (error) {
-    console.error('[authService] Create user failed:', error);
+    console.error('[authService] Tworzenie użytkownika nie powiodło się:', error);
+
     if (error.message.includes('UNIQUE constraint failed')) {
-      console.log('[authService] email already registered:', email);
+      console.log('[authService] email już zarejestrowany:', email);
       alert('Nazwa użytkownika już zajęta');
     } else {
-      console.log('[authService] Create user error:', error);
+      console.log('[authService] Błąd podczas tworzenia użytkownika:', error);
       alert('Wystąpił błąd podczas rejestracji.');
     }
     return false;
@@ -43,13 +44,13 @@ export const getUserByemail = async (db, email) => {
     const user = await db.select().from(users).where(eq(users.email, email)).get();
 
     if (!user) {
-      console.log('[authService] No user found with email:', email);
+      console.log('[authService] Nie znaleziono użytkownika o emailu:', email);
     } else {
-      console.log('[authService] User fetched:', email);
+      console.log('[authService] Użytkownik pobrany:', email);
     }
     return user;
   } catch (error) {
-    console.log('[authService] Get user failed:', error);
+    console.log('[authService] Pobieranie użytkownika nie powiodło się:', error);
     return null;
   }
 };
@@ -58,13 +59,13 @@ export const getUserById = async (db, id) => {
   try {
     const user = await db.select().from(users).where(eq(users.id, id)).get();
     if (!user) {
-      console.log('[authService] No user found with id:', id);
+      console.log('[authService] Nie znaleziono użytkownika o id:', id);
     } else {
-      console.log('[authService] User fetched by id:', id);
+      console.log('[authService] Użytkownik pobrany po id:', id);
     }
     return user;
   } catch (error) {
-    console.log('[authService] Get user by id failed:', error);
+    console.log('[authService] Pobieranie użytkownika po id nie powiodło się:', error);
     return null;
   }
 };

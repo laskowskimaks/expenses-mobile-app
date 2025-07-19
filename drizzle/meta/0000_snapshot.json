@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "c7f92410-f429-4939-92cb-3168fe44fa4b",
+  "id": "5dc29d60-b6f7-40d4-995a-c8a61c33c42c",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "users": {
@@ -28,11 +28,25 @@
           "notNull": true,
           "autoincrement": false
         },
-        "salt": {
-          "name": "salt",
+        "passwordSalt": {
+          "name": "passwordSalt",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false
+        },
+        "pin": {
+          "name": "pin",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "pinSalt": {
+          "name": "pinSalt",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         }
       },

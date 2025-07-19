@@ -4,8 +4,7 @@ export const users = sqliteTable('users', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   email: text('email').notNull().unique(),
   password: text('password').notNull(),
-  salt: text('salt').notNull(),
+  passwordSalt: text('passwordSalt').notNull(),
+  pin: text('pin'),
+  pinSalt: text('pinSalt'),
 });
-
-// eksportuje typ userów, aby można było go używać w innych częściach aplikacji
-export type User = typeof users.$inferSelect;
