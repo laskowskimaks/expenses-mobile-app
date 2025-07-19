@@ -4,7 +4,6 @@ import { auth } from '@/FirebaseConfig';
 
 const LOCAL_DB_DIR = FileSystem.documentDirectory + 'SQLite/';
 const LOCAL_DB_PATH = LOCAL_DB_DIR + 'database.db';
-//const MAX_BACKUPS_TO_KEEP = 5;
 
 //funkcja zapewniająca, że katalog SQLite istnieje lokalnie.
 async function ensureDbDirectoryExists() {

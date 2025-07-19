@@ -16,12 +16,12 @@ export default function PinCheckingScreen() {
 
     const handleCheckPin = async () => {
         if (!pin || pin.length !== 4) {
-            alert('Błąd', 'PIN musi składać się z 4 cyfr.');
+            Alert.alert('Błąd', 'PIN musi składać się z 4 cyfr.');
             return;
         }
 
         if (!db || !user) {
-            alert('Błąd', 'Aplikacja nie jest gotowa. Spróbuj ponownie.');
+            Alert.alert('Błąd', 'Aplikacja nie jest gotowa. Spróbuj ponownie.');
             return;
         }
 

@@ -21,7 +21,7 @@ export default function PinSettingScreen() {
     setIsSaving(true);
 
     if (pinToSave && (pinToSave.length !== 4 || isNaN(pinToSave))) {
-      alert('Błąd', 'PIN musi mieć dokładnie 4 cyfry!');
+      Alert.alert('Błąd', 'PIN musi mieć dokładnie 4 cyfry!');
       setIsSaving(false);
       return;
     }
