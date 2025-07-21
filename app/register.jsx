@@ -5,7 +5,6 @@ import { useDb } from '../context/DbContext';
 import { useNetworkStatus } from '../context/NetworkContext';
 import { validateCredentials } from '@/utils/validation';
 
-
 export default function RegisterScreen() {
   const { register } = useAuth();
   const { handleNewRegistration } = useDb();
@@ -29,22 +28,23 @@ export default function RegisterScreen() {
 
     setIsRegistering(true);
     try {
-      const firebaseResult  = await register(email, password);
+      const firebaseResult = await register(email, password);
 
-      if (firebaseResult.success) {
+      if (firebaseResult.success && firebaseResult.user) {
         console.log("[RegisterScreen] Rejestracja w Firebase udana. Tworzenie nowej lokalnej bazy...");
-            try {
-            await handleNewRegistration(email, password);
-            } catch (err) {
-            setIsRegistering(false);
-            alert('Błąd podczas inicjalizacji lokalnej bazy.');
-            console.error('[RegisterScreen] Błąd podczas handleNewRegistration:', err);
-            return;
-            }
+        const userId = firebaseResult.user.uid;
+        try {
+          await handleNewRegistration(userId, email, password);
+        } catch (err) {
+          setIsRegistering(false);
+          alert('Błąd podczas inicjalizacji lokalnej bazy.');
+          console.error('[RegisterScreen] Błąd podczas handleNewRegistration:', err);
+          return;
+        }
 
         console.log("[RegisterScreen] Rejestracja i inicjalizacja bazy zakończona. _layout.jsx przejmuje nawigację.");
       } else {
-        if (firebaseResult.error.code === 'auth/email-already-in-use') {
+        if (firebaseResult.error?.code === 'auth/email-already-in-use') {
           alert('Ten adres e-mail jest już używany!');
         } else {
           alert('Wystąpił błąd rejestracji.');

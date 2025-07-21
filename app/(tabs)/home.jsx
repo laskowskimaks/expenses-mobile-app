@@ -1,26 +1,27 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { View, Text, Button, ScrollView, ActivityIndicator } from 'react-native';
-import { getAllUsers } from '@/services/authService';
 import { useDb } from '@/context/DbContext';
+import { getAllSettingsAsObject } from '@/services/authService';
 
 export default function HomeScreen() {
   const { user, logout } = useAuth();
-  const [users, setUsers] = useState([]);
   const { db } = useDb();
+  const [currentUserData, setCurrentUserData] = useState(null);
 
   useEffect(() => {
-    const fetchUsers = async () => {
+    const fetchUserData = async () => {
       if (db) {
         console.log("[HomeScreen] Instancja bazy dostępna, pobieram dane...");
-        const allUsers = await getAllUsers(db);
-        setUsers(allUsers);
+        const settingsObject = await getAllSettingsAsObject(db);
+        setCurrentUserData(settingsObject);
       } else {
-        setUsers([]);
+        setCurrentUserData(null);
       }
     };
-    fetchUsers();
+    fetchUserData();
   }, [db]);
+
 
   if (!user) {
     return (
@@ -46,12 +47,6 @@ export default function HomeScreen() {
       </View>
       <View style={{ marginTop: 30 }}>
         <Text style={{ fontWeight: 'bold', marginBottom: 10 }}>Lista użytkowników:</Text>
-        {users.map(u => (
-          <View key={u.id}>
-            <Text>{u.email}</Text>
-            <Text>{u.pin ? `PIN: ${u.pin}` : 'Brak PIN'}</Text>
-          </View>
-        ))}
       </View>
     </ScrollView>
   );

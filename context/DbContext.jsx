@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useCallback, useRef, useMemo } from 'react';
+import React, { createContext, useState, useContext, useCallback, useRef, useMemo, useEffect } from 'react';
 import { drizzle } from 'drizzle-orm/expo-sqlite';
 import * as FileSystem from 'expo-file-system';
 import * as schema from '@/database/schema';
@@ -7,6 +7,7 @@ import { migrate } from 'drizzle-orm/expo-sqlite/migrator';
 import migrations from '@/drizzle/migrations';
 import { createUser } from '@/services/authService';
 import { openDatabaseSync } from 'expo-sqlite';
+import StudioInitializer from '@/database/StudioInitializer';
 
 export const DATABASE_NAME = 'database.db';
 const DB_PATH = `${FileSystem.documentDirectory}SQLite/${DATABASE_NAME}`;
@@ -19,6 +20,8 @@ export const DbProvider = ({ children }) => {
 
     const sqliteConnectionRef = useRef(null);
     const isClearingRef = useRef(false);
+
+
 
     const clearDatabase = useCallback(async () => {
         if (!db) {
@@ -45,7 +48,7 @@ export const DbProvider = ({ children }) => {
             } else {
                 console.log('[DbContext] Brak aktywnego połączenia do zamknięcia, kontynuuję.');
             }
-            
+
             setDb(null);
             sqliteConnectionRef.current = null;
 
@@ -94,6 +97,8 @@ export const DbProvider = ({ children }) => {
             setDb(newDrizzleDb);
             console.log('[DbContext] Nowe połączenie z bazą danych zostało utworzone.');
 
+
+
         } catch (e) {
             console.error('[DbContext] Krytyczny błąd podczas inicjalizacji bazy:', e);
             await clearDatabase();
@@ -102,7 +107,7 @@ export const DbProvider = ({ children }) => {
         isInitializingRef.current = false;
     }, [clearDatabase]);
 
-    const handleNewRegistration = useCallback(async (email, password) => {
+    const handleNewRegistration = useCallback(async (userId, email, password) => {
         setIsLoading(true);
         console.log(`[DbContext] Inicjalizacja bazy dla nowego użytkownika: ${email}`);
 
@@ -111,7 +116,7 @@ export const DbProvider = ({ children }) => {
         try {
             const { newDrizzleDb, newSqliteConn } = await _openAndMigrateDb();
 
-            const created = await createUser(newDrizzleDb, email, password);
+            const created = await createUser(newDrizzleDb, userId, email, password);
             if (!created) {
                 throw new Error("Nie udało się dodać użytkownika do lokalnej bazy danych.");
             }
@@ -137,7 +142,7 @@ export const DbProvider = ({ children }) => {
     const _openAndMigrateDb = async () => {
         console.log('[DbContext-Helper] Otwieranie połączenia i uruchamianie migracji...');
         try {
-            const newSqliteConn = openDatabaseSync(DATABASE_NAME);
+            const newSqliteConn = openDatabaseSync(DATABASE_NAME, { enableChangeListener: true });
             const newDrizzleDb = drizzle(newSqliteConn, { schema });
 
             console.log('[DbContext-Helper] Uruchamianie migracji...');
@@ -159,7 +164,13 @@ export const DbProvider = ({ children }) => {
         handleNewRegistration
     }), [db, isLoading, initializeDatabase, clearDatabase, handleNewRegistration]);
 
-    return <DbContext.Provider value={value}>{children}</DbContext.Provider>;
+    return <DbContext.Provider value={value}>
+        {/* Uruchom Drizzle Studio tylko w DEV i gdy połączenie istnieje */}
+        {__DEV__ && sqliteConnectionRef.current && (
+            <StudioInitializer sqliteConn={sqliteConnectionRef.current} />
+        )}
+        {children}
+    </DbContext.Provider>;
 };
 
 export const useDb = () => useContext(DbContext);

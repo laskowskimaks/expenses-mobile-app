@@ -1,22 +1,22 @@
 import React, { useState } from 'react';
 import { eq } from 'drizzle-orm';
-import { useLocalSearchParams } from 'expo-router';
 import { View, Text, TextInput, Button, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { useDb } from '../context/DbContext';
 import { useAuth } from '../context/AuthContext';
-import { users } from '@/database/schema';
 import { generateSalt, hashData } from '@/utils/hashUtils';
+import { deleteSetting, upsertSetting } from '@/services/authService';
 
 export default function PinSettingScreen() {
   const { db } = useDb();
   const { completeRegistration, unlockApp } = useAuth();
-  const { email } = useLocalSearchParams();
 
   const [pin, setPin] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
   const handleFinish = async (pinToSave) => {
-    if (isSaving) return;
+    if (isSaving) {
+      return;
+    }
 
     setIsSaving(true);
 
@@ -30,9 +30,13 @@ export default function PinSettingScreen() {
       if (pinToSave) {
         const pinSalt = generateSalt();
         const hashedPin = await hashData(pinToSave, pinSalt);
-        await db.update(users).set({ pin: hashedPin, pinSalt }).where(eq(users.email, email)).execute();
+        await upsertSetting(db, 'pin', hashedPin);
+        await upsertSetting(db, 'pinSalt', pinSalt);
+
         console.log('[PinSetting] PIN zapisany!');
       } else {
+        await deleteSetting(db, 'pin');
+        await deleteSetting(db, 'pinSalt');
         console.log('[PinSetting] Użytkownik pominął ustawianie PINu.');
       }
 

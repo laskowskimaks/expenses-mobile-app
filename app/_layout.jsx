@@ -4,7 +4,7 @@ import { DbProvider, useDb } from '../context/DbContext';
 import { Stack, SplashScreen, useRouter, usePathname } from 'expo-router';
 import { ActivityIndicator, View, AppState, Text, StyleSheet } from 'react-native';
 import { NetworkProvider, useNetworkStatus } from '@/context/NetworkContext';
-import { getUserByemail } from '@/services/authService';
+import { getHashedPin } from '@/services/authService';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -15,7 +15,7 @@ const OfflineBanner = () => (
 );
 
 function RootLayoutNav() {
-  const { user, isAuthLoading, isLocked, lockApp, unlockApp, needsPinSetup, completeRegistration } = useAuth();
+  const { user, isAuthLoading, isLocked, lockApp, unlockApp, needsPinSetup } = useAuth();
   const { isConnected } = useNetworkStatus();
   const { db, initializeDatabase, clearDatabase, isLoading: isDbLoading } = useDb();
 
@@ -62,7 +62,7 @@ function RootLayoutNav() {
       // Jeśli trwa proces rejestracji (ustawianie PINu)
       if (needsPinSetup) {
         if (pathname !== '/pinSetting') {
-          router.replace({ pathname: '/pinSetting', params: { email: user.email } });
+          router.replace('/pinSetting');
         }
         await SplashScreen.hideAsync();
         return;
@@ -78,8 +78,8 @@ function RootLayoutNav() {
 
       // Jeśli aplikacja jest zablokowana PINem
       if (isLocked) {
-        const dbUser = await getUserByemail(db, user.email);
-        if (dbUser?.pin) {
+        const storedPin = await getHashedPin(db);
+        if (storedPin) {
           if (pathname !== '/pinChecking') {
             router.push('/pinChecking');
           }
