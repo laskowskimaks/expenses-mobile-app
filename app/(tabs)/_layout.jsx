@@ -1,11 +1,12 @@
 import { Tabs } from 'expo-router';
+import CustomTabBar from '@/components/CustomTabBar'; // Upewnij się, że ścieżka jest poprawna
 
 export default function TabsLayout() {
-
   return (
     <Tabs
+      tabBar={(props) => <CustomTabBar {...props} />}
       screenOptions={{
-        headerShown: true,
+        headerShown: false,
       }}
     >
       <Tabs.Screen name='home' />
