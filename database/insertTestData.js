@@ -1,10 +1,11 @@
 import { loyaltyCards, periodicTransactions, transactions } from '@/database/schema';
+import { getCurrentTimestamp } from '@/utils/dateUtils';
 
 export const insertTestData = async (db) => {
   try {
     console.log('[TestData] Rozpoczynam dodawanie testowych danych...');
 
-    const currentTimestamp = Math.floor(Date.now() / 1000);
+    const currentTimestamp = getCurrentTimestamp();
 
     // 1. Loyalty Cards
     const loyaltyCardsData = [

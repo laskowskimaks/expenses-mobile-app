@@ -1,7 +1,8 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { formatCurrency, formatDate } from '@/services/transactionService';
+import { formatCurrency} from '@/services/transactionService';
+import { formatDate } from '@/utils/dateUtils';
 
 const TransactionItem = ({ transaction }) => {
   const isExpense = transaction.amount < 0;

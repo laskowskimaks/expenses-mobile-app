@@ -123,7 +123,7 @@ export const processPeriodicTransactions = async (db) => {
     }
 };
 
-// Obliczanie następną datę wystąpienia dla transakcji okresowej
+// Obliczanie następnej daty wystąpienia dla transakcji okresowej
 const calculateNextOccurrence = (currentTimestamp, interval, unit) => {
     const currentDate = new Date(currentTimestamp * 1000);
     let nextDate = new Date(currentDate);

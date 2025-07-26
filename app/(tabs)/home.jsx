@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { View, Text, Button, ScrollView, ActivityIndicator, StyleSheet, FlatList, RefreshControl } from 'react-native';
+import { View, Text, Button, ActivityIndicator, StyleSheet, FlatList, RefreshControl, Alert } from 'react-native';
 import { useDb } from '@/context/DbContext';
 import { getAllSettingsAsObject } from '@/services/authService';
 import { insertTestData } from '@/database/insertTestData';
 import TransactionItem from '@/components/TransactionItem';
 import { getAllTransactionsSorted } from '@/services/transactionService';
-import { getLastCheckInfo } from '@/utils/periodicChecker';
+import { getLastCheckInfo, resetPeriodicCheckTime } from '@/utils/periodicChecker';
 import { processPeriodicTransactions } from '@/services/periodicTransactionService';
 
 export default function HomeScreen() {

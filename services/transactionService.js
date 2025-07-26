@@ -1,4 +1,4 @@
-import { transactions, periodicTransactions, categories } from '@/database/schema';
+import { transactions, categories } from '@/database/schema';
 import { eq, desc, sql } from 'drizzle-orm';
 
 export const getAllTransactionsSorted = async (db) => {
@@ -39,24 +39,3 @@ export const formatCurrency = (amount) => {
   }).format(amount);
 };
 
-export const formatDate = (timestamp) => {
-  if (!timestamp || typeof timestamp !== 'number') {
-    return 'Brak daty';
-  }
-  
-  try {
-    return new Intl.DateTimeFormat('pl-PL', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
-    }).format(new Date(timestamp * 1000));
-  } catch (error) {
-    console.error('[formatDate] Błąd formatowania:', error);
-    return 'Błąd formatowania';
-  }
-};
-
-export const getCurrentTimestamp = () => Math.floor(Date.now() / 1000);
-export const dateToTimestamp = (date) => Math.floor(date.getTime() / 1000);
