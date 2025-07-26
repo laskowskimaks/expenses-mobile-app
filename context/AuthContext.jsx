@@ -3,6 +3,7 @@ import * as SecureStore from 'expo-secure-store';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail } from "firebase/auth";
 import { auth as firebaseAuth } from '../FirebaseConfig';
 import { performUpload } from '@/services/backupService';
+import { resetPeriodicCheckTime } from '@/utils/periodicChecker';
 
 export const AuthContext = createContext();
 
@@ -97,6 +98,7 @@ export const AuthProvider = ({ children }) => {
       await performUpload();
       await signOut(firebaseAuth);
       await SecureStore.deleteItemAsync('lastUser');
+      await resetPeriodicCheckTime();
       console.log('[AuthContext] Użytkownik wylogowany');
     } catch (error) {
       console.log('[AuthContext] Błąd wylogowania Firebase:', error);

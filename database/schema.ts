@@ -13,8 +13,6 @@ export const categories = sqliteTable('categories', {
   name: text('name').notNull().unique(),
   color: text('color').notNull(),
   iconName: text('icon_name').notNull(),
-  // Drizzle ORM domyślnie mapuje INTEGER na number. `mode: 'boolean'` to ułatwienie
-  // które sprawia, że Drizzle traktuje 0/1 jak true/false.
   isDeletable: integer('is_deletable', { mode: 'boolean' }).notNull().default(true),
 });
 
@@ -29,24 +27,23 @@ export const transactions = sqliteTable('transactions', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   amount: real('amount').notNull(),
   title: text('title').notNull(),
-  // Drizzle ORM może mapować typ INTEGER na Date, jeśli użyjemy `mode: 'timestamp'`
-  transactionDate: integer('transaction_date', { mode: 'timestamp' }).notNull(),
+  transactionDate: integer('transaction_date').notNull(),
   notes: text('notes'),
   location: text('location'),
   // Definicja klucza obcego wskazującego na kategorie
   categoryId: integer('category_id').references(() => categories.id, { onDelete: 'set null' }),
 });
 
-// Tabela 5: Transakcje Cykliczne (Szablony)
+// Tabela 5: Transakcje Cykliczne
 export const periodicTransactions = sqliteTable('periodic_transactions', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   amount: real('amount').notNull(),
   title: text('title').notNull(),
   repeatInterval: integer('repeat_interval').notNull(),
   repeatUnit: text('repeat_unit').notNull(), // 'day', 'week', 'month', 'year'
-  startDate: integer('start_date', { mode: 'timestamp' }).notNull(),
-  nextOccurrenceDate: integer('next_occurrence_date', { mode: 'timestamp' }).notNull(),
-  endDate: integer('end_date', { mode: 'timestamp' }), // Może być NULL
+  startDate: integer('start_date').notNull(), 
+  nextOccurrenceDate: integer('next_occurrence_date').notNull(),
+  endDate: integer('end_date'), // Może być NULL
   categoryId: integer('category_id').references(() => categories.id, { onDelete: 'set null' }),
 });
 
@@ -68,7 +65,6 @@ export const transactionTags = sqliteTable('transaction_tags', {
   transactionId: integer('transaction_id').notNull().references(() => transactions.id, { onDelete: 'cascade' }),
   tagId: integer('tag_id').notNull().references(() => tags.id, { onDelete: 'cascade' }),
 }, (table) => ({
-  // Definicja złożonego klucza głównego
   pk: primaryKey({ columns: [table.transactionId, table.tagId] }),
 }));
 
@@ -81,7 +77,7 @@ export const periodicTransactionTags = sqliteTable('periodic_transaction_tags', 
 }));
 
 
-// === DEFINICJE RELACJI (BARDZO WAŻNE DLA ZAPYTAŃ Z JOINAMI) ===
+// === DEFINICJE RELACJI ===
 
 // Relacje dla tabeli `categories`
 export const categoriesRelations = relations(categories, ({ many }) => ({

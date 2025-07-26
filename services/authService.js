@@ -46,7 +46,6 @@ export const getAllSettingsAsObject = async (db) => {
     if (!allSettings || allSettings.length === 0) {
       return null;
     }
-    // Transformacja tablicy klucz-wartość w jeden obiekt
     return allSettings.reduce((acc, setting) => {
       acc[setting.key] = setting.value;
       return acc;
@@ -62,37 +61,17 @@ export const createUser = async (db, userId, email, plainPassword) => {
     const passwordSalt = generateSalt();
     const hashedPassword = await hashData(plainPassword, passwordSalt);
 
-    const initialSettings = [
-      { key: 'userId', value: userId },
-      { key: 'email', value: email },
-      { key: 'password', value: hashedPassword },
-      { key: 'passwordSalt', value: passwordSalt },
-
-      { key: 'billing_period_start_day', value: '10' },
-      { key: 'savings_goal', value: '0' },
-
-      { key: 'pin', value: '' },
-      { key: 'pinSalt', value: '' },
-    ];
-
-    await db.transaction(async (tx) => {
-      for (const setting of initialSettings) {
-        await upsertSetting(tx, setting.key, setting.value);
-      }
-    });
-
-    console.log('[authService] Użytkownik utworzony:', email);
-    return true;
+    return {
+      success: true,
+      data: {
+        userId,
+        email,
+        hashedPassword,
+        passwordSalt,
+      },
+    };
   } catch (error) {
-    console.error('[authService] Tworzenie użytkownika nie powiodło się:', error);
-
-    if (error.message.includes('UNIQUE constraint failed')) {
-      console.log('[authService] email już zarejestrowany:', email);
-      alert('Nazwa użytkownika już zajęta');
-    } else {
-      console.log('[authService] Błąd podczas tworzenia użytkownika:', error);
-      alert('Wystąpił błąd podczas rejestracji.');
-    }
-    return false;
+    console.error('[authService] Przygotowanie danych użytkownika nie powiodło się:', error);
+    return { success: false, error };
   }
 };
