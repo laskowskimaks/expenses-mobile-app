@@ -5,7 +5,7 @@ import { auth } from '@/FirebaseConfig';
 const LOCAL_DB_DIR = FileSystem.documentDirectory + 'SQLite/';
 const LOCAL_DB_PATH = LOCAL_DB_DIR + 'database.db';
 
-let isUploading = false;
+let uploadPromise = null;
 
 //funkcja zapewniająca, że katalog SQLite istnieje lokalnie.
 async function ensureDbDirectoryExists() {
@@ -18,68 +18,79 @@ async function ensureDbDirectoryExists() {
 
 //funkcja wykonująca upload lokalnej bazy danych do Firebase Storage.
 export async function performUpload() {
-    if (isUploading) {
-        console.log("[BackupService:performUpload] Upload już trwa, pomijam kolejne wywołanie");
-        return undefined;
+    if (uploadPromise) {
+        console.log("[BackupService:performUpload] Upload już trwa, czekam na zakończenie...");
+        return await uploadPromise; // Czekaj na istniejący upload
     }
-    isUploading = true;
+
+    uploadPromise = _performUploadInternal();
 
     try {
-        console.log("[BackupService:performUpload] Rozpoczynanie...");
-        const storage = getStorage();
-        const userId = auth.currentUser?.uid;
+        // Wykonuje upload i zwraca rezultat
+        const result = await uploadPromise;
+        return result;
+    } finally {
+        uploadPromise = null;
+    }
 
-        if (!userId) {
-            console.error("[BackupService:performUpload] Użytkownik nie jest zalogowany.");
-            return undefined;
-        }
-
-        await ensureDbDirectoryExists();
-
-        const localFileInfo = await FileSystem.getInfoAsync(LOCAL_DB_PATH);
-        if (!localFileInfo.exists) {
-            console.log("[BackupService:performUpload] Lokalna baza danych nie istnieje. Nie ma czego backupować.");
-            return undefined;
-        }
-
-        const fileName = `app_database_${Date.now()}.db`;
-        const storageRef = ref(storage, `database_backups/${userId}/${fileName}`);
-        let fileData = null;
-
+    async function _performUploadInternal() {
         try {
-            const response = await fetch(LOCAL_DB_PATH);
-            if (!response.ok) {
-                console.error(`[BackupService:performUpload] Nie udało się odczytać pliku lokalnego: ${response.statusText}`);
+            console.log("[BackupService:_performUploadInternal] Rozpoczynanie...");
+            const storage = getStorage();
+            const userId = auth.currentUser?.uid;
+
+            if (!userId) {
+                console.error("[BackupService:_performUploadInternal] Użytkownik nie jest zalogowany.");
                 return undefined;
             }
-            fileData = await response.blob();
+
+            await ensureDbDirectoryExists();
+
+            const localFileInfo = await FileSystem.getInfoAsync(LOCAL_DB_PATH);
+            if (!localFileInfo.exists) {
+                console.log("[BackupService:_performUploadInternal] Lokalna baza danych nie istnieje. Nie ma czego backupować.");
+                return undefined;
+            }
+
+            const fileName = `app_database_${Date.now()}.db`;
+            const storageRef = ref(storage, `database_backups/${userId}/${fileName}`);
+            let fileData = null;
+
+            try {
+                const response = await fetch(LOCAL_DB_PATH);
+                if (!response.ok) {
+                    console.error(`[BackupService:_performUploadInternal] Nie udało się odczytać pliku lokalnego: ${response.statusText}`);
+                    return undefined;
+                }
+                fileData = await response.blob();
+            } catch (error) {
+                console.error("[BackupService:_performUploadInternal] Błąd podczas odczytywania lokalnego pliku .db:", error);
+                return undefined;
+            }
+
+            if (!fileData) {
+                console.error("[BackupService:_performUploadInternal] Brak danych pliku do uploadu.");
+                return undefined;
+            }
+
+            console.log("[BackupService:_performUploadInternal] Rozpoczynam upload pliku .db do Storage...");
+            const uploadResult = await uploadBytes(storageRef, fileData, {
+                contentType: 'application/octet-stream'
+            });
+
+            console.log("[BackupService:_performUploadInternal] Upload zakończony sukcesem. Plik:", uploadResult.ref.fullPath);
+            return uploadResult;
+
         } catch (error) {
-            console.error("[BackupService:performUpload] Błąd podczas odczytywania lokalnego pliku .db:", error);
+            console.error("[BackupService:_performUploadInternal] Błąd podczas uploadu pliku .db do Storage:", error);
             return undefined;
         }
-
-        if (!fileData) {
-            console.error("[BackupService:performUpload] Brak danych pliku do uploadu.");
-            return undefined;
-        }
-
-        console.log("[BackupService:performUpload] Rozpoczynam upload pliku .db do Storage...");
-        const uploadResult = await uploadBytes(storageRef, fileData, {
-            contentType: 'application/octet-stream'
-        });
-
-        console.log("[BackupService:performUpload] Upload zakończony sukcesem. Plik:", uploadResult.ref.fullPath);
-
-        return uploadResult;
-
-    } catch (error) {
-        console.error("[BackupService:performUpload] Błąd podczas uploadu pliku .db do Storage:", error);
-        return undefined;
-    } finally {
-        isUploading = false;
     }
 }
 
+export function isUploadInProgress() {
+    return uploadPromise !== null;
+}
 
 //sprawdza datę ostatniego zdalnego backupu i jeśli jest starszy niż tydzień (lub nie istnieje), wykonuje nowy backup
 export async function uploadBackupIfOlderThan(thresholdInMilliseconds = 7 * 24 * 60 * 60 * 1000) {
