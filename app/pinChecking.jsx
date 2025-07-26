@@ -3,7 +3,7 @@ import { View, Text, TextInput, Button, StyleSheet, Alert, Pressable } from 'rea
 import { useAuth } from '../context/AuthContext';
 import { useDb } from '../context/DbContext';
 import { useRouter } from 'expo-router';
-import { getUserByemail } from '@/services/authService';
+import { getHashedPin, getPinSalt } from '@/services/authService';
 import { useNetworkStatus } from '../context/NetworkContext';
 import { hashData } from '@/utils/hashUtils';
 
@@ -26,11 +26,12 @@ export default function PinCheckingScreen() {
         }
 
         try {
-            const dbUser = await getUserByemail(db, user.email);
+            const storedHashedPin = await getHashedPin(db);
+            const storedPinSalt = await getPinSalt(db);
 
-            if (dbUser && dbUser.pin && dbUser.pinSalt) {
-                const hashedInputPin = await hashData(pin, dbUser.pinSalt);
-                if (hashedInputPin === dbUser.pin) {
+            if (storedHashedPin && storedPinSalt) {
+                const hashedInputPin = await hashData(pin, storedPinSalt);
+                if (hashedInputPin === storedHashedPin) {
                     console.log('[PinChecking] PIN poprawny. Odblokowuję aplikację.');
                     unlockApp();
                     router.back();
@@ -38,6 +39,9 @@ export default function PinCheckingScreen() {
                     alert('Nieprawidłowy PIN');
                     setPin('');
                 }
+            } else {
+                alert('Błąd konfiguracji PIN. Zaloguj się ponownie.');
+                await logout();
             }
         } catch (e) {
             console.error('[PinChecking] Błąd podczas weryfikacji PINu:', e);
