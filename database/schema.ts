@@ -44,6 +44,7 @@ export const periodicTransactions = sqliteTable('periodic_transactions', {
   startDate: integer('start_date').notNull(), 
   nextOccurrenceDate: integer('next_occurrence_date').notNull(),
   endDate: integer('end_date'), // Może być NULL
+  notes: text('notes'),
   categoryId: integer('category_id').references(() => categories.id, { onDelete: 'set null' }),
 });
 

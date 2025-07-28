@@ -125,6 +125,14 @@ function RootLayoutNav() {
           options={{ title: 'Weryfikacja PIN', headerShown: false, gestureEnabled: false }}
         />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="(modals)/AddTransactionModal"
+          options={{
+            presentation: 'transparentModal',
+            title: 'Nowa Transakcja',
+            animation: 'fade_from_bottom',
+          }}
+        />
       </Stack>
       {shouldShowBanner && <OfflineBanner />}
     </>
