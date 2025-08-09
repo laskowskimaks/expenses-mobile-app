@@ -1,7 +1,8 @@
 import React from 'react';
 import { View, Pressable, StyleSheet, Dimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather, FontAwesome5, Foundation, Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router'
+import { Feather, FontAwesome5, Foundation } from '@expo/vector-icons';
 
 const ICON_MAP = {
     home: (props) => <FontAwesome5 name="home" {...props} />,
@@ -15,30 +16,41 @@ const { width } = Dimensions.get('window');
 const TAB_BAR_WIDTH = width * 0.9;
 const TAB_WIDTH = TAB_BAR_WIDTH / 5;
 
-const CustomTabBar = ({ state, descriptors, navigation }) => {
+const CustomTabBar = ({ state }) => {
     const { bottom } = useSafeAreaInsets();
+    const router = useRouter();
+
+    const ROUTE_MAP = {
+        home: '/(tabs)/home',
+        details: '/(tabs)/details',
+        add: '/(modals)/AddTransactionModal',
+        cards: '/(tabs)/cards',
+        settings: '/(tabs)/settings',
+    };
 
     return (
         <View style={[styles.tabBarContainer, { bottom: bottom + 10 }]}>
             <View style={styles.tabBar}>
                 {state.routes.map((route, index) => {
-                    const { options } = descriptors[route.key];
                     const isFocused = state.index === index;
                     const isCentralButton = route.name === 'add';
+                    const routePath = ROUTE_MAP[route.name];
 
                     const onPress = () => {
-                        const event = navigation.emit({
-                            type: 'tabPress',
-                            target: route.key,
-                            canPreventDefault: true,
-                        });
 
-                        if (!isFocused && !event.defaultPrevented) {
-                            navigation.navigate(route.name, route.params);
+                        if (isCentralButton) {
+                            router.push('/(modals)/AddTransactionModal');
+                        } else if (!isFocused) {
+                            router.push(routePath);
                         }
                     };
 
                     const IconComponent = ICON_MAP[route.name];
+
+                    if (!IconComponent) {
+                        console.warn(`[CustomTabBar] Brak ikony dla route: ${route.name}`);
+                        return null;
+                    }
 
                     if (isCentralButton) {
                         return (
@@ -48,7 +60,7 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
                                 style={styles.centralButtonContainer}
                             >
                                 <View style={styles.centralButton}>
-                                    {IconComponent({ size: 50, color: 'white' })}
+                                    {IconComponent({ size: 50, color: '#ffffff' })}
                                 </View>
                             </Pressable>
                         );
@@ -57,9 +69,6 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
                     return (
                         <Pressable
                             key={route.key}
-                            accessibilityRole="button"
-                            accessibilityState={isFocused ? { selected: true } : {}}
-                            accessibilityLabel={options.tabBarAccessibilityLabel}
                             onPress={onPress}
                             style={styles.tabItem}
                         >
@@ -87,7 +96,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         height: 65,
         width: TAB_BAR_WIDTH,
-        backgroundColor: 'white',
+        backgroundColor: '#ffffff',
         borderRadius: 15.5,
         alignItems: 'center',
         justifyContent: 'space-around',

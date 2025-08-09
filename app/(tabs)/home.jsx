@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { View, Text, Button, ActivityIndicator, StyleSheet, FlatList, RefreshControl, Alert } from 'react-native';
 import { useDb } from '@/context/DbContext';
@@ -8,6 +8,7 @@ import TransactionItem from '@/components/TransactionItem';
 import { getAllTransactionsSorted } from '@/services/transactionService';
 import { getLastCheckInfo, resetPeriodicCheckTime } from '@/utils/periodicChecker';
 import { processPeriodicTransactions } from '@/services/periodicTransactionService';
+import { eventEmitter } from '@/utils/eventEmitter';
 
 export default function HomeScreen() {
   const { user, logout } = useAuth();
@@ -45,8 +46,23 @@ export default function HomeScreen() {
   }, []);
 
   useEffect(() => {
-    fetchTransactions();
+    if (db) {
+      fetchTransactions(true);
+    }
   }, [db]);
+
+  const handleTransactionAdded = useCallback((data) => {
+    console.log('[HomeScreen] Otrzymano event transactionAdded:', data);
+    fetchTransactions(false);
+  }, []);
+
+  useEffect(() => {
+    eventEmitter.on('transactionAdded', handleTransactionAdded);
+
+    return () => {
+      eventEmitter.off('transactionAdded', handleTransactionAdded);
+    };
+  }, [handleTransactionAdded]);
 
   const fetchTransactions = async (showLoading = true) => {
     if (!db) return;
@@ -100,10 +116,9 @@ export default function HomeScreen() {
         Alert.alert('Transakcje okresowe', message);
 
         if (result.addedCount > 0) {
-          await fetchTransactions(false); // Odświeżanie listy bez spinnera
+          await fetchTransactions(false);
         }
 
-        // Odświeżanie info o ostatnim sprawdzeniu
         const info = await getLastCheckInfo();
         setLastCheckInfo(info);
 
@@ -164,7 +179,7 @@ export default function HomeScreen() {
         <Button title="Wyloguj" onPress={logout} />
       </View>
 
-      {/* Przyciski deweloperskie */}
+      {/* Przyciski dev */}
       {__DEV__ && (
         <View style={styles.devContainer}>
           <View style={styles.testDataContainer}>
@@ -225,7 +240,7 @@ export default function HomeScreen() {
             )}
           </View>
         ) : (
-          /* Lista z pull-to-refresh */
+          /* Lista */
           <FlatList
             data={transactions}
             keyExtractor={(item, index) => `${item.type}-${item.id}-${index}`}
@@ -255,7 +270,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8f9fa',
   },
   header: {
-    backgroundColor: 'white',
+    backgroundColor: '#ffffff',
     padding: 20,
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -298,7 +313,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 15,
     paddingVertical: 10,
-    backgroundColor: 'white',
+    backgroundColor: '#ffffff',
     borderBottomWidth: 1,
     borderBottomColor: '#ecf0f1',
   },
