@@ -1,10 +1,13 @@
 import React, { useEffect, useRef } from 'react';
-import { AuthProvider, useAuth } from '../context/AuthContext';
-import { DbProvider, useDb } from '../context/DbContext';
-import { Stack, SplashScreen, useRouter, usePathname } from 'expo-router';
-import { ActivityIndicator, View, AppState, Text, StyleSheet } from 'react-native';
+import { Stack, useRouter, usePathname } from 'expo-router';
+import { AppState, View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import * as SplashScreen from 'expo-splash-screen';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { AuthProvider, useAuth } from '@/context/AuthContext';
+import { DbProvider, useDb } from '@/context/DbContext';
 import { NetworkProvider, useNetworkStatus } from '@/context/NetworkContext';
 import { getHashedPin } from '@/services/authService';
+import { PaperProvider } from 'react-native-paper';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -125,6 +128,15 @@ function RootLayoutNav() {
           options={{ title: 'Weryfikacja PIN', headerShown: false, gestureEnabled: false }}
         />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="(modals)/AddTransactionModal"
+          options={{
+            presentation: 'transparentModal',
+            title: 'Nowa Transakcja',
+            animation: 'fade_from_bottom',
+            headerShown: false,
+          }}
+        />
       </Stack>
       {shouldShowBanner && <OfflineBanner />}
     </>
@@ -134,13 +146,17 @@ function RootLayoutNav() {
 
 export default function RootLayout() {
   return (
-    <NetworkProvider>
-      <DbProvider>
-        <AuthProvider>
-          <RootLayoutNav />
-        </AuthProvider>
-      </DbProvider>
-    </NetworkProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <PaperProvider>
+        <NetworkProvider>
+          <DbProvider>
+            <AuthProvider>
+              <RootLayoutNav />
+            </AuthProvider>
+          </DbProvider>
+        </NetworkProvider>
+      </PaperProvider>
+    </GestureHandlerRootView>
   );
 }
 
@@ -157,7 +173,7 @@ const styles = StyleSheet.create({
     zIndex: 1000,
   },
   bannerText: {
-    color: 'white',
+    color: '#ffffff',
     fontWeight: 'bold',
   },
 });

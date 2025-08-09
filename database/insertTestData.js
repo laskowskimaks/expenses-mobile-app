@@ -21,12 +21,12 @@ export const insertTestData = async (db) => {
 
     // 2. Periodic Transactions
     const periodicData = [
-      { amount: -2250.00, title: 'Rata kredytu hipotecznego', categoryId: 8, repeatInterval: 1, repeatUnit: 'month', startDate: 1718409600, nextOccurrenceDate: currentTimestamp - (5 * 24 * 60 * 60), endDate: null },
-      { amount: -149.99, title: 'Karnet na siłownię', categoryId: 4, repeatInterval: 1, repeatUnit: 'month', startDate: 1717200000, nextOccurrenceDate: currentTimestamp - (4 * 24 * 60 * 60), endDate: null },
-      { amount: -43.00, title: 'Subskrypcja Netflix', categoryId: 6, repeatInterval: 1, repeatUnit: 'month', startDate: 1717545600, nextOccurrenceDate: currentTimestamp - (3 * 24 * 60 * 60), endDate: null },
-      { amount: -19.99, title: 'Subskrypcja Spotify', categoryId: 6, repeatInterval: 1, repeatUnit: 'month', startDate: 1717804800, nextOccurrenceDate: currentTimestamp - (2 * 24 * 60 * 60), endDate: null },
-      { amount: -89.00, title: 'Internet i TV', categoryId: 2, repeatInterval: 1, repeatUnit: 'month', startDate: 1717286400, nextOccurrenceDate: currentTimestamp - (1 * 24 * 60 * 60), endDate: null },
-      { amount: -65.00, title: 'Abonament telefoniczny', categoryId: 2, repeatInterval: 1, repeatUnit: 'month', startDate: 1718841600, nextOccurrenceDate: currentTimestamp, endDate: null }
+      { amount: -2250.00, title: 'Rata kredytu hipotecznego', categoryId: 8, repeatInterval: 1, repeatUnit: 'month', startDate: 1718409600, nextOccurrenceDate: currentTimestamp - (5 * 24 * 60 * 60), endDate: null, notes: 'Kredyt na mieszkanie - rata stała' },
+      { amount: -149.99, title: 'Karnet na siłownię', categoryId: 4, repeatInterval: 1, repeatUnit: 'month', startDate: 1717200000, nextOccurrenceDate: currentTimestamp - (4 * 24 * 60 * 60), endDate: null, notes: 'Karnet miesięczny na siłownię' },
+      { amount: -43.00, title: 'Subskrypcja Netflix', categoryId: 6, repeatInterval: 1, repeatUnit: 'month', startDate: 1717545600, nextOccurrenceDate: currentTimestamp - (3 * 24 * 60 * 60), endDate: null, notes: 'Subskrypcja Netflix' },
+      { amount: -19.99, title: 'Subskrypcja Spotify', categoryId: 6, repeatInterval: 1, repeatUnit: 'month', startDate: 1717804800, nextOccurrenceDate: currentTimestamp - (2 * 24 * 60 * 60), endDate: null, notes: 'Subskrypcja Spotify' },
+      { amount: -89.00, title: 'Internet i TV', categoryId: 2, repeatInterval: 1, repeatUnit: 'month', startDate: 1717286400, nextOccurrenceDate: currentTimestamp - (1 * 24 * 60 * 60), endDate: null, notes: 'Internet i TV' },
+      { amount: -65.00, title: 'Abonament telefoniczny', categoryId: 2, repeatInterval: 1, repeatUnit: 'month', startDate: 1718841600, nextOccurrenceDate: currentTimestamp, endDate: null, notes: 'Abonament telefoniczny' }
     ];
 
     for (const periodic of periodicData) {

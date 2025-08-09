@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "158728bd-e6df-4551-a70a-a788e3f473ad",
+  "id": "b788b42b-eff0-4e86-a14c-93e5a06a5e42",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "categories": {
@@ -224,6 +224,13 @@
         "end_date": {
           "name": "end_date",
           "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false

@@ -33,6 +33,7 @@ CREATE TABLE `periodic_transactions` (
 	`start_date` integer NOT NULL,
 	`next_occurrence_date` integer NOT NULL,
 	`end_date` integer,
+	`notes` text,
 	`category_id` integer,
 	FOREIGN KEY (`category_id`) REFERENCES `categories`(`id`) ON UPDATE no action ON DELETE set null
 );
