@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, Button, ActivityIndicator, StyleSheet, FlatList, RefreshControl, Alert } from 'react-native';
 import { useDb } from '@/context/DbContext';
 import TransactionItem from '@/components/TransactionItem';
+import { TransactionSkeletonList } from '@/components/TransactionSkeleton';
 import { getAllTransactionsSorted } from '@/services/transactionService';
 import { eventEmitter } from '@/utils/eventEmitter';
 
@@ -81,10 +82,7 @@ export default function TransactionListScreen() {
 
       {/* Loading state */}
       {isLoadingTransactions ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007BFF" />
-          <Text style={styles.loadingText}>Ładowanie transakcji...</Text>
-        </View>
+        <TransactionSkeletonList count={6} />
       ) : transactions.length === 0 ? (
         /* Empty state */
         <View style={styles.emptyContainer}>
