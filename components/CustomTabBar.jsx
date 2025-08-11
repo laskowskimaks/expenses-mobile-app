@@ -6,9 +6,9 @@ import { Feather, FontAwesome5, Foundation } from '@expo/vector-icons';
 
 const ICON_MAP = {
     home: (props) => <FontAwesome5 name="home" {...props} />,
-    details: (props) => <Foundation name="list" {...props} />,
+    transactionListScreen: (props) => <Foundation name="list" {...props} />,
     add: (props) => <Feather name="plus" {...props} />,
-    cards: (props) => <FontAwesome5 name="credit-card" {...props} />,
+    cards: (props) => <FontAwesome5 name="barcode" {...props} />,
     settings: (props) => <FontAwesome5 name="cog" {...props} />,
 };
 
@@ -22,7 +22,7 @@ const CustomTabBar = ({ state }) => {
 
     const ROUTE_MAP = {
         home: '/(tabs)/home',
-        details: '/(tabs)/details',
+        transactionListScreen: '/(tabs)/transactionListScreen',
         add: '/(modals)/AddTransactionModal',
         cards: '/(tabs)/cards',
         settings: '/(tabs)/settings',
