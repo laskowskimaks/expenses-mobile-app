@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, memo } from 'react';
 import {
   View,
   Text,
@@ -32,7 +32,7 @@ const RenderIcon = ({ iconName, size = 32, color = '#333' }) => {
   return <MaterialCommunityIcons name={iconName} size={size} color={color} />;
 };
 
-export default function TransactionItem({
+export default memo(function TransactionItem({
   transaction,
   onPress = null,
   initialExpanded = false,
@@ -183,7 +183,8 @@ export default function TransactionItem({
       </View>
     </TouchableOpacity>
   );
-}
+
+});
 
 const styles = StyleSheet.create({
   container: {

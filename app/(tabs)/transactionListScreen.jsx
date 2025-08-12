@@ -1,14 +1,17 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, Button, ActivityIndicator, StyleSheet, FlatList, RefreshControl, Alert } from 'react-native';
+import { View, Text, Button, ActivityIndicator, StyleSheet, FlatList, RefreshControl, Alert, SectionList } from 'react-native';
 import { useDb } from '@/context/DbContext';
 import TransactionItem from '@/components/TransactionItem';
 import { TransactionSkeletonList } from '@/components/TransactionSkeleton';
 import { getAllTransactionsSorted } from '@/services/transactionService';
 import { eventEmitter } from '@/utils/eventEmitter';
+import DateSeparator from '@/components/DateSeparator';
+import { groupTransactionsByDate } from '@/utils/transactionUtils';
 
 export default function TransactionListScreen() {
   const { db } = useDb();
   const [transactions, setTransactions] = useState([]);
+  const [sections, setSections] = useState([]);
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -43,6 +46,8 @@ export default function TransactionListScreen() {
     try {
       console.log("[TransactionListScreen] Pobieranie transakcji...");
       const allTransactions = await getAllTransactionsSorted(db);
+      setTransactions(allTransactions); // <-- Ustawiamy oryginalne transakcje
+      setSections(groupTransactionsByDate(allTransactions));
       setTransactions(allTransactions);
     } catch (error) {
       console.error('[TransactionListScreen] Błąd podczas pobierania transakcji:', error);
@@ -90,12 +95,16 @@ export default function TransactionListScreen() {
         </View>
       ) : (
         /* Lista */
-        <FlatList
-          data={transactions}
+        <SectionList
+          sections={sections}
           keyExtractor={(item, index) => `${item.type}-${item.id}-${index}`}
           renderItem={({ item }) => <TransactionItem transaction={item} />}
+          renderSectionHeader={({ section: { title } }) => (
+            <DateSeparator title={title} />
+          )}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.listContainer}
+          stickySectionHeadersEnabled={false} // <-- Opcjonalnie: czy nagłówki mają się przyklejać
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
