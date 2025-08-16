@@ -8,6 +8,7 @@ import { DbProvider, useDb } from '@/context/DbContext';
 import { NetworkProvider, useNetworkStatus } from '@/context/NetworkContext';
 import { getHashedPin } from '@/services/authService';
 import { PaperProvider } from 'react-native-paper';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -151,7 +152,9 @@ export default function RootLayout() {
         <NetworkProvider>
           <DbProvider>
             <AuthProvider>
-              <RootLayoutNav />
+              <SafeAreaView style={{ flex: 1 }}>
+                <RootLayoutNav />
+              </SafeAreaView>
             </AuthProvider>
           </DbProvider>
         </NetworkProvider>

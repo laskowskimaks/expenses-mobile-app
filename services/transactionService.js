@@ -6,7 +6,6 @@ export const getAllTransactionsSorted = async (db) => {
   try {
     console.log('[TransactionService] Pobieranie wszystkich transakcji (zoptymalizowane)...');
 
-    // Pobierz wszystkie transakcje
     const allTransactions = await db
       .select({
         id: transactions.id,
@@ -15,6 +14,7 @@ export const getAllTransactionsSorted = async (db) => {
         transactionDate: transactions.transactionDate,
         notes: transactions.notes,
         location: transactions.location,
+        categoryId: transactions.categoryId,
         categoryName: categories.name,
         categoryColor: categories.color,
         categoryIcon: categories.iconName,
@@ -23,7 +23,6 @@ export const getAllTransactionsSorted = async (db) => {
       .leftJoin(categories, eq(transactions.categoryId, categories.id))
       .orderBy(desc(transactions.transactionDate));
 
-    // Pobierz wszystkie tagi jednym zapytaniem
     const allTransactionTags = await db
       .select({
         transactionId: transactionTags.transactionId,
@@ -33,22 +32,18 @@ export const getAllTransactionsSorted = async (db) => {
       .from(transactionTags)
       .innerJoin(tags, eq(transactionTags.tagId, tags.id));
 
-    // Zgrupuj tagi według transactionId
-    const tagsByTransaction = allTransactionTags.reduce((acc, tag) => {
-      if (!acc[tag.transactionId]) {
-        acc[tag.transactionId] = [];
-      }
-      acc[tag.transactionId].push({
-        id: tag.tagId,
-        name: tag.tagName
+      const tagsByTransaction = allTransactionTags.reduce((acc, tagRow) => {
+      if (!acc[tagRow.transactionId]) acc[tagRow.transactionId] = [];
+      acc[tagRow.transactionId].push({
+        id: tagRow.tagId,
+        name: tagRow.tagName
       });
       return acc;
     }, {});
 
-    // Dodaj tagi do transakcji
-    const transactionsWithTags = allTransactions.map(transaction => ({
-      ...transaction,
-      tags: tagsByTransaction[transaction.id] || []
+    const transactionsWithTags = allTransactions.map(tx => ({
+      ...tx,
+      tags: tagsByTransaction[tx.id] || []
     }));
 
     console.log(`[TransactionService] Pobrano ${transactionsWithTags.length} transakcji z tagami (zoptymalizowane)`);
@@ -68,14 +63,12 @@ export const addTransaction = async (db, transactionData) => {
 
   try {
     const result = await db.transaction(async (tx) => {
-      // Bezpieczna konwersja kwoty na liczbę
       const normalizedAmount = String(transactionData.amount || '0')
         .replace(',', '.')
         .replace(/[^0-9.]/g, '');
 
       let finalAmount = parseFloat(normalizedAmount);
 
-      // Walidacja czy to prawidłowa liczba
       if (isNaN(finalAmount) || finalAmount <= 0) {
         throw new Error('Kwota musi być liczbą większą od 0');
       }
@@ -84,7 +77,6 @@ export const addTransaction = async (db, transactionData) => {
         finalAmount = -Math.abs(finalAmount);
       }
 
-      // Konwersja daty na timestamp (sekundy)
       const transactionTimestamp = Math.floor(transactionData.date.getTime() / 1000);
 
       const categoryId = transactionData.categoryId;
@@ -103,7 +95,6 @@ export const addTransaction = async (db, transactionData) => {
 
       const newTransactionId = newTransaction[0].insertedId;
 
-      // Helper funkcji dla tagów
       if (transactionData.tags && transactionData.tags.length > 0) {
         await processTransactionTags(tx, newTransactionId, transactionData.tags);
       }

@@ -249,8 +249,7 @@ export default function AddTransactionModal() {
     <>
       <Pressable style={styles.backdrop} onPress={() => router.back()} accessible={false} />
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      <View
         style={[styles.modalSheet, { backgroundColor: theme.colors.background }]}
       >
         <ScrollView
@@ -490,7 +489,7 @@ export default function AddTransactionModal() {
             {state.isPeriodic ? 'Dodaj Cykliczną' : 'Dodaj Transakcję'}
           </Button>
         </View>
-      </KeyboardAvoidingView>
+      </View>
 
       {/* Pickery i modale */}
       <CategoryPicker

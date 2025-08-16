@@ -1,6 +1,5 @@
 import React from 'react';
 import { View, Pressable, StyleSheet, Dimensions } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router'
 import { Feather, FontAwesome5, Foundation } from '@expo/vector-icons';
 
@@ -17,7 +16,6 @@ const TAB_BAR_WIDTH = width * 0.9;
 const TAB_WIDTH = TAB_BAR_WIDTH / 5;
 
 const CustomTabBar = ({ state }) => {
-    const { bottom } = useSafeAreaInsets();
     const router = useRouter();
 
     const ROUTE_MAP = {
@@ -29,7 +27,7 @@ const CustomTabBar = ({ state }) => {
     };
 
     return (
-        <View style={[styles.tabBarContainer, { bottom: bottom + 10 }]}>
+        <View style={[styles.tabBarContainer, { bottom: 10 }]}>
             <View style={styles.tabBar}>
                 {state.routes.map((route, index) => {
                     const isFocused = state.index === index;
@@ -37,7 +35,6 @@ const CustomTabBar = ({ state }) => {
                     const routePath = ROUTE_MAP[route.name];
 
                     const onPress = () => {
-
                         if (isCentralButton) {
                             router.push('/(modals)/AddTransactionModal');
                         } else if (!isFocused) {

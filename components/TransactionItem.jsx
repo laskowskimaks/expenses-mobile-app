@@ -14,7 +14,6 @@ import { MaterialCommunityIcons, Ionicons, FontAwesome } from '@expo/vector-icon
 import { formatCurrency } from '@/services/transactionService';
 
 
-// Render ikony
 const RenderIcon = ({ iconName, size = 32, color = '#333' }) => {
   if (!iconName) {
     return <MaterialCommunityIcons name="shape" size={size} color={color} />;
@@ -87,7 +86,6 @@ export default memo(function TransactionItem({
   const displayedTags = expanded ? tags : tags.slice(0, maxVisibleTags);
   const remainingTags = expanded ? 0 : Math.max(0, tags.length - maxVisibleTags);
 
-  // Gradient na całą długość
   const gradientColors = [
     categoryColor || '#6ac6b6',
     `${categoryColor || '#6ac6b6'}00`
@@ -95,7 +93,7 @@ export default memo(function TransactionItem({
 
   return (
     <TouchableOpacity activeOpacity={0.95} onPress={toggle} style={styles.container}>
-      {/* GRADIENT BACKGROUND */}
+      {/* BACKGROUND */}
       <LinearGradient
         colors={gradientColors}
         start={{ x: 0, y: 0.5 }}
@@ -103,7 +101,7 @@ export default memo(function TransactionItem({
         style={styles.gradientBackground}
       />
 
-      {/* BIAŁA PRZESTRZEŃ NA TREŚĆ */}
+      {/* TREŚĆ */}
       <View style={styles.contentArea}>
         {/* górna sekcja - ikona, tytuł, kwota */}
         <View style={styles.topSection}>
@@ -146,7 +144,7 @@ export default memo(function TransactionItem({
           </View>
         )}
 
-        {/* Tagi - czarne */}
+        {/* Tagi  */}
         {tags.length > 0 && (
           <View style={styles.tagsSection}>
             <View style={styles.tagsRow}>
@@ -164,7 +162,7 @@ export default memo(function TransactionItem({
           </View>
         )}
 
-        {/* ✅ Badge kalendarza - zawsze w prawym dolnym rogu */}
+        {/* Badge kalendarza */}
         {isPeriodicTransaction && (
           <Badge
             style={[
