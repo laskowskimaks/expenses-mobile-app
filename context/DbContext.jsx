@@ -197,7 +197,11 @@ export const DbProvider = ({ children }) => {
     const _openAndMigrateDb = async () => {
         console.log('[DbContext-Helper] Otwieranie połączenia i uruchamianie migracji...');
         try {
-            const newSqliteConn = openDatabaseSync(DATABASE_NAME, { enableChangeListener: true });
+            const newSqliteConn = openDatabaseSync(DATABASE_NAME, {
+                enableChangeListener: true,
+                readOnly: false,
+                create: true,
+            });
             const newDrizzleDb = drizzle(newSqliteConn, { schema });
 
             console.log('[DbContext-Helper] Uruchamianie migracji...');

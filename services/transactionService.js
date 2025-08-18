@@ -3,6 +3,11 @@ import { eq, desc } from 'drizzle-orm';
 import { processTransactionTags } from './tagService';
 
 export const getAllTransactionsSorted = async (db) => {
+  if (!db) {
+    console.error('[TransactionService] Baza danych jest null - nie można pobrać transakcji');
+    return [];
+  }
+
   try {
     console.log('[TransactionService] Pobieranie wszystkich transakcji (zoptymalizowane)...');
 
@@ -32,7 +37,7 @@ export const getAllTransactionsSorted = async (db) => {
       .from(transactionTags)
       .innerJoin(tags, eq(transactionTags.tagId, tags.id));
 
-      const tagsByTransaction = allTransactionTags.reduce((acc, tagRow) => {
+    const tagsByTransaction = allTransactionTags.reduce((acc, tagRow) => {
       if (!acc[tagRow.transactionId]) acc[tagRow.transactionId] = [];
       acc[tagRow.transactionId].push({
         id: tagRow.tagId,

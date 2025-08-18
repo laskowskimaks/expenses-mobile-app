@@ -1,4 +1,5 @@
 import { tags, transactionTags } from '@/database/schema';
+import { eventEmitter } from '@/utils/eventEmitter';
 import { eq } from 'drizzle-orm';
 
 export const getAllTags = async (db) => {
@@ -76,6 +77,11 @@ export const processTransactionTags = async (db, transactionId, tagNames) => {
 
       tagId = newTag[0].insertedId;
       console.log(`[TagService] Utworzono nowy tag "${trimmedTagName}" (ID: ${tagId})`);
+      try {
+        eventEmitter.emit('tagAdded', { id: tagId, name: trimmedTagName });
+      } catch (e) {
+        console.error('[TagService] Błąd podczas emitowania zdarzenia tagAdded:', e);
+      }
     }
 
     tagIds.push(tagId);
