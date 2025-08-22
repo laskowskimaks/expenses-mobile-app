@@ -53,22 +53,10 @@ export default memo(function TransactionItem({
     location,
     notes,
     tags = [],
-    transactionDate,
-    isPeriodic,
-    repeatInterval,
-    repeatUnit,
-    endDate,
-    nextOccurrenceDate,
+    isFromPeriodic, 
   } = transaction;
 
-  const isPeriodicTransaction = Boolean(
-    isPeriodic || 
-    repeatInterval || 
-    repeatUnit || 
-    nextOccurrenceDate ||
-    // sprawdź czy w notes jest informacja o automatycznym dodaniu
-    (notes && notes.includes('(transakcja dodana automatycznie)'))
-  );
+  const isPeriodicTransaction = Boolean(isFromPeriodic);
 
   const amountText = formatCurrency(amount);
   const amountColor = amount < 0 ? '#ff3b30' : '#0a9d58';
@@ -110,11 +98,11 @@ export default memo(function TransactionItem({
               <Text style={styles.categoryText}>{categoryName || 'Inne'}</Text>
               {location && (
                 <View style={styles.locationContainer}>
-                  <MaterialCommunityIcons 
-                    name="map-marker" 
-                    size={14} 
-                    color="#777" 
-                    style={styles.locationIcon} 
+                  <MaterialCommunityIcons
+                    name="map-marker"
+                    size={14}
+                    color="#777"
+                    style={styles.locationIcon}
                   />
                   <Text style={styles.locationText}>{location}</Text>
                 </View>
@@ -140,8 +128,8 @@ export default memo(function TransactionItem({
           <View style={styles.tagsSection}>
             <View style={styles.tagsRow}>
               {displayedTags.map((t) => (
-                <View key={t.id ?? t.name} style={styles.tag}>
-                  <Text style={styles.tagText}>{t.name}</Text>
+                <View key={t.id ?? t.name} style={[styles.tag, { borderColor: t.color || '#000000' }]}>
+                  <Text style={[styles.tagText, { color: t.color || '#000000' }]}>{t.name}</Text>
                 </View>
               ))}
               {remainingTags > 0 && (
@@ -172,7 +160,6 @@ export default memo(function TransactionItem({
       </View>
     </TouchableOpacity>
   );
-
 });
 
 const styles = StyleSheet.create({
@@ -310,7 +297,6 @@ const styles = StyleSheet.create({
 
   tag: {
     borderWidth: 1.5,
-    borderColor: '#000000',
     borderRadius: 20,
     paddingHorizontal: 12,
     paddingVertical: 6,
@@ -322,7 +308,6 @@ const styles = StyleSheet.create({
   tagText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#000000',
   },
 
   tagMore: {

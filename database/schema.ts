@@ -20,6 +20,7 @@ export const categories = sqliteTable('categories', {
 export const tags = sqliteTable('tags', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   name: text('name').notNull().unique(),
+  color: text('color').notNull(),
 });
 
 // Tabela 4: Transakcje
@@ -30,6 +31,7 @@ export const transactions = sqliteTable('transactions', {
   transactionDate: integer('transaction_date').notNull(),
   notes: text('notes'),
   location: text('location'),
+  isFromPeriodic: integer('is_from_periodic', { mode: 'boolean' }).notNull().default(false),
   // Definicja klucza obcego wskazującego na kategorie
   categoryId: integer('category_id').references(() => categories.id, { onDelete: 'set null' }),
 });

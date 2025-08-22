@@ -1,6 +1,7 @@
 import { periodicTransactions, transactions, categories, periodicTransactionTags, tags, transactionTags } from '@/database/schema';
 import { eq, lte } from 'drizzle-orm';
 import { getCurrentTimestamp } from '@/utils/dateUtils';
+import { getRandomColor } from './tagService';
 
 export const addPeriodicTransaction = async (db, periodicTransactionData) => {
     if (!db) {
@@ -84,11 +85,17 @@ export const addPeriodicTransaction = async (db, periodicTransactionData) => {
                         console.log(`[PeriodicTransactionService] Znaleziono istniejący tag "${trimmedTagName}" (ID: ${tagId})`);
                     } else {
                         const newTag = await tx.insert(tags).values({
-                            name: trimmedTagName
+                            name: trimmedTagName,
+                            color: getRandomColor()
                         }).returning({ insertedId: tags.id });
 
                         tagId = newTag[0].insertedId;
                         console.log(`[PeriodicTransactionService] Utworzono nowy tag "${trimmedTagName}" (ID: ${tagId})`);
+                        try {
+                            eventEmitter.emit('tagAdded', { id: tagId, name: trimmedTagName });
+                        } catch (e) {
+                            console.error('[TagService] Błąd podczas emitowania zdarzenia tagAdded:', e);
+                        }
                     }
 
                     tagIds.push(tagId);
@@ -181,7 +188,6 @@ export const processPeriodicTransactions = async (db) => {
                         break;
                     }
 
-                    // Utwórz transakcję dla tej daty
                     const newTransactionData = {
                         amount: periodicTransaction.amount,
                         title: periodicTransaction.title,
@@ -190,7 +196,8 @@ export const processPeriodicTransactions = async (db) => {
                             ? `${periodicTransaction.notes}\n(transakcja dodana automatycznie)`
                             : `(transakcja dodana automatycznie)`,
                         location: null,
-                        categoryId: periodicTransaction.categoryId
+                        categoryId: periodicTransaction.categoryId,
+                        isFromPeriodic: true, 
                     };
 
                     const insertResult = await db
@@ -204,7 +211,8 @@ export const processPeriodicTransactions = async (db) => {
                     const periodicTags = await db
                         .select({
                             tagId: periodicTransactionTags.tagId,
-                            tagName: tags.name
+                            tagName: tags.name,
+                            tagColor: tags.color 
                         })
                         .from(periodicTransactionTags)
                         .innerJoin(tags, eq(periodicTransactionTags.tagId, tags.id))
@@ -215,6 +223,7 @@ export const processPeriodicTransactions = async (db) => {
                         const tagsToInsert = periodicTags.map(tag => ({
                             transactionId: newTransactionId,
                             tagId: tag.tagId,
+                            tagColor: tag.tagColor
                         }));
 
                         await db.insert(transactionTags).values(tagsToInsert);
@@ -224,7 +233,7 @@ export const processPeriodicTransactions = async (db) => {
                         ...newTransactionData,
                         id: newTransactionId,
                         categoryName: periodicTransaction.categoryName,
-                        tags: periodicTags.map(tag => ({ id: tag.tagId, name: tag.tagName }))
+                        tags: periodicTags.map(tag => ({ id: tag.tagId, name: tag.tagName, color: tag.tagColor }))
                     });
 
                     addedTransactionsCount++;

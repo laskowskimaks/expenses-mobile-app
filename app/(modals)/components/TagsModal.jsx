@@ -2,6 +2,14 @@ import React, { useState, useEffect, memo, useCallback } from 'react';
 import { View, FlatList, TouchableOpacity, StyleSheet, Pressable } from 'react-native';
 import { Text, TextInput, Button, Chip, useTheme } from 'react-native-paper';
 
+// Funkcja pomocnicza do rozjaśniania kolorów dla tła
+const lightenColor = (color, percent) => {
+    if (!color) return '#e0e0e0';
+    let f = parseInt(color.slice(1), 16), t = percent < 0 ? 0 : 255, p = percent < 0 ? percent * -1 : percent, R = f >> 16, G = f >> 8 & 0x00FF, B = f & 0x0000FF;
+    return "#" + (0x1000000 + (Math.round((t - R) * p) + R) * 0x10000 + (Math.round((t - G) * p) + G) * 0x100 + (Math.round((t - B) * p) + B)).toString(16).slice(1);
+};
+
+
 const TagItem = memo(({ item, isSelected, onSelectTag }) => (
     <TouchableOpacity
         style={[
@@ -21,16 +29,24 @@ const TagItem = memo(({ item, isSelected, onSelectTag }) => (
     </TouchableOpacity>
 ));
 
-const SelectedTagChip = memo(({ tag, onRemove }) => (
-    <Chip
-        onClose={() => onRemove(tag)}
-        style={styles.selectedChip}
-        accessibilityLabel={`Usuń tag ${tag}`}
-        accessible
-    >
-        {tag}
-    </Chip>
-));
+const SelectedTagChip = memo(({ tag, onRemove }) => {
+    const chipBackgroundColor = lightenColor(tag.color, 0.8);
+    const chipTextColor = tag.color || '#000000';
+
+    return (
+        <Chip
+            onClose={() => onRemove(tag.name)}
+            style={[styles.selectedChip, { backgroundColor: chipBackgroundColor }]}
+            textStyle={{ color: chipTextColor, fontWeight: 'bold' }}
+            closeIconProps={{ color: chipTextColor }}
+            accessibilityLabel={`Usuń tag ${tag.name}`}
+            accessible
+        >
+            {tag.name}
+        </Chip>
+    );
+});
+
 
 const EmptyTagsList = memo(({ localSearchText, availableTags, tags, onAddNewTag }) => (
     <View style={styles.emptyTagsContainer}>
@@ -113,12 +129,17 @@ function TagsModal({
                     <View style={styles.selectedTagsSection}>
                         <Text style={styles.selectedTagsLabel}>Wybrane tagi:</Text>
                         <View style={styles.selectedTagsContainer}>
-                            {tags.map(tag => (
-                                <SelectedTagChip key={tag} tag={tag} onRemove={handleRemoveTag} />
-                            ))}
+                            {tags.map(tagName => {
+                                const tagObject = availableTags.find(t => t.name === tagName);
+                                const displayTag = tagObject || { name: tagName, color: '#808080' };
+                                return (
+                                    <SelectedTagChip key={tagName} tag={displayTag} onRemove={handleRemoveTag} />
+                                );
+                            })}
                         </View>
                     </View>
                 )}
+
 
                 <TextInput
                     mode="outlined"
@@ -166,23 +187,77 @@ const styles = StyleSheet.create({
     absoluteOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, elevation: 1000 },
     pickerBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
     tagsModalContainer: {
-        position: 'absolute', bottom: 0, left: 0, right: 0, height: '90%', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 16, width: '100%',
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: '90%',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        padding: 16,
+        width: '100%',
     },
-    pickerTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 16, textAlign: 'center' },
-    selectedTagsSection: { marginBottom: 16, paddingBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#E0E0E0' },
-    selectedTagsLabel: { fontSize: 14, fontWeight: '600', marginBottom: 8, color: '#666' },
+    pickerTitle: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        marginBottom: 16,
+        textAlign: 'center',
+        lineHeight: 28,
+        letterSpacing: 0.2,
+    },
+    selectedTagsSection: {
+        marginBottom: 16,
+        paddingBottom: 12,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: '#E0E0E0',
+    },
+    selectedTagsLabel: {
+        fontSize: 14,
+        fontWeight: '600',
+        marginBottom: 8,
+        color: '#666',
+        lineHeight: 20,
+        letterSpacing: 0.1,
+    },
     selectedTagsContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
     selectedChip: { marginRight: 0, marginBottom: 0 },
     tagSearchInput: { marginBottom: 16 },
     tagsList: { flex: 1, marginBottom: 16 },
-    tagItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#ccc' },
+    tagItem: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 12,
+        paddingHorizontal: 8,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: '#ccc',
+    },
     tagItemSelected: { backgroundColor: '#f0f0f0', opacity: 0.6 },
-    tagItemText: { flex: 1 },
+    tagItemText: {
+        flex: 1,
+        fontSize: 16,
+        lineHeight: 22,
+        letterSpacing: 0.15,
+    },
     tagItemTextSelected: { color: '#666' },
     tagSelectedIndicator: { color: '#4CAF50', fontWeight: 'bold', fontSize: 16 },
     emptyTagsContainer: { padding: 20, alignItems: 'center' },
-    emptyTagsText: { textAlign: 'center', color: '#666', marginBottom: 16 },
+    emptyTagsText: {
+        textAlign: 'center',
+        color: '#666',
+        marginBottom: 16,
+        fontSize: 15,
+        lineHeight: 22,
+        letterSpacing: 0.1,
+    },
     createTagButton: { backgroundColor: '#2196F3', paddingVertical: 12, paddingHorizontal: 24, borderRadius: 8 },
-    createTagButtonText: { color: 'white', fontWeight: 'bold', textAlign: 'center' },
+    createTagButtonText: {
+        color: 'white',
+        fontWeight: 'bold',
+        textAlign: 'center',
+        fontSize: 16,
+        lineHeight: 22,
+        letterSpacing: 0.15,
+    },
     closeTagsButton: { marginTop: 8 },
 });

@@ -21,6 +21,7 @@ export const DbContext = createContext();
 export const DbProvider = ({ children }) => {
     const [db, setDb] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
+    const [isReady, setIsReady] = useState(false);
 
     const sqliteConnectionRef = useRef(null);
     const isClearingRef = useRef(false);
@@ -59,6 +60,7 @@ export const DbProvider = ({ children }) => {
             }
 
             setDb(null);
+            setIsReady(false);
             sqliteConnectionRef.current = null;
 
             await FileSystem.deleteAsync(DB_PATH, { idempotent: true });
@@ -85,7 +87,7 @@ export const DbProvider = ({ children }) => {
 
         if (sqliteConnectionRef.current) {
             try {
-                sqliteConnectionRef.current.closeSync();
+                    sqliteConnectionRef.current.closeSync();
             } catch (e) {
                 console.log("[DbContext] Nie udało się zamknąć starego połączenia:", e);
             }
@@ -103,6 +105,7 @@ export const DbProvider = ({ children }) => {
 
             sqliteConnectionRef.current = newSqliteConn;
             setDb(newDrizzleDb);
+            setIsReady(true);
             console.log('[DbContext] Nowe połączenie z bazą danych zostało utworzone.');
 
             try {
@@ -154,7 +157,7 @@ export const DbProvider = ({ children }) => {
 
         try {
             const { newDrizzleDb, newSqliteConn } = await _openAndMigrateDb();
-            const { success, data: userData, error } = await createUser(userId, email, password);
+            const { success, data: userData, error } = await createUser(newDrizzleDb, userId, email, password);
 
             if (!success) {
                 throw error || new Error("Nie udało się przygotować danych uwierzytelniających.");

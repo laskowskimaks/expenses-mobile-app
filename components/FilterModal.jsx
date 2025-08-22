@@ -26,13 +26,21 @@ import MultiSlider from '@ptomasroos/react-native-multi-slider';
 const DEFAULT_MIN_AMOUNT = 0;
 const DEFAULT_MAX_AMOUNT = 20000;
 
+// Funkcja pomocnicza do rozjaśniania kolorów
+const lightenColor = (color, percent) => {
+    if (!color) return '#e0e0e0';
+    let f = parseInt(color.slice(1), 16), t = percent < 0 ? 0 : 255, p = percent < 0 ? percent * -1 : percent, R = f >> 16, G = f >> 8 & 0x00FF, B = f & 0x0000FF;
+    return "#" + (0x1000000 + (Math.round((t - R) * p) + R) * 0x10000 + (Math.round((t - G) * p) + G) * 0x100 + (Math.round((t - B) * p) + B)).toString(16).slice(1);
+};
+
+
 const MainScroll = ({
     localFilters,
     dynamicMaxAmount,
     setScreen,
     onClose,
 }) => (
-    <ScrollView contentContainerStyle={{ paddingBottom: 160 }} keyboardShouldPersistTaps="always">
+    <ScrollView contentContainerStyle={{ paddingBottom: 180 }} keyboardShouldPersistTaps="always">
         <View style={styles.innerContent}>
             <View style={styles.headerRow}>
                 <Text style={styles.headerTitle}>Filtry</Text>
@@ -53,7 +61,10 @@ const MainScroll = ({
             <Pressable style={styles.row} onPress={() => setScreen('date')}>
                 <Text style={styles.rowTitle}>Zakres dat</Text>
                 <Text style={styles.rowSubtitle}>
-                    {`${new Date((localFilters.dateFrom || 0) * 1000).toLocaleDateString()} — ${new Date((localFilters.dateTo || 0) * 1000).toLocaleDateString()}`}
+                    {localFilters.dateFrom === null && localFilters.dateTo === null
+                        ? 'Wszystkie daty'
+                        : `od ${formatDateEuropean(localFilters.dateFrom || 0)} do ${formatDateEuropean(localFilters.dateTo || 0)}`
+                    }
                 </Text>
             </Pressable>
 
@@ -61,7 +72,7 @@ const MainScroll = ({
                 <Text style={styles.rowTitle}>Zakres kwot</Text>
                 <Text style={styles.rowSubtitle}>
                     {(localFilters.amountMin != null || localFilters.amountMax != null)
-                        ? `${localFilters.amountMin ?? 0} zł — ${localFilters.amountMax ?? dynamicMaxAmount} zł`
+                        ? `${localFilters.amountMin ?? 0} zł - ${localFilters.amountMax ?? dynamicMaxAmount} zł`
                         : 'Dowolnie'}
                 </Text>
             </Pressable>
@@ -109,23 +120,20 @@ const CategoriesView = ({ setScreen, categories, localFilters, toggleCategory, c
                 <View style={{ width: 40 }} />
             </View>
             <Divider />
-            <Pressable style={{ padding: 12 }} onPress={() => { clearCategories(); setScreen('main'); }}>
-                <Text style={{ color: '#1976d2' }}>Wszystkie (wyczyść)</Text>
-            </Pressable>
             <FlatList
                 data={categories}
                 keyExtractor={c => String(c.id)}
                 renderItem={renderCategoryItem}
                 ItemSeparatorComponent={() => <Divider style={{ marginLeft: 72 }} />}
                 keyboardShouldPersistTaps="always"
-                contentContainerStyle={{ paddingBottom: 180 }}
+                contentContainerStyle={{ paddingBottom: 200 }}
             />
         </View>
     );
 };
 
 const TagsView = ({ setScreen, tagQuery, setTagQuery, filteredTags, localFilters, toggleTag }) => (
-    <ScrollView contentContainerStyle={{ paddingBottom: 160 }} keyboardShouldPersistTaps="always">
+    <ScrollView contentContainerStyle={{ paddingBottom: 180 }} keyboardShouldPersistTaps="always">
         <View style={styles.innerContent}>
             <View style={styles.headerRow}>
                 <IconButton icon="arrow-left" onPress={() => setScreen('main')} />
@@ -147,15 +155,25 @@ const TagsView = ({ setScreen, tagQuery, setTagQuery, filteredTags, localFilters
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 12 }}>
                     {filteredTags.map(tag => {
                         const selected = (localFilters.tagIds || []).includes(tag.id);
+                        const backgroundColor = selected ? lightenColor(tag.color, 0.8) : 'transparent';
+                        const textColor = tag.color;
+                        const borderColor = tag.color;
+
                         return (
                             <Chip
                                 key={tag.id}
                                 mode={selected ? 'flat' : 'outlined'}
                                 selected={selected}
                                 onPress={() => toggleTag(tag.id)}
-                                style={{ marginRight: 8, marginBottom: 8 }}
+                                style={{
+                                    marginRight: 8,
+                                    marginBottom: 8,
+                                    backgroundColor,
+                                    borderColor,
+                                }}
+                                textStyle={{ color: textColor }}
                             >
-                                <Text>{tag.name}</Text>
+                                {tag.name}
                             </Chip>
                         );
                     })}
@@ -165,8 +183,8 @@ const TagsView = ({ setScreen, tagQuery, setTagQuery, filteredTags, localFilters
     </ScrollView>
 );
 
-const DateView = ({ setScreen, localFilters, setShowFromPicker, setShowToPicker, showFromPicker, showToPicker, onChangeFrom, onChangeTo }) => (
-    <ScrollView contentContainerStyle={{ paddingBottom: 160 }} keyboardShouldPersistTaps="always">
+const DateView = ({ setScreen, localFilters, setShowFromPicker, setShowToPicker, showFromPicker, showToPicker, onChangeFrom, onChangeTo, onClearDates }) => (
+    <ScrollView contentContainerStyle={{ paddingBottom: 180 }} keyboardShouldPersistTaps="always">
         <View style={styles.innerContent}>
             <View style={styles.headerRow}>
                 <IconButton icon="arrow-left" onPress={() => setScreen('main')} />
@@ -175,27 +193,70 @@ const DateView = ({ setScreen, localFilters, setShowFromPicker, setShowToPicker,
             </View>
             <Divider />
             <View style={{ padding: 12 }}>
-                <PaperButton mode="outlined" onPress={() => setShowFromPicker(true)}>
-                    <Text>{new Date((localFilters.dateFrom || 0) * 1000).toLocaleDateString()}</Text>
+                <Text style={{ fontSize: 14, color: '#666', marginBottom: 16, textAlign: 'center' }}>
+                    Wybierz zakres dat lub wyświetl wszystkie transakcje
+                </Text>
+
+                {/*  OPCJA "WSZYSTKIE DATY" */}
+                <PaperButton
+                    mode={localFilters.dateFrom === null && localFilters.dateTo === null ? "contained" : "outlined"}
+                    onPress={onClearDates}
+                    style={{ marginBottom: 16 }}
+                    icon="calendar-remove"
+                >
+                    <Text>Wszystkie daty (bez ograniczeń)</Text>
                 </PaperButton>
-                <Text style={{ marginVertical: 12, textAlign: 'center' }}>—</Text>
-                <PaperButton mode="outlined" onPress={() => setShowToPicker(true)}>
-                    <Text>{new Date((localFilters.dateTo || 0) * 1000).toLocaleDateString()}</Text>
+
+                <Divider style={{ marginVertical: 16 }} />
+
+                <Text style={{ fontSize: 13, color: '#888', marginBottom: 8, textAlign: 'center' }}>
+                    Lub ustaw konkretny zakres:
+                </Text>
+
+                <Text style={{ fontSize: 13, color: '#888', marginBottom: 8 }}>Data od:</Text>
+                <PaperButton
+                    mode="outlined"
+                    onPress={() => setShowFromPicker(true)}
+                >
+                    <Text>{localFilters.dateFrom ? formatDateEuropean(localFilters.dateFrom) : 'Wybierz datę'}</Text>
+                </PaperButton>
+
+                <Text style={{ marginVertical: 12, textAlign: 'center', fontSize: 16, color: '#666' }}>do</Text>
+
+                <Text style={{ fontSize: 13, color: '#888', marginBottom: 8 }}>Data do:</Text>
+                <PaperButton
+                    mode="outlined"
+                    onPress={() => setShowToPicker(true)}
+                >
+                    <Text>{localFilters.dateTo ? formatDateEuropean(localFilters.dateTo) : 'Wybierz datę'}</Text>
                 </PaperButton>
 
                 {showFromPicker && (
-                    <DateTimePicker value={new Date((localFilters.dateFrom || 0) * 1000)} mode="date" display="default" onChange={onChangeFrom} maximumDate={new Date()} />
+                    <DateTimePicker
+                        value={new Date((localFilters.dateFrom || Date.now() / 1000) * 1000)}
+                        mode="date"
+                        display="default"
+                        onChange={onChangeFrom}
+                        maximumDate={localFilters.dateTo ? new Date(localFilters.dateTo * 1000) : new Date()} //  Nie może być późniejsza niż dateTo
+                    />
                 )}
                 {showToPicker && (
-                    <DateTimePicker value={new Date((localFilters.dateTo || 0) * 1000)} mode="date" display="default" onChange={onChangeTo} maximumDate={new Date()} />
+                    <DateTimePicker
+                        value={new Date((localFilters.dateTo || Date.now() / 1000) * 1000)}
+                        mode="date"
+                        display="default"
+                        onChange={onChangeTo}
+                        minimumDate={localFilters.dateFrom ? new Date(localFilters.dateFrom * 1000) : undefined} //  Nie może być wcześniejsza niż dateFrom
+                        maximumDate={new Date()} //  Nie może być z przyszłości
+                    />
                 )}
             </View>
         </View>
     </ScrollView>
 );
 
-const PriceView = ({ setScreen, sliderVals, dynamicMaxAmount, onSliderChange, onSliderFinish, localFilters, onManualMinChange, onManualMaxChange }) => (
-    <ScrollView contentContainerStyle={{ paddingBottom: 160 }} keyboardShouldPersistTaps="always">
+const PriceView = ({ setScreen, localFilters, onManualMinChange, onManualMaxChange }) => (
+    <ScrollView contentContainerStyle={{ paddingBottom: 180 }} keyboardShouldPersistTaps="always">
         <View style={styles.innerContent}>
             <View style={styles.headerRow}>
                 <IconButton icon="arrow-left" onPress={() => setScreen('main')} />
@@ -204,45 +265,46 @@ const PriceView = ({ setScreen, sliderVals, dynamicMaxAmount, onSliderChange, on
             </View>
             <Divider />
             <View style={{ padding: 12, alignItems: 'center' }}>
-                <Text>{`${sliderVals[0] ?? 0} zł — ${sliderVals[1] ?? dynamicMaxAmount} zł`}</Text>
-                <View style={{ width: '100%', paddingHorizontal: 16 }}>
-                    <MultiSlider
-                        values={[sliderVals[0] ?? 0, sliderVals[1] ?? dynamicMaxAmount]}
-                        sliderLength={Math.min(320, 340)}
-                        onValuesChange={onSliderChange}
-                        onValuesChangeFinish={onSliderFinish}
-                        min={DEFAULT_MIN_AMOUNT}
-                        max={Math.max(dynamicMaxAmount, DEFAULT_MAX_AMOUNT)}
-                        step={1}
-                        allowOverlap={false}
-                        snapped
-                    />
+                <Text style={{ fontSize: 14, color: '#666', marginBottom: 16, textAlign: 'center' }}>
+                    Wpisz zakres kwot do filtrowania transakcji
+                </Text>
+                <View style={{ flexDirection: 'row', width: '100%', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16 }}>
+                    <View style={{ flex: 1, marginRight: 8 }}>
+                        <Text style={{ fontSize: 13, color: '#888', marginBottom: 8 }}>Kwota od:</Text>
+                        <TextInput
+                            placeholder="0"
+                            keyboardType="numeric"
+                            value={localFilters.amountMin != null ? String(localFilters.amountMin) : ''}
+                            onChangeText={onManualMinChange}
+                            style={[styles.manualInput, { width: '100%' }]}
+                            blurOnSubmit={false}
+                        />
+                    </View>
+                    <Text style={{ fontSize: 16, color: '#666', marginTop: 20 }}>do</Text>
+                    <View style={{ flex: 1, marginLeft: 8 }}>
+                        <Text style={{ fontSize: 13, color: '#888', marginBottom: 8 }}>Kwota do:</Text>
+                        <TextInput
+                            placeholder="Bez limitu"
+                            keyboardType="numeric"
+                            value={localFilters.amountMax != null ? String(localFilters.amountMax) : ''}
+                            onChangeText={onManualMaxChange}
+                            style={[styles.manualInput, { width: '100%' }]}
+                            blurOnSubmit={false}
+                        />
+                    </View>
                 </View>
-                <View style={{ flexDirection: 'row', marginTop: 12, width: '100%', justifyContent: 'space-between', paddingHorizontal: 16 }}>
-                    <TextInput
-                        placeholder="Min"
-                        keyboardType="numeric"
-                        value={localFilters.amountMin != null ? String(localFilters.amountMin) : ''}
-                        onChangeText={onManualMinChange}
-                        style={styles.manualInput}
-                        blurOnSubmit={false}
-                    />
-                    <TextInput
-                        placeholder="Max"
-                        keyboardType="numeric"
-                        value={localFilters.amountMax != null ? String(localFilters.amountMax) : ''}
-                        onChangeText={onManualMaxChange}
-                        style={styles.manualInput}
-                        blurOnSubmit={false}
-                    />
-                </View>
+                {(localFilters.amountMin != null || localFilters.amountMax != null) && (
+                    <Text style={{ marginTop: 16, fontSize: 14, color: '#333', textAlign: 'center' }}>
+                        Zakres: {localFilters.amountMin ?? '0'} zł - {localFilters.amountMax ?? '∞'} zł
+                    </Text>
+                )}
             </View>
         </View>
     </ScrollView>
 );
 
 const TypeView = ({ setScreen, localFilters, onTypeChange, onRecurringChange }) => (
-    <ScrollView contentContainerStyle={{ paddingBottom: 160 }} keyboardShouldPersistTaps="always">
+    <ScrollView contentContainerStyle={{ paddingBottom: 180 }} keyboardShouldPersistTaps="always">
         <View style={styles.innerContent}>
             <View style={styles.headerRow}>
                 <IconButton icon="arrow-left" onPress={() => setScreen('main')} />
@@ -286,25 +348,24 @@ const FilterModal = ({
     onApply,
     onResetAndApply,
     onClose,
+    initialScreen = 'main',
 }) => {
-    // ... reszta kodu pozostaje bez zmian ...
     const [localFilters, setLocalFilters] = useState(() => initialFilters ? { ...initialFilters } : createDefaultLocal());
     const [screen, setScreen] = useState('main');
     const [tagQuery, setTagQuery] = useState('');
     const [showFromPicker, setShowFromPicker] = useState(false);
     const [showToPicker, setShowToPicker] = useState(false);
-    const [sliderVals, setSliderVals] = useState([DEFAULT_MIN_AMOUNT, DEFAULT_MAX_AMOUNT]);
 
     useEffect(() => {
         if (visible) {
             setLocalFilters(initialFilters ? { ...initialFilters } : createDefaultLocal());
-            setScreen('main');
+            setScreen(initialScreen ?? 'main');
             setTagQuery('');
         }
-    }, [visible, initialFilters]);
+    }, [visible, initialFilters, initialScreen]);
 
     const normalizeCategory = (cat) => ({ id: cat.id ?? cat.categoryId ?? cat._id ?? null, name: cat.name ?? cat.label ?? cat.categoryName ?? '', iconName: cat.iconName ?? cat.icon ?? cat.categoryIcon ?? 'folder', color: cat.color ?? cat.backgroundColor ?? cat.categoryColor ?? '#cccccc' });
-    const normalizeTag = (tag) => ({ id: tag.id ?? tag.tagId ?? tag._id ?? null, name: tag.name ?? tag.label ?? tag.tagName ?? '' });
+    const normalizeTag = (tag) => ({ id: tag.id ?? tag.tagId ?? tag._id ?? null, name: tag.name ?? tag.label ?? tag.tagName ?? '', color: tag.color ?? '#808080' });
 
     const categories = (categoriesOptions || []).map(normalizeCategory).filter(c => c.id != null);
     const tags = (tagsOptions || []).map(normalizeTag).filter(t => t.id != null);
@@ -325,7 +386,7 @@ const FilterModal = ({
                 if (f.transactionType === 'income' && !(tx.amount > 0)) return false;
                 if (f.transactionType === 'expenditure' && !(tx.amount < 0)) return false;
                 if (f.recurring && f.recurring !== 'all') {
-                    const r = Boolean(tx.recurring || tx.isRecurring || false);
+                    const r = Boolean(tx.isFromPeriodic);
                     if (f.recurring === 'yes' && !r) return false;
                     if (f.recurring === 'no' && r) return false;
                 }
@@ -339,25 +400,74 @@ const FilterModal = ({
         }
     }, [allTransactions, localFilters]);
 
-    useEffect(() => {
-        const min = localFilters.amountMin != null ? Number(localFilters.amountMin) : DEFAULT_MIN_AMOUNT;
-        const max = localFilters.amountMax != null ? Number(localFilters.amountMax) : dynamicMaxAmount;
-        setSliderVals([min, Math.max(min, Math.min(max, dynamicMaxAmount))]);
-    }, [localFilters.amountMin, localFilters.amountMax, dynamicMaxAmount]);
-
     const updateLocal = (patch) => setLocalFilters(prev => ({ ...prev, ...patch }));
     const toggleCategory = (catId) => updateLocal({ categoryIds: (localFilters.categoryIds || []).includes(catId) ? localFilters.categoryIds.filter(id => id !== catId) : [...(localFilters.categoryIds || []), catId] });
     const clearCategories = () => updateLocal({ categoryIds: [] });
     const toggleTag = (tagId) => updateLocal({ tagIds: (localFilters.tagIds || []).includes(tagId) ? localFilters.tagIds.filter(t => t !== tagId) : [...(localFilters.tagIds || []), tagId] });
 
-    const onChangeFrom = (event, selectedDate) => { setShowFromPicker(Platform.OS === 'ios'); if (selectedDate) { const d = new Date(selectedDate); d.setHours(0, 0, 0, 0); updateLocal({ dateFrom: Math.floor(d.getTime() / 1000) }); } };
-    const onChangeTo = (event, selectedDate) => { setShowToPicker(Platform.OS === 'ios'); if (selectedDate) { const d = new Date(selectedDate); d.setHours(23, 59, 59, 999); updateLocal({ dateTo: Math.floor(d.getTime() / 1000) }); } };
+    const onChangeFrom = (event, selectedDate) => {
+        setShowFromPicker(Platform.OS === 'ios');
+        if (selectedDate) {
+            const d = new Date(selectedDate);
+            d.setHours(0, 0, 0, 0);
 
-    const onSliderChange = (values) => setSliderVals(values);
-    const onSliderFinish = (values) => { setSliderVals(values); updateLocal({ amountMin: values[0], amountMax: values[1] }); };
+            //  Sprawdź czy wybrana data nie jest późniejsza niż dateTo
+            if (localFilters.dateTo && Math.floor(d.getTime() / 1000) > localFilters.dateTo) {
+                console.warn('[FilterModal] Data "od" nie może być późniejsza niż data "do"');
+                return;
+            }
 
-    const onManualMinChange = (text) => { const cleaned = text.replace(/[^\d]/g, ''); const asNum = cleaned === '' ? null : Number(cleaned); updateLocal({ amountMin: asNum }); setSliderVals(s => [asNum != null ? asNum : s[0], s[1]]); };
-    const onManualMaxChange = (text) => { const cleaned = text.replace(/[^\d]/g, ''); const asNum = cleaned === '' ? null : Number(cleaned); updateLocal({ amountMax: asNum }); setSliderVals(s => [s[0], asNum != null ? asNum : s[1]]); };
+            updateLocal({ dateFrom: Math.floor(d.getTime() / 1000) });
+
+            //  Automatycznie ustaw dateTo na dzisiaj jeśli była null
+            if (localFilters.dateTo === null) {
+                const today = new Date();
+                today.setHours(23, 59, 59, 999);
+                updateLocal({ dateTo: Math.floor(today.getTime() / 1000) });
+            }
+        }
+    };
+
+    const onChangeTo = (event, selectedDate) => {
+        setShowToPicker(Platform.OS === 'ios');
+        if (selectedDate) {
+            const d = new Date(selectedDate);
+            d.setHours(23, 59, 59, 999);
+
+            //  Sprawdź czy wybrana data nie jest wcześniejsza niż dateFrom
+            if (localFilters.dateFrom && Math.floor(d.getTime() / 1000) < localFilters.dateFrom) {
+                console.warn('[FilterModal] Data "do" nie może być wcześniejsza niż data "od"');
+                return;
+            }
+
+            updateLocal({ dateTo: Math.floor(d.getTime() / 1000) });
+
+            //  Automatycznie ustaw dateFrom jeśli była null (60 dni wcześniej)
+            if (localFilters.dateFrom === null) {
+                const sixtyDaysAgo = new Date(selectedDate);
+                sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+                sixtyDaysAgo.setHours(0, 0, 0, 0);
+                updateLocal({ dateFrom: Math.floor(sixtyDaysAgo.getTime() / 1000) });
+            }
+        }
+    };
+
+    //  FUNKCJA DO CZYSZCZENIA DAT
+    const onClearDates = () => {
+        updateLocal({ dateFrom: null, dateTo: null });
+        console.log('[FilterModal] Wyczyszczono ograniczenia dat - wyświetlane wszystkie transakcje');
+    };
+
+    const onManualMinChange = (text) => {
+        const cleaned = text.replace(/[^\d]/g, '');
+        const asNum = cleaned === '' ? null : Number(cleaned);
+        updateLocal({ amountMin: asNum });
+    };
+    const onManualMaxChange = (text) => {
+        const cleaned = text.replace(/[^\d]/g, '');
+        const asNum = cleaned === '' ? null : Number(cleaned);
+        updateLocal({ amountMax: asNum });
+    };
 
     const onTypeChange = (value) => updateLocal({ transactionType: value });
     const onRecurringChange = (value) => updateLocal({ recurring: value });
@@ -365,7 +475,113 @@ const FilterModal = ({
     const filteredTags = useMemo(() => { const q = (tagQuery || '').trim().toLowerCase(); if (!q) return tags; return tags.filter(t => t.name.toLowerCase().includes(q)); }, [tags, tagQuery]);
 
     const applyToParent = () => { let min = localFilters.amountMin != null ? Number(localFilters.amountMin) : null; let max = localFilters.amountMax != null ? Number(localFilters.amountMax) : null; if (min != null && max != null && min > max) [min, max] = [max, min]; const finalFilters = { ...localFilters, amountMin: min, amountMax: max }; if (typeof onApply === 'function') onApply(finalFilters); };
-    const resetToDefaults = () => { if (typeof onResetAndApply === 'function') { onResetAndApply(); } else { const defaults = createDefaultLocal(); setLocalFilters(defaults); if (typeof onApply === 'function') onApply(defaults); } };
+
+    //  KONTEKSTOWE CZYSZCZENIE - różne dla każdego ekranu
+    const resetCurrentScreen = () => {
+        switch (screen) {
+            case 'categories':
+                // Wyczyść tylko kategorie
+                updateLocal({ categoryIds: [] });
+                console.log('[FilterModal] Wyczyszczono kategorie');
+                break;
+
+            case 'tags':
+                // Wyczyść tylko tagi
+                updateLocal({ tagIds: [] });
+                setTagQuery(''); // Wyczyść też wyszukiwanie
+                console.log('[FilterModal] Wyczyszczono tagi');
+                break;
+
+            case 'date':
+                //  Resetuj daty do "ostatnie 60 dni" zamiast null
+                const defaults = createDefaultLocal();
+                updateLocal({
+                    dateFrom: defaults.dateFrom,
+                    dateTo: defaults.dateTo
+                });
+                console.log('[FilterModal] Zresetowano do zakresu ostatnich 60 dni');
+                break;
+
+            case 'price':
+                // Wyczyść zakres kwot
+                updateLocal({ amountMin: null, amountMax: null });
+                console.log('[FilterModal] Wyczyszczono zakres kwot');
+                break;
+
+            case 'type':
+                // Resetuj typ transakcji i cykliczność
+                updateLocal({
+                    transactionType: 'all',
+                    recurring: 'all'
+                });
+                console.log('[FilterModal] Zresetowano typ transakcji');
+                break;
+
+            case 'main':
+            default:
+                // W głównym widoku - wyczyść wszystko
+                const allDefaults = createDefaultLocal();
+                setLocalFilters(allDefaults);
+                setTagQuery('');
+                console.log('[FilterModal] Wyczyszczono wszystkie filtry');
+                break;
+        }
+    };
+
+    //  FUNKCJA DO OKREŚLENIA TEKSTU PRZYCISKU
+    const getClearButtonText = () => {
+        switch (screen) {
+            case 'categories':
+                const catCount = (localFilters.categoryIds || []).length;
+                return catCount > 0 ? `Wyczyść (${catCount})` : 'Wyczyść kategorie';
+            case 'tags':
+                const tagCount = (localFilters.tagIds || []).length;
+                return tagCount > 0 ? `Wyczyść (${tagCount})` : 'Wyczyść tagi';
+            case 'date':
+                return 'Resetuj daty';
+            case 'price':
+                const hasAmounts = localFilters.amountMin != null || localFilters.amountMax != null;
+                return hasAmounts ? 'Wyczyść kwoty' : 'Resetuj kwoty';
+            case 'type':
+                return 'Resetuj typ';
+            case 'main':
+            default:
+                return 'Wyczyść wszystko';
+        }
+    };
+
+    //  FUNKCJA DO SPRAWDZENIA CZY JEST CO CZYŚCIĆ
+    const hasFiltersToReset = () => {
+        const defaults = createDefaultLocal();
+
+        switch (screen) {
+            case 'categories':
+                return (localFilters.categoryIds || []).length > 0;
+            case 'tags':
+                return (localFilters.tagIds || []).length > 0 || tagQuery.trim() !== '';
+            case 'date':
+                return localFilters.dateFrom !== defaults.dateFrom ||
+                    localFilters.dateTo !== defaults.dateTo;
+            case 'price':
+                return localFilters.amountMin != null || localFilters.amountMax != null;
+            case 'type':
+                return localFilters.transactionType !== 'all' ||
+                    localFilters.recurring !== 'all';
+            case 'main':
+            default:
+                //  Sprawdź czy są ustawione niestandardowe daty (różne od domyślnych 60 dni)
+                const hasCustomDates = (localFilters.dateFrom !== defaults.dateFrom ||
+                    localFilters.dateTo !== defaults.dateTo);
+
+                return (localFilters.categoryIds || []).length > 0 ||
+                    (localFilters.tagIds || []).length > 0 ||
+                    localFilters.amountMin != null ||
+                    localFilters.amountMax != null ||
+                    localFilters.transactionType !== 'all' ||
+                    localFilters.recurring !== 'all' ||
+                    hasCustomDates; //  Tylko jeśli daty są różne od domyślnych
+        }
+    };
 
     return (
         <SafeAreaView style={styles.container}>
@@ -406,15 +622,12 @@ const FilterModal = ({
                     showToPicker={showToPicker}
                     onChangeFrom={onChangeFrom}
                     onChangeTo={onChangeTo}
+                    onClearDates={onClearDates}
                 />
             )}
             {screen === 'price' && (
                 <PriceView
                     setScreen={setScreen}
-                    sliderVals={sliderVals}
-                    dynamicMaxAmount={dynamicMaxAmount}
-                    onSliderChange={onSliderChange}
-                    onSliderFinish={onSliderFinish}
                     localFilters={localFilters}
                     onManualMinChange={onManualMinChange}
                     onManualMaxChange={onManualMaxChange}
@@ -432,21 +645,45 @@ const FilterModal = ({
             {/* Footer */}
             <View style={styles.footer}>
                 <View style={styles.footerLeft}>
-                    <PaperButton mode="text" onPress={resetToDefaults}>
-                        <Text>Wyczyść</Text>
+                    {/*  KONTEKSTOWY PRZYCISK "WYCZYŚĆ" */}
+                    <PaperButton
+                        mode="text"
+                        onPress={resetCurrentScreen}
+                        disabled={!hasFiltersToReset()} //  Disable jeśli nie ma co czyścić
+                        icon={screen === 'main' ? 'refresh' : 'close'} //  Różne ikony
+                    >
+                        <Text>{getClearButtonText()}</Text>
                     </PaperButton>
                 </View>
                 <View style={styles.footerRight}>
-                    <PaperButton mode="text" onPress={onClose}>
+                    <PaperButton
+                        mode="text"
+                        onPress={onClose}
+                        style={{ marginRight: 8 }}
+                    >
                         <Text>Anuluj</Text>
                     </PaperButton>
                     {screen === 'main' ? (
-                        <PaperButton mode="contained" onPress={applyToParent} style={{ marginLeft: 8 }}>
-                            <Text style={{ color: '#fff' }}>Pokaż wyniki</Text>
+                        <PaperButton
+                            mode="contained"
+                            onPress={applyToParent}
+                            style={{ minWidth: 120 }}
+                            contentStyle={{ height: 44, paddingHorizontal: 12 }}
+                            labelStyle={{ color: '#fff', fontSize: 15 }}
+                            uppercase={false}
+                        >
+                            Pokaż wyniki
                         </PaperButton>
                     ) : (
-                        <PaperButton mode="contained" onPress={() => setScreen('main')} style={{ marginLeft: 8 }}>
-                            <Text style={{ color: '#fff' }}>Zastosuj</Text>
+                        <PaperButton
+                            mode="contained"
+                            onPress={() => setScreen('main')}
+                            style={{ minWidth: 100 }}
+                            contentStyle={{ height: 44, paddingHorizontal: 12 }}
+                            labelStyle={{ color: '#fff', fontSize: 15 }}
+                            uppercase={false}
+                        >
+                            Zastosuj
                         </PaperButton>
                     )}
                 </View>
@@ -455,21 +692,63 @@ const FilterModal = ({
     );
 };
 
-const createDefaultLocal = () => {
+// FUNKCJA DOMYŚLNYCH FILTRÓW
+export const createDefaultFilters = () => {
+    // DOMYŚLNY ZAKRES: ostatnie 60 dni
     const now = new Date();
     const to = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
     const fromDate = new Date(now);
-    fromDate.setDate(now.getDate() - 45);
+    fromDate.setDate(now.getDate() - 60); // 60 dni wstecz
+    fromDate.setHours(0, 0, 0, 0);
+
     return {
         categoryIds: [],
         tagIds: [],
-        dateFrom: Math.floor(fromDate.getTime() / 1000),
-        dateTo: Math.floor(to.getTime() / 1000),
+        dateFrom: Math.floor(fromDate.getTime() / 1000), // 60 dni temu
+        dateTo: Math.floor(to.getTime() / 1000),         // dzisiaj
         amountMin: null,
         amountMax: null,
         transactionType: 'all',
         recurring: 'all',
     };
+};
+
+//  EKSPORTOWANA FUNKCJA DO SPRAWDZANIA AKTYWNYCH FILTRÓW
+export const getActiveFiltersCount = (filters) => {
+    const defaults = createDefaultFilters();
+    let count = 0;
+
+    // Kategorie
+    if (filters.categoryIds?.length > 0) count++;
+
+    // Tagi  
+    if (filters.tagIds?.length > 0) count++;
+
+    // Daty - tylko jeśli różne od domyślnych
+    if (filters.dateFrom !== defaults.dateFrom ||
+        filters.dateTo !== defaults.dateTo) count++;
+
+    // Kwoty
+    if (filters.amountMin != null || filters.amountMax != null) count++;
+
+    // Typ transakcji
+    if (filters.transactionType !== 'all') count++;
+
+    // Cykliczność
+    if (filters.recurring !== 'all') count++;
+
+    return count;
+};
+
+const createDefaultLocal = createDefaultFilters;
+
+//  ULEPSZONY FORMAT DATY - dokładnie dd.mm.rrrr
+const formatDateEuropean = (timestamp) => {
+    return new Date(timestamp * 1000).toLocaleDateString('pl-PL', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+    });
 };
 
 const styles = StyleSheet.create({
@@ -505,14 +784,18 @@ const styles = StyleSheet.create({
         borderTopWidth: 1,
         borderTopColor: '#eee',
         backgroundColor: '#fff',
-        paddingHorizontal: 12,
-        paddingVertical: 10,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
+        minHeight: 60,
     },
-    footerLeft: { flex: 1 },
-    footerRight: { flexDirection: 'row', alignItems: 'center' },
+    footerLeft: {
+        flex: 1,
+        marginRight: 8,
+    },
+    footerRight: { flexDirection: 'row', alignItems: 'center', marginLeft: 'auto' },
     listTitle: { fontSize: 16 },
 });
 

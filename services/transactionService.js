@@ -2,6 +2,27 @@ import { transactions, categories, tags, transactionTags } from '@/database/sche
 import { eq, desc } from 'drizzle-orm';
 import { processTransactionTags } from './tagService';
 
+let activePromise = null;
+
+export async function getAllTransactionsSortedSafe(db) {
+  if (activePromise) {
+    console.log('[TransactionService] Fetch już trwa, używam istniejącego Promise...');
+    return activePromise;
+  }
+  activePromise = getAllTransactionsSorted(db);
+
+  try {
+    const result = await activePromise;
+    return result;
+  } finally {
+    activePromise = null;
+  }
+}
+
+export function resetTransactionMutex() {
+  activePromise = null;
+}
+
 export const getAllTransactionsSorted = async (db) => {
   if (!db) {
     console.error('[TransactionService] Baza danych jest null - nie można pobrać transakcji');
@@ -19,6 +40,7 @@ export const getAllTransactionsSorted = async (db) => {
         transactionDate: transactions.transactionDate,
         notes: transactions.notes,
         location: transactions.location,
+        isFromPeriodic: transactions.isFromPeriodic,
         categoryId: transactions.categoryId,
         categoryName: categories.name,
         categoryColor: categories.color,
@@ -32,7 +54,8 @@ export const getAllTransactionsSorted = async (db) => {
       .select({
         transactionId: transactionTags.transactionId,
         tagId: tags.id,
-        tagName: tags.name
+        tagName: tags.name,
+        tagColor: tags.color,
       })
       .from(transactionTags)
       .innerJoin(tags, eq(transactionTags.tagId, tags.id));
@@ -41,7 +64,8 @@ export const getAllTransactionsSorted = async (db) => {
       if (!acc[tagRow.transactionId]) acc[tagRow.transactionId] = [];
       acc[tagRow.transactionId].push({
         id: tagRow.tagId,
-        name: tagRow.tagName
+        name: tagRow.tagName,
+        color: tagRow.tagColor,
       });
       return acc;
     }, {});
@@ -96,6 +120,7 @@ export const addTransaction = async (db, transactionData) => {
         notes: transactionData.description,
         location: transactionData.location,
         categoryId: categoryId,
+        isFromPeriodic: false,
       }).returning({ insertedId: transactions.id });
 
       const newTransactionId = newTransaction[0].insertedId;
@@ -108,6 +133,9 @@ export const addTransaction = async (db, transactionData) => {
     });
 
     console.log(`[transactionService] Pomyślnie dodano transakcję o ID: ${result.transactionId}`);
+
+    resetTransactionMutex();
+
     return result;
 
   } catch (error) {
@@ -122,4 +150,3 @@ export const formatCurrency = (amount) => {
     currency: 'PLN'
   }).format(amount);
 };
-

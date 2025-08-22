@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { View, Text, Button, ActivityIndicator, StyleSheet, Alert } from 'react-native';
 import { useDb } from '@/context/DbContext';
@@ -19,8 +19,13 @@ export default function HomeScreen() {
     const fetchUserData = async () => {
       if (db) {
         console.log("[HomeScreen] Instancja bazy dostępna, pobieram dane...");
-        const settingsObject = await getAllSettingsAsObject(db);
-        setCurrentUserData(settingsObject);
+        try {
+          const settingsObject = await getAllSettingsAsObject(db);
+          setCurrentUserData(settingsObject);
+        } catch (error) {
+          console.error("[HomeScreen] Błąd podczas pobierania danych użytkownika:", error);
+          setCurrentUserData(null);
+        }
       } else {
         setCurrentUserData(null);
       }
@@ -28,12 +33,15 @@ export default function HomeScreen() {
     fetchUserData();
   }, [db]);
 
-  // Pobieranie info o ostatnim sprawdzeniu transakcji okresowych
   useEffect(() => {
     const fetchLastCheckInfo = async () => {
       if (__DEV__) {
-        const info = await getLastCheckInfo();
-        setLastCheckInfo(info);
+        try {
+          const info = await getLastCheckInfo();
+          setLastCheckInfo(info);
+        } catch (error) {
+          console.error("[HomeScreen] Błąd podczas pobierania info o sprawdzeniu:", error);
+        }
       }
     };
     fetchLastCheckInfo();
@@ -94,10 +102,10 @@ export default function HomeScreen() {
   };
 
   const handleResetCheckTime = async () => {
-    await resetPeriodicCheckTime();
-    Alert.alert('Reset', 'Czas ostatniego sprawdzania został zresetowany');
-    const info = await getLastCheckInfo();
-    setLastCheckInfo(info);
+      await resetPeriodicCheckTime();
+      Alert.alert('Reset', 'Czas ostatniego sprawdzania został zresetowany');
+      const info = await getLastCheckInfo();
+      setLastCheckInfo(info);
   };
 
   if (!user) {
@@ -188,5 +196,18 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#ffeaa7',
+  },
+  periodicContainer: {
+    marginTop: 8,
+  },
+  lastCheckText: {
+    marginTop: 8,
+    fontSize: 13,
+    color: '#333',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
