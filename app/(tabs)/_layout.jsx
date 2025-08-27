@@ -12,7 +12,7 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen name='home' />
-      <Tabs.Screen name='details' />
+      <Tabs.Screen name='transactionListScreen' />
       <Tabs.Screen
         name='add'
         listeners={{

@@ -1,14 +1,13 @@
 import React from 'react';
 import { View, Pressable, StyleSheet, Dimensions } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router'
 import { Feather, FontAwesome5, Foundation } from '@expo/vector-icons';
 
 const ICON_MAP = {
     home: (props) => <FontAwesome5 name="home" {...props} />,
-    details: (props) => <Foundation name="list" {...props} />,
+    transactionListScreen: (props) => <Foundation name="list" {...props} />,
     add: (props) => <Feather name="plus" {...props} />,
-    cards: (props) => <FontAwesome5 name="credit-card" {...props} />,
+    cards: (props) => <FontAwesome5 name="barcode" {...props} />,
     settings: (props) => <FontAwesome5 name="cog" {...props} />,
 };
 
@@ -17,19 +16,18 @@ const TAB_BAR_WIDTH = width * 0.9;
 const TAB_WIDTH = TAB_BAR_WIDTH / 5;
 
 const CustomTabBar = ({ state }) => {
-    const { bottom } = useSafeAreaInsets();
     const router = useRouter();
 
     const ROUTE_MAP = {
         home: '/(tabs)/home',
-        details: '/(tabs)/details',
+        transactionListScreen: '/(tabs)/transactionListScreen',
         add: '/(modals)/AddTransactionModal',
         cards: '/(tabs)/cards',
         settings: '/(tabs)/settings',
     };
 
     return (
-        <View style={[styles.tabBarContainer, { bottom: bottom + 10 }]}>
+        <View style={[styles.tabBarContainer, { bottom: 10 }]}>
             <View style={styles.tabBar}>
                 {state.routes.map((route, index) => {
                     const isFocused = state.index === index;
@@ -37,7 +35,6 @@ const CustomTabBar = ({ state }) => {
                     const routePath = ROUTE_MAP[route.name];
 
                     const onPress = () => {
-
                         if (isCentralButton) {
                             router.push('/(modals)/AddTransactionModal');
                         } else if (!isFocused) {

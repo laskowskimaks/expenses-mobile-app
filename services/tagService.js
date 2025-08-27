@@ -1,5 +1,16 @@
 import { tags, transactionTags } from '@/database/schema';
+import { eventEmitter } from '@/utils/eventEmitter';
 import { eq } from 'drizzle-orm';
+
+const COLOR_PALETTE = [
+  '#ef4444', '#f97316', '#f59e0b', '#84dc16', '#22c55e',
+  '#10b981', '#14b8a6', '#06b6d4', '#0ea5e9', '#3b22f6',
+  '#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899'
+];
+
+export const getRandomColor = () => {
+  return COLOR_PALETTE[Math.floor(Math.random() * COLOR_PALETTE.length)];
+};
 
 export const getAllTags = async (db) => {
   try {
@@ -13,40 +24,7 @@ export const getAllTags = async (db) => {
   }
 };
 
-// Dodaj tag jeśli nie istnieje
-export const ensureTagExists = async (db, tagName) => {
-  try {
-    const trimmedName = tagName.trim();
-    if (!trimmedName) {
-      throw new Error('Nazwa tagu nie może być pusta');
-    }
-
-    // Sprawdź czy tag już istnieje
-    const existingTag = await db.select()
-      .from(tags)
-      .where(eq(tags.name, trimmedName))
-      .limit(1);
-
-    if (existingTag.length > 0) {
-      console.log(`[TagService] Tag "${trimmedName}" już istnieje (ID: ${existingTag[0].id})`);
-      return { tagId: existingTag[0].id, created: false };
-    }
-
-    // Dodaj nowy tag
-    const newTag = await db.insert(tags).values({
-      name: trimmedName
-    }).returning();
-
-    console.log(`[TagService] Utworzono nowy tag "${trimmedName}" (ID: ${newTag[0].id})`);
-    return { tagId: newTag[0].id, created: true };
-
-  } catch (error) {
-    console.error('[TagService] Błąd podczas tworzenia tagu:', error);
-    throw error;
-  }
-};
-
-// Przetwórz wszystkie tagi dla transakcji
+// wszystkie tagi dla transakcji
 export const processTransactionTags = async (db, transactionId, tagNames) => {
   if (!tagNames || tagNames.length === 0) return [];
 
@@ -69,13 +47,19 @@ export const processTransactionTags = async (db, transactionId, tagNames) => {
       tagId = existingTag[0].id;
       console.log(`[TagService] Znaleziono istniejący tag "${trimmedTagName}" (ID: ${tagId})`);
     } else {
-      // Tag nie istnieje - dodaj nowy do tabeli tags
+      // Tag nie istnieje - dodaj nowy do tabeli tags wraz z kolorem
       const newTag = await db.insert(tags).values({
-        name: trimmedTagName
+        name: trimmedTagName,
+        color: getRandomColor(),
       }).returning({ insertedId: tags.id });
 
       tagId = newTag[0].insertedId;
       console.log(`[TagService] Utworzono nowy tag "${trimmedTagName}" (ID: ${tagId})`);
+      try {
+        eventEmitter.emit('tagAdded', { id: tagId, name: trimmedTagName });
+      } catch (e) {
+        console.error('[TagService] Błąd podczas emitowania zdarzenia tagAdded:', e);
+      }
     }
 
     tagIds.push(tagId);

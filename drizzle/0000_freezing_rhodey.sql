@@ -45,7 +45,8 @@ CREATE TABLE `settings` (
 --> statement-breakpoint
 CREATE TABLE `tags` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
-	`name` text NOT NULL
+	`name` text NOT NULL,
+	`color` text NOT NULL
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `tags_name_unique` ON `tags` (`name`);--> statement-breakpoint
@@ -64,6 +65,7 @@ CREATE TABLE `transactions` (
 	`transaction_date` integer NOT NULL,
 	`notes` text,
 	`location` text,
+	`periodic_transaction_id` integer,
 	`category_id` integer,
 	FOREIGN KEY (`category_id`) REFERENCES `categories`(`id`) ON UPDATE no action ON DELETE set null
 );

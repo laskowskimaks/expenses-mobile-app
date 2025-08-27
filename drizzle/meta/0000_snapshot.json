@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "b788b42b-eff0-4e86-a14c-93e5a06a5e42",
+  "id": "2671ad88-19ad-45ca-88b6-598f2b5d5cff",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "categories": {
@@ -303,6 +303,13 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "color": {
+          "name": "color",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
         }
       },
       "indexes": {
@@ -419,6 +426,13 @@
         "location": {
           "name": "location",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "periodic_transaction_id": {
+          "name": "periodic_transaction_id",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
