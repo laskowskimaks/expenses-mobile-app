@@ -65,7 +65,7 @@ CREATE TABLE `transactions` (
 	`transaction_date` integer NOT NULL,
 	`notes` text,
 	`location` text,
-	`is_from_periodic` integer DEFAULT false NOT NULL,
+	`periodic_transaction_id` integer,
 	`category_id` integer,
 	FOREIGN KEY (`category_id`) REFERENCES `categories`(`id`) ON UPDATE no action ON DELETE set null
 );

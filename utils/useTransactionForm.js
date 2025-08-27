@@ -49,6 +49,7 @@ export const ACTIONS = {
   SET_IS_SAVING: 'SET_IS_SAVING',
   RESET_FORM: 'RESET_FORM',
   SET_FIELD: 'SET_FIELD',
+  POPULATE_FORM_FOR_EDIT: 'POPULATE_FORM_FOR_EDIT',
 };
 
 function formatAmountInput(input) {
@@ -135,6 +136,36 @@ function transactionFormReducer(state, action) {
       return { ...initialState, date: new Date(), time: new Date() };
     case ACTIONS.SET_FIELD:
       return { ...state, [action.field]: action.value };
+    case ACTIONS.POPULATE_FORM_FOR_EDIT: {
+        const { categories, editMode, ...transactionAndPattern } = action.payload;
+
+        if (!transactionAndPattern) return state;
+
+        const { periodicPattern, ...transactionData } = transactionAndPattern;
+        const transactionDate = new Date(transactionData.transactionDate * 1000);
+        const category = categories.find(c => c.id === transactionData.categoryId);
+
+        const originalNotes = transactionData.notes || '';
+        const autoTextRegex = /\s*\n?\(transakcja dodana automatycznie\)$/;
+        const cleanedDescription = originalNotes.replace(autoTextRegex, '').trim();
+
+        return {
+            ...state,
+            type: transactionData.amount > 0 ? 'income' : 'expenditure',
+            title: transactionData.title || '',
+            amount: String(Math.abs(transactionData.amount)),
+            description: cleanedDescription,
+            location: transactionData.location || '',
+            selectedCategory: category || null,
+            date: transactionDate,
+            time: transactionDate,
+            tags: (transactionData.tags || []).map(t => t.name),
+            isPeriodic: editMode === 'future',
+            repeatInterval: periodicPattern ? String(periodicPattern.repeatInterval) : '1',
+            repeatUnit: periodicPattern ? periodicPattern.repeatUnit : 'month',
+            endDate: periodicPattern && periodicPattern.endDate ? new Date(periodicPattern.endDate * 1000) : null,
+        };
+    }
     default:
       return state;
   }
@@ -143,7 +174,6 @@ function transactionFormReducer(state, action) {
 export function useTransactionForm() {
   const [state, dispatch] = useReducer(transactionFormReducer, initialState);
 
-  // debounce dla tagSearchText
   const [debouncedTagSearchText, setDebouncedTagSearchText] = useState('');
 
   useEffect(() => {
@@ -156,9 +186,10 @@ export function useTransactionForm() {
   const isButtonDisabled = useMemo(() => {
     const amountNumber = parseFloat((state.amount || '').replace(',', '.'));
     const isValidAmount = !isNaN(amountNumber) && amountNumber > 0;
-
+    
+    const isPeriodicAction = state.isPeriodic;
     const intervalInt = parseInt(state.repeatInterval, 10);
-    const isValidInterval = !state.isPeriodic || (!isNaN(intervalInt) && intervalInt >= 1 && intervalInt <= 1000);
+    const isValidInterval = !isPeriodicAction || (!isNaN(intervalInt) && intervalInt >= 1 && intervalInt <= 1000);
 
     return !state.title.trim() ||
       !state.amount.trim() ||

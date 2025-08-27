@@ -31,7 +31,7 @@ export const transactions = sqliteTable('transactions', {
   transactionDate: integer('transaction_date').notNull(),
   notes: text('notes'),
   location: text('location'),
-  isFromPeriodic: integer('is_from_periodic', { mode: 'boolean' }).notNull().default(false),
+  periodicTransactionId: integer('periodic_transaction_id'),
   // Definicja klucza obcego wskazującego na kategorie
   categoryId: integer('category_id').references(() => categories.id, { onDelete: 'set null' }),
 });
@@ -45,7 +45,7 @@ export const periodicTransactions = sqliteTable('periodic_transactions', {
   repeatUnit: text('repeat_unit').notNull(), // 'day', 'week', 'month', 'year'
   startDate: integer('start_date').notNull(), 
   nextOccurrenceDate: integer('next_occurrence_date').notNull(),
-  endDate: integer('end_date'), // Może być NULL
+  endDate: integer('end_date'),
   notes: text('notes'),
   categoryId: integer('category_id').references(() => categories.id, { onDelete: 'set null' }),
 });
@@ -100,6 +100,11 @@ export const transactionsRelations = relations(transactions, ({ one, many }) => 
   category: one(categories, {
     fields: [transactions.categoryId],
     references: [categories.id],
+  }),
+  // Relacja do definicji transakcji cyklicznych
+  periodicTransaction: one(periodicTransactions, {
+    fields: [transactions.periodicTransactionId],
+    references: [periodicTransactions.id],
   }),
   // Relacja wiele-do-wielu: każda transakcja może mieć wiele tagów poprzez tabelę łączącą
   transactionTags: many(transactionTags),

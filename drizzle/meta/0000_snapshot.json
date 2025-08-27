@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "fd7dbff5-e5cc-4372-b68a-c3295a2697d2",
+  "id": "2671ad88-19ad-45ca-88b6-598f2b5d5cff",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "categories": {
@@ -430,13 +430,12 @@
           "notNull": false,
           "autoincrement": false
         },
-        "is_from_periodic": {
-          "name": "is_from_periodic",
+        "periodic_transaction_id": {
+          "name": "periodic_transaction_id",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": false
+          "notNull": false,
+          "autoincrement": false
         },
         "category_id": {
           "name": "category_id",
