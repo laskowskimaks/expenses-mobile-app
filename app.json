@@ -35,7 +35,19 @@
       ],
       "expo-sqlite",
       "expo-secure-store",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Aplikacja potrzebuje dostępu do aparatu, aby móc skanować kody kreskowe kart lojalnościowych."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Aplikacja potrzebuje dostępu do Twoich zdjęć, abyś mógł dodać obraz kodu kreskowego."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

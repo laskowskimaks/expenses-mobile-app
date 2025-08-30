@@ -138,6 +138,30 @@ function RootLayoutNav() {
             headerShown: false,
           }}
         />
+        <Stack.Screen
+          name="(modals)/AddLoyaltyCardModal"
+          options={{
+            presentation: 'transparentModal',
+            title: 'Nowa Karta Lojalnościowa',
+            animation: 'fade_from_bottom',
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="(modals)/CardDetailModal"
+          options={{
+            presentation: 'transparentModal',
+            animation: 'fade_from_bottom',
+            headerShown: false
+          }}
+        />
+        <Stack.Screen
+          name="(screens)/BarcodeScannerScreen"
+          options={{
+            presentation: 'modal',
+            headerShown: false
+          }}
+        />
       </Stack>
       {shouldShowBanner && <OfflineBanner />}
     </>

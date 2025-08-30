@@ -54,10 +54,10 @@ export const periodicTransactions = sqliteTable('periodic_transactions', {
 export const loyaltyCards = sqliteTable('loyalty_cards', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   name: text('name').notNull(),
-  cardNumber: text('card_number'),
   barcodeData: text('barcode_data'),
   barcodeFormat: text('barcode_format'), // np. 'QR_CODE', 'EAN_13'
   notes: text('notes'),
+  imageUri: text('image_uri'), 
 });
 
 

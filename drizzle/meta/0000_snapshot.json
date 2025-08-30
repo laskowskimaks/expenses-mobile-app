@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "2671ad88-19ad-45ca-88b6-598f2b5d5cff",
+  "id": "4fc1cf1f-3e36-47c7-ae80-c4eabf8b462d",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "categories": {
@@ -75,13 +75,6 @@
           "notNull": true,
           "autoincrement": false
         },
-        "card_number": {
-          "name": "card_number",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "barcode_data": {
           "name": "barcode_data",
           "type": "text",
@@ -98,6 +91,13 @@
         },
         "notes": {
           "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "image_uri": {
+          "name": "image_uri",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
