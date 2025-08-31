@@ -12,6 +12,7 @@ export const AuthProvider = ({ children }) => {
   const [isAuthLoading, setAuthIsLoading] = useState(true);
   const [isLocked, setIsLocked] = useState(true);
   const [needsPinSetup, setNeedsPinSetup] = useState(false);
+  const [isExternalActivity, setIsExternalActivity] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(firebaseAuth, async (firebaseUser) => {
@@ -109,7 +110,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const value = { user, isAuthLoading, needsPinSetup, register, login, logout, isLocked, lockApp, unlockApp, completeRegistration, forgotPassword };
+  const value = { user, isAuthLoading, needsPinSetup, register, login, logout, isLocked, lockApp, unlockApp, completeRegistration, forgotPassword, isExternalActivity, setIsExternalActivity };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

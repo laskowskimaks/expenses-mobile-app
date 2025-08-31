@@ -8,12 +8,14 @@ import * as ImageManipulator from 'expo-image-manipulator';
 
 import { useDb } from '@/context/DbContext';
 import { getLoyaltyCardById, addLoyaltyCard, updateLoyaltyCard } from '@/services/loyaltyCardService';
-import LoyaltyCardPreview from '../components/LoyaltyCardPreview';
+import LoyaltyCardPreview from './components/LoyaltyCardPreview';
+import { useAuth } from '@/context/AuthContext';
 
 export default function AddLoyaltyCardModal() {
     const theme = useTheme();
     const router = useRouter();
     const { db } = useDb();
+    const { setIsExternalActivity } = useAuth();
     const params = useLocalSearchParams();
 
     const cardId = useMemo(() => params.cardId ? parseInt(params.cardId, 10) : null, [params.cardId]);
@@ -32,6 +34,7 @@ export default function AddLoyaltyCardModal() {
 
     useFocusEffect(
         useCallback(() => {
+            setIsExternalActivity(false);
             if (params.imageUri && typeof params.imageUri === 'string' && params.imageUri !== 'null' && params.imageUri !== '') {
                 setImageUri(params.imageUri);
                 setBarcodeData(null);
@@ -74,24 +77,35 @@ export default function AddLoyaltyCardModal() {
         if (result.success) { router.back(); } else { Alert.alert('Błąd', result.message || 'Nie udało się zapisać karty.'); }
     };
 
-    const handleScanLive = () => { router.push('/(screens)/BarcodeScannerScreen'); };
+    const handleScanLive = () => {
+        setIsExternalActivity(true);
+        router.push('/(screens)/BarcodeScannerScreen');
+    };
 
     const handlePickCardImage = async () => {
-        const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: 'images',
-            allowsEditing: true,
-            quality: 1,
-        });
-        if (!result.canceled && result.assets && result.assets.length > 0) {
-            const manipResult = await ImageManipulator.manipulateAsync(
-                result.assets[0].uri,
-                [{ resize: { width: 900 } }],
-                { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG }
-            );
-            setImageUri(manipResult.uri);
-            setBarcodeData(null);
-            setBarcodeFormat(null);
+        setIsExternalActivity(true);
+        let manipResult = null;
+        try {
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: 'images',
+                allowsEditing: true,
+                quality: 1,
+            });
+            if (!result.canceled && result.assets && result.assets.length > 0) {
+                manipResult = await ImageManipulator.manipulateAsync(
+                    result.assets[0].uri,
+                    [{ resize: { width: 900 } }],
+                    { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG }
+                );
+                setImageUri(manipResult.uri);
+                setBarcodeData(null);
+                setBarcodeFormat(null);
+            }
+        } catch (error) {
+            Alert.alert('Błąd', 'Nie udało się przetworzyć zdjęcia. Spróbuj ponownie.');
+            console.error('[AddLoyaltyCardModal] Błąd ImageManipulator:', error);
         }
+        setIsExternalActivity(false);
     };
 
     if (isLoading) { return <View style={styles.centered}><ActivityIndicator size="large" /></View>; }

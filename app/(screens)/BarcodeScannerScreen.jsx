@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Button } from 'react-native';
+import { View, Text, StyleSheet, Button, Alert } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IconButton } from 'react-native-paper';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
+import { useAuth } from '@/context/AuthContext';
 
 export default function BarcodeScannerScreen() {
     const router = useRouter();
@@ -14,6 +15,8 @@ export default function BarcodeScannerScreen() {
     const [scanned, setScanned] = useState(false);
     const [isScanningActive, setIsScanningActive] = useState(false);
     const [unsupportedFormat, setUnsupportedFormat] = useState(null);
+    const { setIsExternalActivity } = useAuth();
+
     useEffect(() => {
         if (!permission?.granted) {
             requestPermission();
@@ -21,25 +24,33 @@ export default function BarcodeScannerScreen() {
     }, [permission]);
 
     const handleTakeCardPhoto = async () => {
-        const result = await ImagePicker.launchCameraAsync({
-            allowsEditing: true,
-            quality: 1,
-        });
-        if (!result.canceled && result.assets && result.assets.length > 0) {
-            const manipResult = await ImageManipulator.manipulateAsync(
-                result.assets[0].uri,
-                [{ resize: { width: 900 } }],
-                { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG }
-            );
-            router.back();
-            setTimeout(() => {
-                router.setParams({
-                    barcodeData: null,
-                    barcodeType: null,
-                    imageUri: manipResult.uri,
-                });
-            }, 100);
+        setIsExternalActivity(true);
+        let manipResult = null;
+        try {
+            const result = await ImagePicker.launchCameraAsync({
+                allowsEditing: true,
+                quality: 1,
+            });
+            if (!result.canceled && result.assets && result.assets.length > 0) {
+                manipResult = await ImageManipulator.manipulateAsync(
+                    result.assets[0].uri,
+                    [{ resize: { width: 900 } }],
+                    { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG }
+                );
+                router.back();
+                setTimeout(() => {
+                    router.setParams({
+                        barcodeData: null,
+                        barcodeType: null,
+                        imageUri: manipResult.uri,
+                    });
+                }, 100);
+            }
+        } catch (error) {
+            Alert.alert('Błąd', 'Nie udało się przetworzyć zdjęcia. Spróbuj ponownie.');
+            console.error('[BarcodeScannerScreen] Błąd ImageManipulator:', error);
         }
+        setIsExternalActivity(false);
     };
 
     const handleBarCodeScanned = ({ type, data }) => {
