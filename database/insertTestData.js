@@ -17,10 +17,10 @@ export const insertTestData = async (db) => {
 
     // 1. Loyalty Cards
     const loyaltyCardsData = [
-      { name: 'Moja Biedronka', cardNumber: '9876543210987', barcodeData: '9876543210987', barcodeFormat: 'EAN_13', notes: 'Główna karta na zakupy spożywcze' },
-      { name: 'Lidl Plus', cardNumber: null, barcodeData: 'qr-code-data-string-lidl', barcodeFormat: 'QR_CODE', notes: 'Aplikacja w telefonie' },
-      { name: 'Rossmann Klub', cardNumber: '1122334455', barcodeData: '1122334455', barcodeFormat: 'CODE_128', notes: null },
-      { name: 'Orlen Vitay', cardNumber: '01230000456789', barcodeData: '01230000456789', barcodeFormat: 'EAN_13', notes: 'Karta do tankowania' }
+      { name: 'Moja Biedronka', barcodeData: '9876543210987', barcodeFormat: 'ean13', notes: 'Główna karta na zakupy spożywcze' },
+      { name: 'Lidl Plus', barcodeData: 'qr-code-data-string-lidl', barcodeFormat: 'qr_code', notes: 'Aplikacja w telefonie' },
+      { name: 'Rossmann Klub', barcodeData: '1122334455', barcodeFormat: 'code128', notes: null },
+      { name: 'Orlen Vitay', barcodeData: '10230000456789', barcodeFormat: 'ean13', notes: 'Karta do tankowania' }
     ];
 
     for (const card of loyaltyCardsData) {

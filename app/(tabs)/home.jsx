@@ -6,6 +6,7 @@ import { getAllSettingsAsObject } from '@/services/authService';
 import { insertTestData } from '@/database/insertTestData';
 import { getLastCheckInfo, resetPeriodicCheckTime } from '@/utils/periodicChecker';
 import { processPeriodicTransactions } from '@/services/periodicTransactionService';
+import { performUpload } from '@/services/backupService';
 
 export default function HomeScreen() {
   const { user, logout } = useAuth();
@@ -46,6 +47,16 @@ export default function HomeScreen() {
     };
     fetchLastCheckInfo();
   }, []);
+
+  const handleUploadBackup = async () => {
+    try {
+      await performUpload(db);
+      Alert.alert('Backup', 'Backup został wysłany do chmury.');
+    } catch (error) {
+      Alert.alert('Błąd', 'Nie udało się wykonać backupu.');
+      console.error('[HomeScreen] Błąd backupu:', error);
+    }
+  };
 
   const handleProcessPeriodicTransactions = async () => {
     if (!db) {
@@ -102,10 +113,10 @@ export default function HomeScreen() {
   };
 
   const handleResetCheckTime = async () => {
-      await resetPeriodicCheckTime();
-      Alert.alert('Reset', 'Czas ostatniego sprawdzania został zresetowany');
-      const info = await getLastCheckInfo();
-      setLastCheckInfo(info);
+    await resetPeriodicCheckTime();
+    Alert.alert('Reset', 'Czas ostatniego sprawdzania został zresetowany');
+    const info = await getLastCheckInfo();
+    setLastCheckInfo(info);
   };
 
   if (!user) {
@@ -122,6 +133,11 @@ export default function HomeScreen() {
       <View style={styles.header}>
         <Text style={styles.welcomeText}>Witaj, {user.email}!</Text>
         <Button title="Wyloguj" onPress={logout} />
+        <Button
+          title="Backup"
+          onPress={handleUploadBackup}
+          color="#2196F3"
+        />
       </View>
 
       {/* Przyciski dev */}

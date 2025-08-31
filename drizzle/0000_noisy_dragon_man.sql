@@ -10,10 +10,10 @@ CREATE UNIQUE INDEX `categories_name_unique` ON `categories` (`name`);--> statem
 CREATE TABLE `loyalty_cards` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`name` text NOT NULL,
-	`card_number` text,
 	`barcode_data` text,
 	`barcode_format` text,
-	`notes` text
+	`notes` text,
+	`image_uri` text
 );
 --> statement-breakpoint
 CREATE TABLE `periodic_transaction_tags` (

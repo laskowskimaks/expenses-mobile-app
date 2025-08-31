@@ -19,7 +19,7 @@ const OfflineBanner = () => (
 );
 
 function RootLayoutNav() {
-  const { user, isAuthLoading, isLocked, lockApp, unlockApp, needsPinSetup } = useAuth();
+  const { user, isAuthLoading, isLocked, lockApp, unlockApp, needsPinSetup, isExternalActivity } = useAuth();
   const { isConnected } = useNetworkStatus();
   const { db, initializeDatabase, clearDatabase, isLoading: isDbLoading } = useDb();
 
@@ -32,13 +32,17 @@ function RootLayoutNav() {
   // Nasłuchiwanie stanu aplikacji w celu blokady
   useEffect(() => {
     const subscription = AppState.addEventListener('change', nextAppState => {
-      if (appState.current === 'active' && (nextAppState === 'inactive' || nextAppState === 'background')) {
+      if (
+        appState.current === 'active' &&
+        (nextAppState === 'inactive' || nextAppState === 'background') &&
+        !isExternalActivity 
+      ) {
         lockApp();
       }
       appState.current = nextAppState;
     });
     return () => subscription.remove();
-  }, [lockApp]);
+  }, [lockApp, isExternalActivity]);
 
   useEffect(() => {
     const handleStateChange = async () => {
@@ -136,6 +140,30 @@ function RootLayoutNav() {
             title: 'Nowa Transakcja',
             animation: 'fade_from_bottom',
             headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="(modals)/AddLoyaltyCardModal"
+          options={{
+            presentation: 'transparentModal',
+            title: 'Nowa Karta Lojalnościowa',
+            animation: 'fade_from_bottom',
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="(modals)/CardDetailModal"
+          options={{
+            presentation: 'transparentModal',
+            animation: 'fade_from_bottom',
+            headerShown: false
+          }}
+        />
+        <Stack.Screen
+          name="(screens)/BarcodeScannerScreen"
+          options={{
+            presentation: 'modal',
+            headerShown: false
           }}
         />
       </Stack>
