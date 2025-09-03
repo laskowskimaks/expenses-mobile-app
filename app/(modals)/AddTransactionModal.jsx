@@ -24,85 +24,88 @@ const REPEAT_UNITS = [
   { value: 'year', label: 'Lata', labelSingle: 'rok', labelPlural: 'lat' }
 ];
 
-const PeriodicSection = ({ state, actions, getRepeatUnitLabel }) => (
-  <View style={[styles.periodicSection, { backgroundColor: useTheme().colors.surfaceVariant }]}>
-    <View style={styles.intervalRow}>
-      <View style={styles.intervalInput}>
-        <TextInput
-          mode="outlined"
-          label="Co ile"
-          value={state.repeatInterval}
-          onChangeText={actions.setRepeatInterval}
-          keyboardType="numeric"
-          placeholder="1"
-          accessibilityLabel="Interwał powtarzania"
-        />
-      </View>
-      <Pressable
-        onPress={() => actions.toggleRepeatUnitPicker(true)}
-        style={styles.unitSelector}
-        accessibilityRole="button"
-        accessibilityLabel="Wybierz jednostkę powtarzania"
-      >
-        <View pointerEvents="none">
+const PeriodicSection = ({ state, actions, getRepeatUnitLabel }) => {
+  const theme = useTheme();
+  return (
+    <View style={[styles.periodicSection, { backgroundColor: theme.colors.surfaceVariant }]}>
+      <View style={styles.intervalRow}>
+        <View style={styles.intervalInput}>
           <TextInput
             mode="outlined"
-            label="Jednostka"
-            value={getRepeatUnitLabel(state.repeatUnit, state.repeatInterval)}
-            editable={false}
-            right={<TextInput.Icon icon="chevron-down" />}
+            label="Co ile"
+            value={state.repeatInterval}
+            onChangeText={actions.setRepeatInterval}
+            keyboardType="numeric"
+            placeholder="1"
+            accessibilityLabel="Interwał powtarzania"
           />
         </View>
-      </Pressable>
-    </View>
-    <View style={styles.endDateSection}>
-      <Text variant="labelMedium" style={styles.subSectionTitle}>
-        Data zakończenia (opcjonalna)
-      </Text>
-      {state.endDate ? (
-        <View style={styles.endDateContainer}>
-          <Pressable
-            onPress={() => actions.toggleEndDatePicker(true)}
-            style={styles.endDateButton}
-            accessibilityRole="button"
-            accessibilityLabel="Wybierz datę zakończenia"
-          >
-            <Text>{state.endDate.toLocaleDateString('pl-PL')}</Text>
-            <MaterialCommunityIcons name="calendar" size={20} color={useTheme().colors.primary} />
-          </Pressable>
-          <Button
-            mode="text"
-            onPress={actions.removeEndDate}
-            compact
-            icon="close"
-            accessibilityLabel="Usuń datę zakończenia"
-          >
-            Usuń
-          </Button>
-        </View>
-      ) : (
-        <Button
-          mode="outlined"
-          onPress={() => actions.toggleEndDatePicker(true)}
-          icon="calendar-plus"
-          accessibilityLabel="Ustaw datę zakończenia"
+        <Pressable
+          onPress={() => actions.toggleRepeatUnitPicker(true)}
+          style={styles.unitSelector}
+          accessibilityRole="button"
+          accessibilityLabel="Wybierz jednostkę powtarzania"
         >
-          Ustaw datę zakończenia
-        </Button>
-      )}
+          <View pointerEvents="none">
+            <TextInput
+              mode="outlined"
+              label="Jednostka"
+              value={getRepeatUnitLabel(state.repeatUnit, state.repeatInterval)}
+              editable={false}
+              right={<TextInput.Icon icon="chevron-down" />}
+            />
+          </View>
+        </Pressable>
+      </View>
+      <View style={styles.endDateSection}>
+        <Text variant="labelMedium" style={styles.subSectionTitle}>
+          Data zakończenia (opcjonalna)
+        </Text>
+        {state.endDate ? (
+          <View style={styles.endDateContainer}>
+            <Pressable
+              onPress={() => actions.toggleEndDatePicker(true)}
+              style={styles.endDateButton}
+              accessibilityRole="button"
+              accessibilityLabel="Wybierz datę zakończenia"
+            >
+              <Text>{state.endDate.toLocaleDateString('pl-PL')}</Text>
+              <MaterialCommunityIcons name="calendar" size={20} color={theme.colors.primary} />
+            </Pressable>
+            <Button
+              mode="text"
+              onPress={actions.removeEndDate}
+              compact
+              icon="close"
+              accessibilityLabel="Usuń datę zakończenia"
+            >
+              Usuń
+            </Button>
+          </View>
+        ) : (
+          <Button
+            mode="outlined"
+            onPress={() => actions.toggleEndDatePicker(true)}
+            icon="calendar-plus"
+            accessibilityLabel="Ustaw datę zakończenia"
+          >
+            Ustaw datę zakończenia
+          </Button>
+        )}
+      </View>
+      <View style={styles.cyclePreview}>
+        <Text variant="labelSmall" style={{ color: theme.colors.primary, marginBottom: 4 }}>
+          Podgląd:
+        </Text>
+        <Text variant="bodyMedium">
+          Co {state.repeatInterval} {getRepeatUnitLabel(state.repeatUnit, state.repeatInterval)},
+          począwszy od {state.date.toLocaleDateString('pl-PL')} o {state.time.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}
+          {state.endDate && `, do ${state.endDate.toLocaleDateString('pl-PL')}`}
+        </Text>
+      </View>
     </View>
-    <View style={styles.cyclePreview}>
-      <Text variant="labelSmall" style={{ color: useTheme().colors.primary, marginBottom: 4 }}>
-        Podgląd:
-      </Text>
-      <Text variant="bodyMedium">
-        Co {state.repeatInterval} {getRepeatUnitLabel(state.repeatUnit, state.repeatInterval)},
-        począwszy od {state.date.toLocaleDateString('pl-PL')} o {state.time.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}
-        {state.endDate && `, do ${state.endDate.toLocaleDateString('pl-PL')}`}
-      </Text>
-    </View>
-  </View>
-);
+  );
+};
 
 export default function AddTransactionModal() {
   const theme = useTheme();

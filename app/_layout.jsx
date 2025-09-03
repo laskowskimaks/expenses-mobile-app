@@ -9,6 +9,7 @@ import { NetworkProvider, useNetworkStatus } from '@/context/NetworkContext';
 import { getHashedPin } from '@/services/authService';
 import { PaperProvider } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { ThemeProvider, useThemeContext } from '@/context/ThemeContext';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -35,7 +36,7 @@ function RootLayoutNav() {
       if (
         appState.current === 'active' &&
         (nextAppState === 'inactive' || nextAppState === 'background') &&
-        !isExternalActivity 
+        !isExternalActivity
       ) {
         lockApp();
       }
@@ -160,6 +161,61 @@ function RootLayoutNav() {
           }}
         />
         <Stack.Screen
+          name="(modals)/ChangePinModal"
+          options={{
+            presentation: 'transparentModal',
+            animation: 'fade_from_bottom',
+            headerShown: false
+          }}
+        />
+        <Stack.Screen
+          name="(modals)/ChangePasswordModal"
+          options={{
+            presentation: 'transparentModal',
+            animation: 'fade_from_bottom',
+            headerShown: false
+          }}
+        />
+        <Stack.Screen
+          name="(modals)/ChangeEmailModal"
+          options={{
+            presentation: 'transparentModal',
+            animation: 'fade_from_bottom',
+            headerShown: false
+          }}
+        />
+        <Stack.Screen
+          name="(modals)/ManageCategoriesModal"
+          options={{
+            presentation: 'transparentModal',
+            animation: 'fade_from_bottom',
+            headerShown: false
+          }}
+        />
+        <Stack.Screen
+          name="(modals)/ManageTagsModal"
+          options={{
+            presentation: 'transparentModal',
+            animation: 'fade_from_bottom',
+            headerShown: false
+          }}
+        />
+        <Stack.Screen
+          name="(modals)/ManagePeriodicTransactionsModal"
+          options={{
+            presentation: 'transparentModal',
+            animation: 'fade_from_bottom',
+            headerShown: false
+          }}
+        />
+        <Stack.Screen
+          name="(modals)/PeriodicFilterModal"
+          options={{
+            presentation: 'modal',
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
           name="(screens)/BarcodeScannerScreen"
           options={{
             presentation: 'modal',
@@ -172,21 +228,29 @@ function RootLayoutNav() {
   );
 }
 
+function ThemedApp() {
+  const { theme } = useThemeContext();
+  return (
+    <PaperProvider theme={theme}>
+      <NetworkProvider>
+        <DbProvider>
+          <AuthProvider>
+            <SafeAreaView style={{ flex: 1 }}>
+              <RootLayoutNav />
+            </SafeAreaView>
+          </AuthProvider>
+        </DbProvider>
+      </NetworkProvider>
+    </PaperProvider>
+  )
+}
 
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <PaperProvider>
-        <NetworkProvider>
-          <DbProvider>
-            <AuthProvider>
-              <SafeAreaView style={{ flex: 1 }}>
-                <RootLayoutNav />
-              </SafeAreaView>
-            </AuthProvider>
-          </DbProvider>
-        </NetworkProvider>
-      </PaperProvider>
+      <ThemeProvider>
+        <ThemedApp />
+      </ThemeProvider>
     </GestureHandlerRootView>
   );
 }

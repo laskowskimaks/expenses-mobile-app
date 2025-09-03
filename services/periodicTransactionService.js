@@ -1,8 +1,95 @@
 import { periodicTransactions, transactions, categories, periodicTransactionTags, tags, transactionTags } from '@/database/schema';
-import { eq, lte } from 'drizzle-orm';
+import { eq, lte, sql, desc } from 'drizzle-orm';
 import { getCurrentTimestamp } from '@/utils/dateUtils';
 import { eventEmitter } from '@/utils/eventEmitter';
 import { getRandomColor } from './tagService';
+
+const calculateOccurrences = (transaction) => {
+    const { startDate, nextOccurrenceDate, endDate, repeatInterval, repeatUnit } = transaction;
+    if (!startDate || !nextOccurrenceDate || !repeatInterval || !repeatUnit) {
+        return { pastOccurrences: 0, totalOccurrences: null };
+    }
+    const nextOccurrenceAsDate = new Date(nextOccurrenceDate * 1000);
+    let lastOccurrenceDate = new Date(nextOccurrenceAsDate);
+
+    switch (repeatUnit) {
+        case 'day': lastOccurrenceDate.setDate(nextOccurrenceAsDate.getDate() - repeatInterval); break;
+        case 'week': lastOccurrenceDate.setDate(nextOccurrenceAsDate.getDate() - (repeatInterval * 7)); break;
+        case 'month': lastOccurrenceDate.setMonth(nextOccurrenceAsDate.getMonth() - repeatInterval); break;
+        case 'year': lastOccurrenceDate.setFullYear(nextOccurrenceAsDate.getFullYear() - repeatInterval); break;
+    }
+    const lastOccurrenceTimestamp = Math.floor(lastOccurrenceDate.getTime() / 1000);
+
+    let totalOccurrences = null;
+    let pastOccurrences = 0;
+    
+    let tempDate = new Date(startDate * 1000);
+    while (Math.floor(tempDate.getTime() / 1000) <= lastOccurrenceTimestamp) {
+        pastOccurrences++;
+         switch (repeatUnit) {
+            case 'day': tempDate.setDate(tempDate.getDate() + repeatInterval); break;
+            case 'week': tempDate.setDate(tempDate.getDate() + (repeatInterval * 7)); break;
+            case 'month': tempDate.setMonth(tempDate.getMonth() + repeatInterval); break;
+            case 'year': tempDate.setFullYear(tempDate.getFullYear() + repeatInterval); break;
+        }
+    }
+
+    if (endDate) {
+        totalOccurrences = 0;
+        let countDate = new Date(startDate * 1000);
+        while (Math.floor(countDate.getTime() / 1000) <= endDate) {
+            totalOccurrences++;
+             switch (repeatUnit) {
+                case 'day': countDate.setDate(countDate.getDate() + repeatInterval); break;
+                case 'week': countDate.setDate(countDate.getDate() + (repeatInterval * 7)); break;
+                case 'month': countDate.setMonth(countDate.getMonth() + repeatInterval); break;
+                case 'year': countDate.setFullYear(countDate.getFullYear() + repeatInterval); break;
+            }
+        }
+    }
+    return { pastOccurrences, totalOccurrences };
+};
+
+export const getAllPeriodicTransactions = async (db) => {
+    if (!db) return [];
+    try {
+        const results = await db
+            .select({
+                id: periodicTransactions.id,
+                amount: periodicTransactions.amount,
+                title: periodicTransactions.title,
+                repeatInterval: periodicTransactions.repeatInterval,
+                repeatUnit: periodicTransactions.repeatUnit,
+                startDate: periodicTransactions.startDate,
+                nextOccurrenceDate: periodicTransactions.nextOccurrenceDate,
+                endDate: periodicTransactions.endDate,
+                notes: periodicTransactions.notes,
+                categoryId: periodicTransactions.categoryId,
+                categoryName: categories.name,
+                categoryColor: categories.color,
+                categoryIcon: categories.iconName,
+                tags: sql`json_group_array(json_object('id', ${tags.id}, 'name', ${tags.name}, 'color', ${tags.color}))`.mapWith(String),
+            })
+            .from(periodicTransactions)
+            .leftJoin(categories, eq(periodicTransactions.categoryId, categories.id))
+            .leftJoin(periodicTransactionTags, eq(periodicTransactions.id, periodicTransactionTags.periodicTransactionId))
+            .leftJoin(tags, eq(periodicTransactionTags.tagId, tags.id))
+            .groupBy(periodicTransactions.id)
+            .orderBy(desc(periodicTransactions.startDate));
+
+        return results.map(row => {
+            const occurrences = calculateOccurrences(row);
+            return {
+                ...row,
+                tags: row.tags ? JSON.parse(row.tags).filter(t => t.id !== null) : [],
+                ...occurrences,
+            }
+        });
+    } catch (error) {
+        console.error("[PeriodicTransactionService] Błąd podczas pobierania transakcji cyklicznych:", error);
+        throw error;
+    }
+};
 
 export const addPeriodicTransaction = async (dbOrTx, periodicTransactionData) => {
     if (!dbOrTx) {
@@ -143,13 +230,7 @@ export const processPeriodicTransactions = async (dbOrTx) => {
 
         for (const periodicTransaction of overduePeriodicTransactions) {
             try {
-                if (periodicTransaction.endDate && periodicTransaction.endDate < currentTimestamp) {
-                    console.log(`[PeriodicTransactionService] Transakcja "${periodicTransaction.title}" wygasła, pomijam`);
-                    continue;
-                }
-
                 let nextOccurrence = periodicTransaction.nextOccurrenceDate;
-                let transactionsAddedForThisTemplate = 0;
                 const maxIterations = 1000;
                 let iterations = 0;
 
@@ -204,7 +285,6 @@ export const processPeriodicTransactions = async (dbOrTx) => {
                     });
 
                     addedTransactionsCount++;
-                    transactionsAddedForThisTemplate++;
 
                     console.log(`[PeriodicTransactionService] Dodano "${periodicTransaction.title}" dla daty ${new Date(nextOccurrence * 1000).toLocaleDateString('pl-PL')}`);
 

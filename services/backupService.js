@@ -15,7 +15,7 @@ const LOCAL_IMAGES_DIR = FileSystem.documentDirectory + 'loyalty_card_images/';
 const RETRY_COUNT = 3;
 const RETRY_DELAY = 1000;
 const COMPRESSION_SIZE_THRESHOLD_BYTES = 200 * 1024; // 200 KB
-const LAST_RESTORED_TIMESTAMP_KEY = '@last_restored_backup_timestamp';
+export const LAST_RESTORED_TIMESTAMP_KEY = '@last_restored_backup_timestamp';
 
 let uploadPromise = null;
 
@@ -113,7 +113,6 @@ async function _performUploadInternal() {
 
     console.log("[BackupService] Rozpoczynanie procesu backupu...");
 
-    let newBackupTimestamp;
     try {
         await _ensureDirectoryExists(LOCAL_DB_DIR);
         const localFileInfo = await FileSystem.getInfoAsync(LOCAL_DB_PATH);
@@ -122,7 +121,7 @@ async function _performUploadInternal() {
             return;
         }
 
-        newBackupTimestamp = Date.now();
+        const newBackupTimestamp = Date.now();
         const dbFileName = `app_database_${newBackupTimestamp}.db`;
         const dbStorageRef = ref(storage, `database_backups/${userId}/${dbFileName}`);
         const response = await fetch(LOCAL_DB_PATH);
@@ -193,8 +192,7 @@ async function _performUploadInternal() {
             }
         }, true);
         
-        await AsyncStorage.setItem(LAST_RESTORED_TIMESTAMP_KEY, newBackupTimestamp.toString());
-        console.log("[BackupService] Proces backupu zakończony. Zaktualizowano znacznik ostatniego przywrócenia.");
+        console.log("[BackupService] Proces backupu zakończony.");
     } catch (error) {
         console.error("[BackupService] Błąd podczas backupu obrazów:", error);
     }
@@ -331,7 +329,6 @@ export async function checkAndRestoreBackup(userIdOverride) {
             }
         }, false);
         
-        // Po udanym przywróceniu zapisuje timestamp
         await AsyncStorage.setItem(LAST_RESTORED_TIMESTAMP_KEY, newestBackup.timestamp.toString());
         console.log(`[RestoreService] Pomyślnie przywrócono backup. Zapisano nowy znacznik czasu: ${newestBackup.timestamp}`);
 
