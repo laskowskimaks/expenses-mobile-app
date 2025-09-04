@@ -4,49 +4,62 @@ import { getCurrentTimestamp } from '@/utils/dateUtils';
 import { eventEmitter } from '@/utils/eventEmitter';
 import { getRandomColor } from './tagService';
 
+const addIntervalToDate = (date, interval, unit) => {
+    const d = new Date(date);
+    switch (unit) {
+        case 'day': d.setDate(d.getDate() + interval); break;
+        case 'week': d.setDate(d.getDate() + (interval * 7)); break;
+        case 'month': d.setMonth(d.getMonth() + interval); break;
+        case 'year': d.setFullYear(d.getFullYear() + interval); break;
+        default: d.setMonth(d.getMonth() + interval);
+    }
+    return d;
+};
+
+const calculateNextOccurrence = (currentTimestamp, interval, unit) => {
+    const currentDate = new Date(currentTimestamp * 1000);
+    const nextDate = addIntervalToDate(currentDate, interval, unit);
+    return Math.floor(nextDate.getTime() / 1000);
+};
+
+const normalizeToLocalDayStart = (timestampSec) => {
+    const d = new Date(timestampSec * 1000);
+    d.setHours(0, 0, 0, 0);
+    return Math.floor(d.getTime() / 1000);
+};
+
 const calculateOccurrences = (transaction) => {
     const { startDate, nextOccurrenceDate, endDate, repeatInterval, repeatUnit } = transaction;
     if (!startDate || !nextOccurrenceDate || !repeatInterval || !repeatUnit) {
         return { pastOccurrences: 0, totalOccurrences: null };
     }
-    const nextOccurrenceAsDate = new Date(nextOccurrenceDate * 1000);
-    let lastOccurrenceDate = new Date(nextOccurrenceAsDate);
 
-    switch (repeatUnit) {
-        case 'day': lastOccurrenceDate.setDate(nextOccurrenceAsDate.getDate() - repeatInterval); break;
-        case 'week': lastOccurrenceDate.setDate(nextOccurrenceAsDate.getDate() - (repeatInterval * 7)); break;
-        case 'month': lastOccurrenceDate.setMonth(nextOccurrenceAsDate.getMonth() - repeatInterval); break;
-        case 'year': lastOccurrenceDate.setFullYear(nextOccurrenceAsDate.getFullYear() - repeatInterval); break;
+    const startTs = Math.floor(startDate);
+    const nextTs = Math.floor(nextOccurrenceDate);
+    const endTs = endDate ? Math.floor(endDate) : null;
+
+    let pastOccurrences = 0;
+    let iterDate = new Date(startTs * 1000);
+
+    while (Math.floor(iterDate.getTime() / 1000) < nextTs) {
+        pastOccurrences++;
+        iterDate = addIntervalToDate(iterDate, repeatInterval, repeatUnit);
+
+        if (pastOccurrences > 100000) break;
     }
-    const lastOccurrenceTimestamp = Math.floor(lastOccurrenceDate.getTime() / 1000);
 
     let totalOccurrences = null;
-    let pastOccurrences = 0;
-    
-    let tempDate = new Date(startDate * 1000);
-    while (Math.floor(tempDate.getTime() / 1000) <= lastOccurrenceTimestamp) {
-        pastOccurrences++;
-         switch (repeatUnit) {
-            case 'day': tempDate.setDate(tempDate.getDate() + repeatInterval); break;
-            case 'week': tempDate.setDate(tempDate.getDate() + (repeatInterval * 7)); break;
-            case 'month': tempDate.setMonth(tempDate.getMonth() + repeatInterval); break;
-            case 'year': tempDate.setFullYear(tempDate.getFullYear() + repeatInterval); break;
+    if (endTs !== null) {
+        totalOccurrences = 0;
+        let countDate = new Date(startTs * 1000);
+        const endDayStart = normalizeToLocalDayStart(endTs);
+        while (normalizeToLocalDayStart(Math.floor(countDate.getTime() / 1000)) <= endDayStart) {
+            totalOccurrences++;
+            countDate = addIntervalToDate(countDate, repeatInterval, repeatUnit);
+            if (totalOccurrences > 100000) break;
         }
     }
 
-    if (endDate) {
-        totalOccurrences = 0;
-        let countDate = new Date(startDate * 1000);
-        while (Math.floor(countDate.getTime() / 1000) <= endDate) {
-            totalOccurrences++;
-             switch (repeatUnit) {
-                case 'day': countDate.setDate(countDate.getDate() + repeatInterval); break;
-                case 'week': countDate.setDate(countDate.getDate() + (repeatInterval * 7)); break;
-                case 'month': countDate.setMonth(countDate.getMonth() + repeatInterval); break;
-                case 'year': countDate.setFullYear(countDate.getFullYear() + repeatInterval); break;
-            }
-        }
-    }
     return { pastOccurrences, totalOccurrences };
 };
 
@@ -180,6 +193,7 @@ export const addPeriodicTransaction = async (dbOrTx, periodicTransactionData) =>
                     await tx.insert(periodicTransactionTags).values(tagsToInsert);
                 }
             }
+
             return { success: true, periodicTransactionId: newPeriodicTransactionId };
         };
 
@@ -195,10 +209,12 @@ export const addPeriodicTransaction = async (dbOrTx, periodicTransactionData) =>
     }
 };
 
+
 export const processPeriodicTransactions = async (dbOrTx) => {
     try {
         console.log('[PeriodicTransactionService] Rozpoczynam sprawdzanie transakcji okresowych...');
         const currentTimestamp = getCurrentTimestamp();
+        const currentDayStart = normalizeToLocalDayStart(currentTimestamp);
 
         const overduePeriodicTransactions = await dbOrTx
             .select({
@@ -234,13 +250,17 @@ export const processPeriodicTransactions = async (dbOrTx) => {
                 const maxIterations = 1000;
                 let iterations = 0;
 
-                while (nextOccurrence <= currentTimestamp && iterations < maxIterations) {
-                    iterations++;
+                const getNextOccurrenceDayStart = () => normalizeToLocalDayStart(nextOccurrence);
+                const endDayStart = periodicTransaction.endDate ? normalizeToLocalDayStart(periodicTransaction.endDate) : null;
 
-                    if (periodicTransaction.endDate && nextOccurrence > periodicTransaction.endDate) {
-                        console.log(`[PeriodicTransactionService] Osiągnięto datę końcową dla "${periodicTransaction.title}"`);
-                        break;
-                    }
+                //console.log(`[PeriodicTransactionService][DEBUG] Processing "${periodicTransaction.title}" start nextOcc=${new Date(periodicTransaction.nextOccurrenceDate * 1000).toLocaleString()} end=${periodicTransaction.endDate ? new Date(periodicTransaction.endDate * 1000).toLocaleString() : 'null'}`);
+
+                while (
+                    getNextOccurrenceDayStart() <= currentDayStart &&
+                    iterations < maxIterations &&
+                    (!endDayStart || getNextOccurrenceDayStart() <= endDayStart)
+                ) {
+                    iterations++;
 
                     const newTransactionData = {
                         amount: periodicTransaction.amount,
@@ -263,7 +283,7 @@ export const processPeriodicTransactions = async (dbOrTx) => {
                         .select({
                             tagId: periodicTransactionTags.tagId,
                             tagName: tags.name,
-                            tagColor: tags.color 
+                            tagColor: tags.color
                         })
                         .from(periodicTransactionTags)
                         .innerJoin(tags, eq(periodicTransactionTags.tagId, tags.id))
@@ -311,29 +331,4 @@ export const processPeriodicTransactions = async (dbOrTx) => {
         console.error('[PeriodicTransactionService] Błąd podczas przetwarzania transakcji okresowych:', error);
         return { success: false, addedCount: 0, addedTransactions: [], message: 'Błąd podczas przetwarzania transakcji okresowych: ' + error.message };
     }
-};
-
-const calculateNextOccurrence = (currentTimestamp, interval, unit) => {
-    const currentDate = new Date(currentTimestamp * 1000);
-    let nextDate = new Date(currentDate);
-
-    switch (unit) {
-        case 'day':
-            nextDate.setDate(currentDate.getDate() + interval);
-            break;
-        case 'week':
-            nextDate.setDate(currentDate.getDate() + (interval * 7));
-            break;
-        case 'month':
-            nextDate.setMonth(currentDate.getMonth() + interval);
-            break;
-        case 'year':
-            nextDate.setFullYear(currentDate.getFullYear() + interval);
-            break;
-        default:
-            console.warn(`[PeriodicTransactionService] Nieznana jednostka czasu: ${unit}, używam domyślnie month`);
-            nextDate.setMonth(currentDate.getMonth() + interval);
-    }
-
-    return Math.floor(nextDate.getTime() / 1000);
 };

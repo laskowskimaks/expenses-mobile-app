@@ -6,7 +6,8 @@ import { getAllSettingsAsObject } from '@/services/authService';
 import { insertTestData } from '@/database/insertTestData';
 import { getLastCheckInfo, resetPeriodicCheckTime } from '@/utils/periodicChecker';
 import { processPeriodicTransactions } from '@/services/periodicTransactionService';
-import { performUpload } from '@/services/backupService';
+import { DB_TIMESTAMP_KEY, performUpload } from '@/services/backupService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function HomeScreen() {
   const { user, logout } = useAuth();
@@ -119,6 +120,15 @@ export default function HomeScreen() {
     setLastCheckInfo(info);
   };
 
+  const handleLogLastRestoredTimestamp = async () => {
+    try {
+      const value = await AsyncStorage.getItem(DB_TIMESTAMP_KEY);
+      console.log('DB_TIMESTAMP_KEY:', value);
+    } catch (error) {
+      console.log('DB_TIMESTAMP_KEY: brak dostępu lub błąd', error);
+    }
+  };
+
   if (!user) {
     return (
       <View style={styles.loadingContainer}>
@@ -166,6 +176,10 @@ export default function HomeScreen() {
             <Button
               title="Reset czasu sprawdzania"
               onPress={handleResetCheckTime}
+            />
+            <Button style={{ padding: 16 }}
+              title="Loguj DB_TIMESTAMP_KEY"
+              onPress={handleLogLastRestoredTimestamp}
             />
           </View>
         </View>

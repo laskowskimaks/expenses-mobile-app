@@ -15,7 +15,7 @@ const LOCAL_IMAGES_DIR = FileSystem.documentDirectory + 'loyalty_card_images/';
 const RETRY_COUNT = 3;
 const RETRY_DELAY = 1000;
 const COMPRESSION_SIZE_THRESHOLD_BYTES = 200 * 1024; // 200 KB
-export const LAST_RESTORED_TIMESTAMP_KEY = '@last_restored_backup_timestamp';
+export const DB_TIMESTAMP_KEY = 'DB_TIMESTAMP_KEY';
 
 let uploadPromise = null;
 
@@ -129,6 +129,7 @@ async function _performUploadInternal() {
 
         await _retryOperation(() => uploadBytes(dbStorageRef, fileData, { contentType: 'application/octet-stream' }));
         console.log("[BackupService] Wysyłanie bazy danych zakończone sukcesem.");
+        await AsyncStorage.setItem(DB_TIMESTAMP_KEY, newBackupTimestamp.toString());
 
     } catch (error) {
         console.error("[BackupService] Krytyczny błąd podczas uploadu pliku .db. Przerywam backup.", error);
@@ -169,7 +170,6 @@ async function _performUploadInternal() {
                         const imageResponse = await fetch(card.imageUri);
                         imageBlob = await imageResponse.blob();
                     }
-                    
                     await _retryOperation(() => uploadBytes(imageStorageRef, imageBlob, { contentType: 'image/jpeg' }));
                     console.log(`[BackupService] Obraz dla karty ID: ${card.id} wysłany pomyślnie.`);
                 } catch (e) {
@@ -191,7 +191,6 @@ async function _performUploadInternal() {
                 }
             }
         }, true);
-        
         console.log("[BackupService] Proces backupu zakończony.");
     } catch (error) {
         console.error("[BackupService] Błąd podczas backupu obrazów:", error);
@@ -265,9 +264,9 @@ export async function checkAndRestoreBackup(userIdOverride) {
             return false;
         }
 
-        const lastRestoredTimestampStr = await AsyncStorage.getItem(LAST_RESTORED_TIMESTAMP_KEY);
+        const lastRestoredTimestampStr = await AsyncStorage.getItem(DB_TIMESTAMP_KEY);
         const lastRestoredTimestamp = lastRestoredTimestampStr ? parseInt(lastRestoredTimestampStr, 10) : 0;
-        
+
         console.log(`[RestoreService] Najnowszy zdalny backup: ${newestBackup.timestamp}, Ostatnio przywrócony: ${lastRestoredTimestamp}`);
 
         if (newestBackup.timestamp > lastRestoredTimestamp) {
@@ -308,7 +307,7 @@ export async function checkAndRestoreBackup(userIdOverride) {
                 try {
                     const downloadURL = await getDownloadURL(imageStorageRef);
                     await _retryOperation(() => FileSystem.downloadAsync(downloadURL, newLocalPath));
-                    
+
                     if (card.imageUri !== newLocalPath) {
                         await tempDb.update(loyaltyCards).set({ imageUri: newLocalPath }).where(eq(loyaltyCards.id, card.id));
                         console.log(`[RestoreService] Pobrany obraz dla karty ID ${card.id} i zaktualizowano ścieżkę.`);
@@ -328,14 +327,14 @@ export async function checkAndRestoreBackup(userIdOverride) {
                 }
             }
         }, false);
-        
-        await AsyncStorage.setItem(LAST_RESTORED_TIMESTAMP_KEY, newestBackup.timestamp.toString());
+
+        await AsyncStorage.setItem(DB_TIMESTAMP_KEY, newestBackup.timestamp.toString());
         console.log(`[RestoreService] Pomyślnie przywrócono backup. Zapisano nowy znacznik czasu: ${newestBackup.timestamp}`);
 
     } catch (error) {
         console.error("[RestoreService] Błąd podczas przywracania obrazów:", error);
-        return false; 
+        return false;
     }
-    
+
     return dbRestored;
 }

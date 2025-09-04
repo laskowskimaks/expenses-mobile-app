@@ -12,7 +12,7 @@ import {
   verifyBeforeUpdateEmail
 } from "firebase/auth";
 import { auth as firebaseAuth } from '../FirebaseConfig';
-import { performUpload, LAST_RESTORED_TIMESTAMP_KEY } from '@/services/backupService';
+import { DB_TIMESTAMP_KEY, performUpload } from '@/services/backupService';
 import { resetPeriodicCheckTime } from '@/utils/periodicChecker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useDb } from './DbContext';
@@ -189,7 +189,7 @@ export const AuthProvider = ({ children }) => {
     try {
       console.log('[AuthContext] Rozpoczynanie czystego wylogowania po akcji...');
       await resetPeriodicCheckTime();
-      await AsyncStorage.removeItem(LAST_RESTORED_TIMESTAMP_KEY);
+      await AsyncStorage.removeItem(DB_TIMESTAMP_KEY);
     } catch (error) {
         console.log('[AuthContext] Błąd podczas czyszczenia danych po akcji:', error);
     } finally {
@@ -204,7 +204,7 @@ export const AuthProvider = ({ children }) => {
         await performUpload();
       }
       await resetPeriodicCheckTime();
-      await AsyncStorage.removeItem(LAST_RESTORED_TIMESTAMP_KEY);
+      await AsyncStorage.removeItem(DB_TIMESTAMP_KEY);
     } catch (error) {
         console.log('[AuthContext] Błąd podczas operacji przed wylogowaniem:', error);
     } finally {

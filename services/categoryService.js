@@ -1,5 +1,5 @@
 import { categories, transactions } from '../database/schema';
-import { eq, and, sql, not } from 'drizzle-orm';
+import { eq, and, sql, not, desc } from 'drizzle-orm';
 
 export const getAllCategories = async (db) => {
   if (!db) {
@@ -7,7 +7,7 @@ export const getAllCategories = async (db) => {
     return [];
   }
   try {
-    const allCategories = await db.select().from(categories).orderBy(sql`lower(${categories.name})`);
+    const allCategories = await db.select().from(categories).orderBy(desc(categories.id));
     return allCategories;
   } catch (error) {
     console.error("[categoryService] Błąd podczas pobierania kategorii:", error);
