@@ -1,5 +1,6 @@
 import { Tabs, useRouter } from 'expo-router';
-import CustomTabBar from '@/components/CustomTabBar'; // Upewnij się, że ścieżka jest poprawna
+import CustomTabBar from '@/components/CustomTabBar';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 export default function TabsLayout() {
   const router = useRouter();
@@ -11,19 +12,44 @@ export default function TabsLayout() {
         headerShown: false,
       }}
     >
-      <Tabs.Screen name='home' />
-      <Tabs.Screen name='transactionListScreen' />
+      <Tabs.Screen 
+        name='home'
+        options={{
+          title: 'Główna',
+          tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="home-variant" color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen 
+        name='transactionListScreen'
+        options={{
+          title: 'Transakcje',
+          tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="format-list-bulleted" color={color} size={size} />,
+        }}
+      />
       <Tabs.Screen
         name='add'
         listeners={{
           tabPress: (e) => {
             e.preventDefault();
-            router.push('/AddTransactionModal');
+            router.push('/(modals)/AddTransactionModal');
           },
         }}
       />
-      <Tabs.Screen name='cards' />
-      <Tabs.Screen name='settings' />
+      <Tabs.Screen 
+        name='cards'
+        options={{
+          title: 'Karty',
+          tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="credit-card-outline" color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen 
+        name='settings'
+        options={{
+          title: 'Ustawienia',
+          headerShown: false,
+          tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="cog-outline" color={color} size={size} />,
+        }}
+      />
     </Tabs>
   );
 }

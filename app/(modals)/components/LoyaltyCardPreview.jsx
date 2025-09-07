@@ -50,7 +50,7 @@ export default function LoyaltyCardPreview({
                                 width={3.5}
                                 height={140}
                                 textColor={theme.colors.onSurface}
-                                lineColor={theme.colors.onSurface}
+                                lineColor={'#000000'}
                             />
                         )}
                     </View>

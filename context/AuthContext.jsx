@@ -1,9 +1,22 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import * as SecureStore from 'expo-secure-store';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail } from "firebase/auth";
+import { 
+  createUserWithEmailAndPassword, 
+  signInWithEmailAndPassword, 
+  signOut, 
+  onAuthStateChanged, 
+  sendPasswordResetEmail,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+  updatePassword,
+  verifyBeforeUpdateEmail
+} from "firebase/auth";
 import { auth as firebaseAuth } from '../FirebaseConfig';
-import { performUpload } from '@/services/backupService';
+import { DB_TIMESTAMP_KEY, performUpload } from '@/services/backupService';
 import { resetPeriodicCheckTime } from '@/utils/periodicChecker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useDb } from './DbContext';
+import { getUserEmail, updateLocalEmail } from '@/services/authService';
 
 export const AuthContext = createContext();
 
@@ -13,6 +26,25 @@ export const AuthProvider = ({ children }) => {
   const [isLocked, setIsLocked] = useState(true);
   const [needsPinSetup, setNeedsPinSetup] = useState(false);
   const [isExternalActivity, setIsExternalActivity] = useState(false);
+  const { db } = useDb();
+
+  const refreshUser = async () => {
+    const currentUser = firebaseAuth.currentUser;
+    if (currentUser) {
+      try {
+        await currentUser.reload();
+        return { success: true, currentUser };
+      } catch (error) {
+        if (error.code === 'auth/user-token-expired') {
+          console.log('[AuthContext] Token użytkownika wygasł - to oczekiwane po zmianie e-maila.');
+        } else {
+          console.error('[AuthContext] Błąd podczas odświeżania danych użytkownika:', error);
+        }
+        return { success: false, error: error };
+      }
+    }
+    return { success: false, error: null };
+  };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(firebaseAuth, async (firebaseUser) => {
@@ -21,6 +53,15 @@ export const AuthProvider = ({ children }) => {
         const userData = { uid: firebaseUser.uid, email: firebaseUser.email };
         setUser(userData);
         await SecureStore.setItemAsync('lastUser', JSON.stringify(userData));
+        
+        if (db) {
+          const localEmail = await getUserEmail(db);
+          if (localEmail && localEmail !== firebaseUser.email) {
+            console.log(`[AuthContext] Wykryto zmianę e-maila. Aktualizuję lokalną bazę...`);
+            await updateLocalEmail(db, firebaseUser.email);
+          }
+        }
+
       } else {
         await SecureStore.deleteItemAsync('lastUser');
         setNeedsPinSetup(false);
@@ -30,7 +71,7 @@ export const AuthProvider = ({ children }) => {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [db]);
 
   const lockApp = () => {
     if (user) {
@@ -84,6 +125,7 @@ export const AuthProvider = ({ children }) => {
       return { success: false, error, message };
     }
   };
+
   const forgotPassword = async (email) => {
     try {
       await sendPasswordResetEmail(firebaseAuth, email);
@@ -94,23 +136,84 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const logout = async () => {
+  const changePassword = async (currentPassword, newPassword) => {
+    const firebaseUser = firebaseAuth.currentUser;
+    if (!firebaseUser) {
+      return { success: false, message: 'Użytkownik nie jest zalogowany.' };
+    }
+
     try {
-      await performUpload();
-      await signOut(firebaseAuth);
-      await SecureStore.deleteItemAsync('lastUser');
-      await resetPeriodicCheckTime();
-      console.log('[AuthContext] Użytkownik wylogowany');
+      const credential = EmailAuthProvider.credential(firebaseUser.email, currentPassword);
+      await reauthenticateWithCredential(firebaseUser, credential);
+      await updatePassword(firebaseUser, newPassword);
+      return { success: true };
     } catch (error) {
-      console.log('[AuthContext] Błąd wylogowania Firebase:', error);
-    } finally {
-      setUser(null);
-      setIsLocked(true);
-      setNeedsPinSetup(false);
+      console.error('[AuthContext] Błąd zmiany hasła:', error.code);
+      if (error.code === 'auth/wrong-password') {
+        return { success: false, message: 'Nieprawidłowe aktualne hasło.' };
+      }
+      if (error.code === 'auth/network-request-failed') {
+        return { success: false, message: 'Błąd sieci. Sprawdź połączenie z internetem.' };
+      }
+      return { success: false, message: 'Wystąpił nieoczekiwany błąd.' };
     }
   };
 
-  const value = { user, isAuthLoading, needsPinSetup, register, login, logout, isLocked, lockApp, unlockApp, completeRegistration, forgotPassword, isExternalActivity, setIsExternalActivity };
+  const changeEmail = async (newEmail, currentPassword) => {
+    const firebaseUser = firebaseAuth.currentUser;
+    if (!firebaseUser) {
+      return { success: false, message: 'Użytkownik nie jest zalogowany.' };
+    }
+
+    try {
+      const credential = EmailAuthProvider.credential(firebaseUser.email, currentPassword);
+      await reauthenticateWithCredential(firebaseUser, credential);
+      await verifyBeforeUpdateEmail(firebaseUser, newEmail);
+      return { success: true };
+    } catch (error) {
+      console.error('[AuthContext] Błąd zmiany adresu e-mail:', error.code);
+      if (error.code === 'auth/wrong-password') {
+        return { success: false, message: 'Nieprawidłowe aktualne hasło.' };
+      }
+      if (error.code === 'auth/email-already-in-use') {
+        return { success: false, message: 'Ten adres e-mail jest już zajęty.' };
+      }
+      if (error.code === 'auth/network-request-failed') {
+        return { success: false, message: 'Błąd sieci. Sprawdź połączenie z internetem.' };
+      }
+      return { success: false, message: 'Wystąpił nieoczekiwany błąd.' };
+    }
+  };
+  
+  const logoutAfterAction = async () => {
+    try {
+      console.log('[AuthContext] Rozpoczynanie czystego wylogowania po akcji...');
+      await resetPeriodicCheckTime();
+      await AsyncStorage.removeItem(DB_TIMESTAMP_KEY);
+    } catch (error) {
+        console.log('[AuthContext] Błąd podczas czyszczenia danych po akcji:', error);
+    } finally {
+        await signOut(firebaseAuth);
+        console.log('[AuthContext] Użytkownik wylogowany z Firebase.');
+    }
+  };
+
+  const logout = async () => {
+    try {
+      if (firebaseAuth.currentUser) {
+        await performUpload();
+      }
+      await resetPeriodicCheckTime();
+      await AsyncStorage.removeItem(DB_TIMESTAMP_KEY);
+    } catch (error) {
+        console.log('[AuthContext] Błąd podczas operacji przed wylogowaniem:', error);
+    } finally {
+        await signOut(firebaseAuth);
+        console.log('[AuthContext] Użytkownik wylogowany z Firebase.');
+    }
+  };
+
+  const value = { user, isAuthLoading, needsPinSetup, register, login, logout, logoutAfterAction, isLocked, lockApp, unlockApp, completeRegistration, forgotPassword, changePassword, changeEmail, refreshUser, isExternalActivity, setIsExternalActivity };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

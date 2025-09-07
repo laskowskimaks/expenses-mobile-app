@@ -1,31 +1,15 @@
 import React, { memo, useRef, useCallback, useMemo } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Animated,
-} from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Badge } from 'react-native-paper';
-import { MaterialCommunityIcons, Ionicons, FontAwesome } from '@expo/vector-icons';
+import { Badge, useTheme, Icon } from 'react-native-paper';
 import { Swipeable } from 'react-native-gesture-handler';
 
-const RenderIcon = ({ iconName, size = 32, color = '#333' }) => {
+// Zachowujemy RenderIcon, ponieważ może być potrzebny do ikon z różnych rodzin
+const RenderIcon = ({ iconName, size = 32, color = '#fff' }) => {
   if (!iconName) {
-    return <MaterialCommunityIcons name="shape" size={size} color={color} />;
+    return <Icon source="shape" size={size} color={color} />;
   }
-  if (iconName.includes(':')) {
-    const [family, name] = iconName.split(':');
-    const props = { name, size, color };
-    switch (family) {
-      case 'MaterialCommunityIcons': return <MaterialCommunityIcons {...props} />;
-      case 'Ionicons': return <Ionicons {...props} />;
-      case 'FontAwesome': return <FontAwesome {...props} />;
-      default: return <MaterialCommunityIcons {...props} />;
-    }
-  }
-  return <MaterialCommunityIcons name={iconName} size={size} color={color} />;
+  return <Icon source={iconName} size={size} color={color} />;
 };
 
 function TransactionItem({
@@ -37,6 +21,7 @@ function TransactionItem({
   onDelete,
   openSwipeableRef
 }) {
+  const theme = useTheme();
   const [expanded, setExpanded] = React.useState(initialExpanded);
   const swipeableRef = useRef(null);
 
@@ -65,55 +50,40 @@ function TransactionItem({
   }, [onDelete, transaction]);
 
   const renderRightActions = useCallback((progress, dragX) => {
-    const trans = dragX.interpolate({
-      inputRange: [-160, 0],
-      outputRange: [0, 160],
-      extrapolate: 'clamp',
-    });
-
+    const trans = dragX.interpolate({ inputRange: [-160, 0], outputRange: [0, 160], extrapolate: 'clamp' });
     return (
       <Animated.View style={[styles.rightActionContainer, { transform: [{ translateX: trans }] }]}>
         <TouchableOpacity style={styles.actionButton} onPress={handleEdit}>
-          <MaterialCommunityIcons name="pencil" size={28} color="#007aff" />
-          <Text style={styles.editText}>Edytuj</Text>
+          <Icon source="pencil" size={28} color={theme.colors.primary} />
+          <Text style={[styles.actionText, { color: theme.colors.primary }]}>Edytuj</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.actionButton} onPress={handleDelete}>
-          <MaterialCommunityIcons name="trash-can-outline" size={28} color="#ff3b30" />
-          <Text style={styles.deleteText}>Usuń</Text>
+          <Icon source="trash-can-outline" size={28} color={theme.colors.error} />
+          <Text style={[styles.actionText, { color: theme.colors.error }]}>Usuń</Text>
         </TouchableOpacity>
       </Animated.View>
     );
-  }, [handleEdit, handleDelete]);
+  }, [handleEdit, handleDelete, theme]);
 
   if (!transaction) return null;
 
   const {
-    title,
-    amount,
-    categoryName,
-    categoryColor = '#6ac6b6',
-    categoryIcon,
-    location,
-    notes,
-    tags = [],
-    periodicTransactionId,
-    amountFormatted,
+    title, amount, categoryName, categoryColor = '#888', categoryIcon,
+    location, notes, tags: rawTags = [], periodicTransactionId, amountFormatted,
   } = transaction;
 
+  const tags = Array.isArray(rawTags) ? rawTags : [];
+
   const isPeriodicTransaction = Boolean(periodicTransactionId);
-  const amountColor = amount < 0 ? '#ff3b30' : '#0a9d58';
+  const amountColor = amount < 0 ? theme.colors.error : 'green';
 
   const { displayedTags, remainingTags } = useMemo(() => {
-    const currentTags = tags || [];
-    const displayed = expanded ? currentTags : currentTags.slice(0, maxVisibleTags);
-    const remaining = expanded ? 0 : Math.max(0, currentTags.length - maxVisibleTags);
+    const displayed = expanded ? tags : tags.slice(0, maxVisibleTags);
+    const remaining = expanded ? 0 : Math.max(0, tags.length - maxVisibleTags);
     return { displayedTags: displayed, remainingTags: remaining };
   }, [expanded, tags, maxVisibleTags]);
 
-  const gradientColors = [
-    categoryColor || '#6ac6b6',
-    `${categoryColor || '#6ac6b6'}00`
-  ];
+  const gradientColors = [categoryColor, `${categoryColor}00`];
 
   return (
     <Swipeable
@@ -123,72 +93,70 @@ function TransactionItem({
       overshootRight={false}
       friction={2}
     >
-      <TouchableOpacity activeOpacity={0.95} onPress={toggle} style={styles.container}>
-        <LinearGradient
-          colors={gradientColors}
-          start={{ x: 0, y: 0.5 }}
-          end={{ x: 1, y: 0.5 }}
-          style={styles.gradientBackground}
-        />
-        <View style={styles.contentArea}>
-          <View style={styles.topSection}>
-            <View style={styles.leftPart}>
-              <View style={[styles.categoryIconWrapper, { backgroundColor: categoryColor }]}>
-                <RenderIcon iconName={categoryIcon} size={34} color="white" />
+      <View>
+        <View style={[styles.container, { borderColor: theme.colors.outlineVariant, backgroundColor: theme.colors.surface }]}>
+          <LinearGradient
+            colors={gradientColors}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={styles.gradientBackground}
+          />
+          <TouchableOpacity activeOpacity={0.95} onPress={toggle} style={[styles.contentArea, { backgroundColor: theme.colors.surface }]}>
+            <View style={styles.topSection}>
+              <View style={styles.leftPart}>
+                <View style={[styles.categoryIconWrapper, { backgroundColor: categoryColor }]}>
+                  <RenderIcon iconName={categoryIcon} size={32} color="white" />
+                </View>
+              </View>
+              <View style={styles.middlePart}>
+                <Text style={[styles.title, { color: theme.colors.onSurface }]}>{title}</Text>
+                <View style={styles.categoryLocationRow}>
+                  <Text style={[styles.categoryText, { color: theme.colors.onSurfaceVariant }]}>{categoryName || 'Inne'}</Text>
+                  {location && (
+                    <View style={styles.locationContainer}>
+                      <Icon source="map-marker" size={14} color={theme.colors.onSurfaceVariant} style={styles.locationIcon} />
+                      <Text style={[styles.locationText, { color: theme.colors.onSurfaceVariant }]}>{location}</Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+              <View style={styles.rightPart}>
+                <Text style={[styles.amountText, { color: amountColor }]}>{amountFormatted}</Text>
+                <Text style={[styles.dateText, { color: theme.colors.onSurfaceVariant }]}>
+                  {transaction.transactionDate ? new Date(transaction.transactionDate * 1000).toLocaleString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}
+                </Text>
               </View>
             </View>
-            <View style={styles.middlePart}>
-              <Text style={styles.title}>{title}</Text>
-              <View style={styles.categoryLocationRow}>
-                <Text style={styles.categoryText}>{categoryName || 'Inne'}</Text>
-                {location && (
-                  <View style={styles.locationContainer}>
-                    <MaterialCommunityIcons name="map-marker" size={14} color="#777" style={styles.locationIcon} />
-                    <Text style={styles.locationText}>{location}</Text>
-                  </View>
-                )}
+
+            {expanded && !!notes && (
+              <View style={styles.descriptionSection}>
+                <Text style={[styles.notesText, { color: theme.colors.onSurfaceVariant }]}>{notes}</Text>
               </View>
-            </View>
-            <View style={styles.rightPart}>
-              <Text style={[styles.amountText, { color: amountColor }]}>{amountFormatted}</Text>
-              <Text style={styles.dateText}>
-                {transaction.transactionDate ?
-                  new Date(transaction.transactionDate * 1000).toLocaleString('pl-PL', {
-                    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
-                  }) : ''}
-              </Text>
-            </View>
-          </View>
+            )}
 
-          {expanded && !!notes && (
-            <View style={styles.descriptionSection}>
-              <Text style={styles.notesText}>{notes}</Text>
-            </View>
-          )}
-
-          {tags.length > 0 && (
-            <View style={styles.tagsSection}>
-              <View style={styles.tagsRow}>
+            {tags.length > 0 && (
+              <View style={styles.tagsSection}>
                 {displayedTags.map((t) => (
-                  <View key={t.id ?? t.name} style={[styles.tag, { borderColor: t.color || '#000000' }]}>
-                    <Text style={[styles.tagText, { color: t.color || '#000000' }]}>{t.name}</Text>
+                  <View key={t.id ?? t.name} style={[styles.tag, { borderColor: t.color, backgroundColor: `${t.color}20` }]}>
+                    <Text style={[styles.tagText, { color: t.color }]}>{t.name}</Text>
                   </View>
                 ))}
                 {remainingTags > 0 && (
-                  <View style={styles.tagMore}>
-                    <Text style={styles.tagMoreText}>+{remainingTags}</Text>
+                  <View style={[styles.tag, { borderColor: theme.colors.onSurfaceVariant, backgroundColor: theme.colors.surfaceVariant }]}>
+                    <Text style={[styles.tagText, { color: theme.colors.onSurfaceVariant }]}>+{remainingTags}</Text>
                   </View>
                 )}
               </View>
-            </View>
-          )}
+            )}
+          </TouchableOpacity>
+
         </View>
-      </TouchableOpacity>
-      {isPeriodicTransaction && (
-        <Badge style={[styles.periodicBadgeAbsolute, { backgroundColor: '#78cfbd' }]} size={22}>
-          <MaterialCommunityIcons name="calendar" size={14} color="#ffffff" />
-        </Badge>
-      )}
+        {isPeriodicTransaction && (
+          <Badge style={[styles.periodicBadgeAbsolute, { backgroundColor: '#78cfbd' }]} size={22}>
+            <Icon source="calendar" size={14} color="#ffffff" />
+          </Badge>
+        )}
+      </View>
     </Swipeable>
   );
 }
@@ -200,37 +168,8 @@ const styles = StyleSheet.create({
     marginHorizontal: 10,
     borderRadius: 20,
     overflow: 'hidden',
-    position: 'relative',
-    paddingVertical: 8,
-    borderWidth: 2,
-    borderColor: 'rgba(0, 0, 0, 0.1)',
-    backgroundColor: 'white',
-  },
-  rightActionContainer: {
-    width: 160,
-    flexDirection: 'row',
-    marginBottom: 8,
-    marginRight: 10,
-    borderRadius: 20,
-    backgroundColor: '#f8f9fa',
-  },
-  actionButton: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'transparent',
-  },
-  editText: {
-    color: '#007aff',
-    fontSize: 14,
-    fontWeight: '600',
-    marginTop: 4,
-  },
-  deleteText: {
-    color: '#ff3b30',
-    fontSize: 14,
-    fontWeight: '600',
-    marginTop: 4,
+    borderWidth: 1,
+    paddingVertical: 4,
   },
   gradientBackground: {
     position: 'absolute',
@@ -238,26 +177,37 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    borderRadius: 18,
   },
   contentArea: {
-    backgroundColor: '#fff',
     borderRadius: 18,
     padding: 8,
     marginLeft: 6,
-    marginRight: 8,
-    marginTop: -2,
-    marginBottom: -2,
+  },
+  rightActionContainer: {
+    width: 160,
+    flexDirection: 'row',
+    marginBottom: 8,
+    marginRight: 10,
+    borderRadius: 20,
+  },
+  actionButton: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  actionText: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginTop: 4,
   },
   topSection: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
   },
   leftPart: {
     width: 60,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 60,
   },
   categoryIconWrapper: {
     width: 52,
@@ -283,9 +233,8 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   categoryText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#555',
+    fontSize: 13,
+    fontWeight: '500',
   },
   locationContainer: {
     flexDirection: 'row',
@@ -296,77 +245,51 @@ const styles = StyleSheet.create({
     marginRight: 4,
   },
   locationText: {
-    fontSize: 13,
-    color: '#777',
+    fontSize: 12,
   },
   rightPart: {
-    width: 125,
     alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    paddingRight: 7,
+    justifyContent: 'center',
+    paddingRight: 8,
   },
   title: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
-    color: '#111',
-    marginVertical: 4,
   },
   amountText: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
   },
   dateText: {
     fontSize: 12,
-    color: '#888',
     marginTop: 4,
     textAlign: 'right',
   },
   descriptionSection: {
     marginTop: 12,
-    paddingLeft: 2,
+    paddingHorizontal: 8,
   },
   notesText: {
-    color: '#333',
-    lineHeight: 20,
-    fontSize: 14,
-    textAlign: 'left',
+    lineHeight: 18,
+    fontSize: 13,
   },
   tagsSection: {
     marginTop: 10,
-    paddingLeft: 2,
-  },
-  tagsRow: {
+    paddingHorizontal: 8,
     flexDirection: 'row',
     flexWrap: 'wrap',
-    alignItems: 'center',
   },
   tag: {
     borderWidth: 1.5,
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    marginRight: 8,
-    marginBottom: 4,
-    backgroundColor: '#fff'
+    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    marginRight: 6,
+    marginBottom: 6,
   },
   tagText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
-  },
-  tagMore: {
-    borderWidth: 1.5,
-    borderColor: '#000000',
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    marginRight: 8,
-    marginBottom: 4,
-    backgroundColor: '#fff',
-  },
-  tagMoreText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#000000',
   },
   periodicBadgeAbsolute: {
     position: 'absolute',

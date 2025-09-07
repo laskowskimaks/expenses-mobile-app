@@ -87,7 +87,7 @@ export const DbProvider = ({ children }) => {
 
         if (sqliteConnectionRef.current) {
             try {
-                    sqliteConnectionRef.current.closeSync();
+                sqliteConnectionRef.current.closeSync();
             } catch (e) {
                 console.log("[DbContext] Nie udało się zamknąć starego połączenia:", e);
             }
@@ -119,7 +119,11 @@ export const DbProvider = ({ children }) => {
 
                     if (periodicResult.success) {
                         // Oznaczenie sprawdzenia jako wykonane
-                        await markPeriodicCheckCompleted();
+                        try {
+                            await markPeriodicCheckCompleted();
+                        } catch (markError) {
+                            console.error('[DbContext] Błąd podczas oznaczania sprawdzenia transakcji okresowych jako zakończone:', markError);
+                        }
 
                         if (periodicResult.addedCount > 0) {
                             console.log(`[DbContext] ${periodicResult.message}`);

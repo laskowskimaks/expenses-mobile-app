@@ -1,15 +1,16 @@
 import { categories, settings } from '@/database/schema';
 
 const DEFAULT_CATEGORIES = [
-    { name: 'Żywność', color: '#ff9f43', iconName: 'food-fork-drink', isDeletable: false },
-    { name: 'Dom', color: '#954535', iconName: 'home', isDeletable: false },
-    { name: 'Transport', color: '#2c387e', iconName: 'car', isDeletable: false },
-    { name: 'Zdrowie', color: '#24ff8e', iconName: 'heart-pulse', isDeletable: false },
-    { name: 'Edukacja', color: '#8e44ad', iconName: 'school', isDeletable: false },
-    { name: 'Rozrywka i kultura', color: '#e74c3c', iconName: 'theater', isDeletable: false },
-    { name: 'Zakupy i ubrania', color: '#f1c40f', iconName: 'shopping', isDeletable: false },
-    { name: 'Finanse', color: '#27ae60', iconName: 'finance', isDeletable: false },
+
     { name: 'Inne', color: '#bdc3c7', iconName: 'shape-outline', isDeletable: false },
+    { name: 'Finanse', color: '#27ae60', iconName: 'finance', isDeletable: false },
+    { name: 'Zakupy i ubrania', color: '#f1c40f', iconName: 'shopping', isDeletable: false },
+    { name: 'Rozrywka i kultura', color: '#e74c3c', iconName: 'theater', isDeletable: false },
+    { name: 'Edukacja', color: '#8e44ad', iconName: 'school', isDeletable: false },
+    { name: 'Zdrowie', color: '#24ff8e', iconName: 'heart-pulse', isDeletable: false },
+    { name: 'Transport', color: '#2c387e', iconName: 'car', isDeletable: false },
+    { name: 'Dom', color: '#954535', iconName: 'home', isDeletable: false },
+    { name: 'Żywność', color: '#ff9f43', iconName: 'food-fork-drink', isDeletable: false },
 ];
 
 const getDefaultSettings = (userId, email, hashedPassword, passwordSalt) => ([
