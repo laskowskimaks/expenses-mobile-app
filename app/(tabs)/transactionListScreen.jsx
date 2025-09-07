@@ -7,7 +7,7 @@ import {
   Alert,
   ScrollView,
 } from 'react-native';
-import { Searchbar, Chip, IconButton, Menu } from 'react-native-paper';
+import { Searchbar, Chip, IconButton, Menu, useTheme } from 'react-native-paper';
 import RNModal from 'react-native-modal';
 import { useRouter } from 'expo-router';
 import { FlashList } from '@shopify/flash-list';
@@ -20,6 +20,7 @@ import DateSeparator from '@/components/DateSeparator';
 import { getAllTransactionsSorted, deleteTransaction, formatCurrency } from '@/services/transactionService';
 import { eventEmitter } from '@/utils/eventEmitter';
 import useDebounce from '@/utils/useDebounce';
+import { processPeriodicTransactions } from '@/services/periodicTransactionService';
 
 import FilterModal, { getActiveFiltersCount, createDefaultFilters } from '@/components/FilterModal';
 import PeriodicActionChoiceModal from '@/components/PeriodicActionChoiceModal';
@@ -88,6 +89,7 @@ function flattenTransactionsForAmountSort(transactions = []) {
 
 export default function TransactionListScreen() {
   const { db } = useDb();
+  const theme = useTheme();
   const router = useRouter();
 
   const [searchInput, setSearchInput] = useState('');
@@ -201,6 +203,23 @@ export default function TransactionListScreen() {
     if (!db) return;
     if (showLoading) setIsLoadingTransactions(true);
     try {
+      // Sprawdź i przetwórz zaległe transakcje okresowe
+      console.log('[TransactionListScreen] Sprawdzanie zaległych transakcji okresowych...');
+      const periodicResult = await processPeriodicTransactions(db);
+      
+      if (periodicResult.success && periodicResult.addedCount > 0) {
+        console.log(`[TransactionListScreen] Dodano ${periodicResult.addedCount} automatycznych transakcji`);
+        if (__DEV__) {
+          // W trybie development pokaż informację o dodanych transakcjach
+          Alert.alert(
+            'Automatyczne transakcje', 
+            periodicResult.message,
+            [{ text: 'OK' }]
+          );
+        }
+      }
+
+      // Pobierz transakcje z bazy danych
       const transactionsFromDb = await getAllTransactionsSorted(db);
       setAllTransactions(transactionsFromDb);
     } catch (error) {
@@ -211,11 +230,49 @@ export default function TransactionListScreen() {
     }
   };
 
-  const normalizeCategory = (cat) => { if (!cat) return null; return { id: cat.id ?? cat.categoryId ?? cat._id ?? null, name: cat.name ?? cat.label ?? cat.categoryName ?? '', iconName: cat.iconName ?? cat.icon ?? cat.categoryIcon ?? null, color: cat.color ?? cat.backgroundColor ?? cat.categoryColor ?? '#cccccc' }; };
-  const normalizeTag = (tag) => { if (!tag) return null; return { id: tag.id ?? tag.tagId ?? tag._id ?? null, name: tag.name ?? tag.label ?? tag.tagName ?? '', color: tag.color ?? '#cccccc' }; };
-  const loadFilterOptions = async () => { try { const [catsRaw, tagsRaw] = await Promise.all([getAllCategories(db), getAllTags(db)]); const cats = (catsRaw || []).map(normalizeCategory).filter(Boolean); const tags = (tagsRaw || []).map(normalizeTag).filter(Boolean); setCategoriesOptions(cats); setTagsOptions(tags); } catch (error) { console.error('[TransactionListScreen] Błąd podczas wczytywania opcji filtrów:', error); } };
-  const handleRefresh = async () => { setSearchInput(''); await fetchTransactions(true); };
-  const onRefresh = async () => { setRefreshing(true); setSearchInput(''); await fetchTransactions(false); setRefreshing(false); };
+  const normalizeCategory = (cat) => {
+    if (!cat) return null;
+    return {
+      id: cat.id ?? cat.categoryId ?? cat._id ?? null,
+      name: cat.name ?? cat.label ?? cat.categoryName ?? '',
+      iconName: cat.iconName ?? cat.icon ?? cat.categoryIcon ?? null,
+      color: cat.color ?? cat.backgroundColor ?? cat.categoryColor ?? '#cccccc',
+    };
+  };
+
+  const normalizeTag = (tag) => {
+    if (!tag) return null;
+    return {
+      id: tag.id ?? tag.tagId ?? tag._id ?? null,
+      name: tag.name ?? tag.label ?? tag.tagName ?? '',
+      color: tag.color ?? '#cccccc',
+    };
+  };
+
+  const loadFilterOptions = async () => {
+    try {
+      const [catsRaw, tagsRaw] = await Promise.all([
+        getAllCategories(db),
+        getAllTags(db),
+      ]);
+      const cats = (catsRaw || []).map(normalizeCategory).filter(Boolean);
+      const tags = (tagsRaw || []).map(normalizeTag).filter(Boolean);
+      setCategoriesOptions(cats);
+      setTagsOptions(tags);
+    } catch (error) {
+      console.error('[TransactionListScreen] Błąd podczas wczytywania opcji filtrów:', error);
+    }
+  };
+
+  const handleRefresh = async () => {
+    await fetchTransactions(true);
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchTransactions(false);
+    setRefreshing(false);
+  };
 
   const handleEdit = useCallback((transaction) => {
     if (transaction.periodicTransactionId) {
@@ -236,20 +293,209 @@ export default function TransactionListScreen() {
       Alert.alert('Potwierdź usunięcie', 'Czy na pewno chcesz trwale usunąć tę transakcję?', [{ text: 'Anuluj', style: 'cancel' }, { text: 'Usuń', style: 'destructive', onPress: async () => { const result = await deleteTransaction(db, transaction.id, { mode: 'single' }); if (result.success) { eventEmitter.emit('transactionDeleted', { id: transaction.id }); } else { Alert.alert('Błąd', result.message || 'Nie udało się usunąć transakcji.'); } } }]);
     }
   }, [db]);
+  const handlePeriodicActionSelect = async (mode) => {
+    setPeriodicModalVisible(false);
+    if (!selectedTransaction || !currentActionType) return;
 
-  const handlePeriodicActionSelect = async (mode) => { setPeriodicModalVisible(false); if (!selectedTransaction || !currentActionType) return; if (currentActionType === 'edit') { router.push({ pathname: '/(modals)/AddTransactionModal', params: { transactionId: selectedTransaction.id, editMode: mode }, }); } else if (currentActionType === 'delete') { const result = await deleteTransaction(db, selectedTransaction.id, { mode }); if (result.success) { eventEmitter.emit('transactionDeleted', { id: selectedTransaction.id, mode }); } else { Alert.alert('Błąd', result.message || 'Nie udało się usunąć transakcji.'); } } setSelectedTransaction(null); setCurrentActionType(null); };
-  const getDisplayedTransactionCount = () => listData.filter(item => item.type === 'transaction').length;
-  const renderEmptyComponent = () => { if (allTransactions.length > 0 && debouncedSearchQuery !== '') { return (<View style={styles.emptyContainer}><Text style={styles.emptyText}>Brak wyników dla frazy "{debouncedSearchQuery}"</Text></View>); } return (<View style={styles.emptyContainer}><Text style={styles.emptyText}>Brak transakcji do wyświetlenia</Text></View>); };
-  const openFilter = useCallback((targetScreen = 'main') => { setFilterInitialScreen(targetScreen || 'main'); setFilterVisible(true); }, []);
-  const closeFilter = useCallback(() => { setFilterVisible(false); setFilterInitialScreen(null); }, []);
-  const applyFilterChanges = useCallback((newFilters) => { setAppliedFilters(newFilters); setFilterVisible(false); setFilterInitialScreen(null); }, []);
-  const resetAndApplyFilters = useCallback(() => { const defaults = createDefaultFilters(); setAppliedFilters(defaults); setFilterVisible(false); }, []);
+    if (currentActionType === 'edit') {
+      router.push({
+        pathname: '/(modals)/AddTransactionModal',
+        params: { transactionId: selectedTransaction.id, editMode: mode },
+      });
+    } else if (currentActionType === 'delete') {
+      const result = await deleteTransaction(db, selectedTransaction.id, { mode });
+      if (result.success) {
+        eventEmitter.emit('transactionDeleted', { id: selectedTransaction.id, mode });
+      } else {
+        Alert.alert('Błąd', result.message || 'Nie udało się usunąć transakcji.');
+      }
+    }
+
+    setSelectedTransaction(null);
+    setCurrentActionType(null);
+  };
+
+  const getDisplayedTransactionCount = () =>
+    listData.filter(item => item.type === 'transaction').length;
+
+  const renderEmptyComponent = () => {
+    if (allTransactions.length > 0 && debouncedSearchQuery !== '') {
+      return (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>
+            Brak wyników dla frazy "{debouncedSearchQuery}"
+          </Text>
+        </View>
+      );
+    }
+    return (
+      <View style={styles.emptyContainer}>
+        <Text style={styles.emptyText}>Brak transakcji do wyświetlenia</Text>
+      </View>
+    );
+  };
+
+  const openFilter = useCallback((targetScreen = 'main') => {
+    setFilterInitialScreen(targetScreen || 'main');
+    setFilterVisible(true);
+  }, []);
+
+  const closeFilter = useCallback(() => {
+    setFilterVisible(false);
+    setFilterInitialScreen(null);
+  }, []);
+
+  const applyFilterChanges = useCallback((newFilters) => {
+    setAppliedFilters(newFilters);
+    setFilterVisible(false);
+    setFilterInitialScreen(null);
+  }, []);
+
+  const resetAndApplyFilters = useCallback(() => {
+    const defaults = createDefaultFilters();
+    setAppliedFilters(defaults);
+    setFilterVisible(false);
+  }, []);
+
   const defaults = useMemo(() => createDefaultFilters(), []);
-  const removeCategoriesGroup = () => setAppliedFilters(prev => ({ ...prev, categoryIds: [] })); const removeTagsGroup = () => setAppliedFilters(prev => ({ ...prev, tagIds: [] })); const removeDateGroup = () => setAppliedFilters(prev => ({ ...prev, dateFrom: defaults.dateFrom, dateTo: defaults.dateTo })); const removeAmountGroup = () => setAppliedFilters(prev => ({ ...prev, amountMin: null, amountMax: null })); const removeTypeGroup = () => setAppliedFilters(prev => ({ ...prev, transactionType: 'all' })); const removePeriodicGroup = () => setAppliedFilters(prev => ({ ...prev, periodic: 'all' })); const clearAllFilters = () => setAppliedFilters(createDefaultFilters()); const activeFilterCount = getActiveFiltersCount(appliedFilters);
-  const groupedChips = useMemo(() => { const out = []; if (appliedFilters.categoryIds?.length > 0) out.push({ key: 'categories', label: `Kategorie (${appliedFilters.categoryIds.length})`, onClose: removeCategoriesGroup }); if (appliedFilters.tagIds?.length > 0) out.push({ key: 'tags', label: `Tagi (${appliedFilters.tagIds.length})`, onClose: removeTagsGroup }); if (appliedFilters.dateFrom !== defaults.dateFrom || appliedFilters.dateTo !== defaults.dateTo) { const from = appliedFilters.dateFrom ? formatDateEuropean(appliedFilters.dateFrom) : null; const to = appliedFilters.dateTo ? formatDateEuropean(appliedFilters.dateTo) : null; const label = from && to ? `${from} — ${to}` : (from ? `od ${from}` : (to ? `do ${to}` : 'Zakres dat')); out.push({ key: 'date', label, onClose: removeDateGroup }); } if (appliedFilters.amountMin != null || appliedFilters.amountMax != null) { const min = appliedFilters.amountMin != null ? `${appliedFilters.amountMin} zł` : null; const max = appliedFilters.amountMax != null ? `${appliedFilters.amountMax} zł` : null; const label = min && max ? `${min} — ${max}` : (min ? `>= ${min}` : `<= ${max}`); out.push({ key: 'amount', label, onClose: removeAmountGroup }); } if (appliedFilters.transactionType && appliedFilters.transactionType !== 'all') { const label = appliedFilters.transactionType === 'income' ? 'Wpływy' : 'Wydatki'; out.push({ key: 'type', label, onClose: removeTypeGroup }); } if (appliedFilters.periodic && appliedFilters.periodic !== 'all') { const label = appliedFilters.periodic === 'yes' ? 'Tylko cykliczne' : 'Bez cyklicznych'; out.push({ key: 'periodic', label, onClose: removePeriodicGroup }); } return out; }, [appliedFilters, defaults]);
-  const mapChipKeyToScreen = (key) => { switch (key) { case 'categories': return 'categories'; case 'tags': return 'tags'; case 'date': return 'date'; case 'amount': return 'price'; case 'type': return 'type'; case 'periodic': return 'type'; default: return 'main'; } };
-  const openSortMenu = () => setSortMenuVisible(true); const closeSortMenu = () => setSortMenuVisible(false); const selectSort = (option) => { setSortOption(option); closeSortMenu(); };
-  const currentSortLabel = useMemo(() => { switch (sortOption) { case 'date_desc': return 'Data (najnowsze)'; case 'date_asc': return 'Data (najstarsze)'; case 'amount_desc': return 'Kwota (największe)'; case 'amount_asc': return 'Kwota (najmniejsze)'; default: return ''; } }, [sortOption]);
+  const removeCategoriesGroup = () =>
+    setAppliedFilters(prev => ({ ...prev, categoryIds: [] }));
+  const removeTagsGroup = () =>
+    setAppliedFilters(prev => ({ ...prev, tagIds: [] }));
+  const removeDateGroup = () =>
+    setAppliedFilters(prev => ({
+      ...prev,
+      dateFrom: defaults.dateFrom,
+      dateTo: defaults.dateTo,
+    }));
+  const removeAmountGroup = () =>
+    setAppliedFilters(prev => ({ ...prev, amountMin: null, amountMax: null }));
+  const removeTypeGroup = () =>
+    setAppliedFilters(prev => ({ ...prev, transactionType: 'all' }));
+  const removePeriodicGroup = () =>
+    setAppliedFilters(prev => ({ ...prev, periodic: 'all' }));
+  const clearAllFilters = () => setAppliedFilters(createDefaultFilters());
+
+  const activeFilterCount = getActiveFiltersCount(appliedFilters);
+
+  const groupedChips = useMemo(() => {
+    const out = [];
+
+    if (appliedFilters.categoryIds?.length > 0) {
+      out.push({
+        key: 'categories',
+        label: `Kategorie (${appliedFilters.categoryIds.length})`,
+        onClose: removeCategoriesGroup,
+      });
+    }
+    if (appliedFilters.tagIds?.length > 0) {
+      out.push({
+        key: 'tags',
+        label: `Tagi (${appliedFilters.tagIds.length})`,
+        onClose: removeTagsGroup,
+      });
+    }
+    if (
+      appliedFilters.dateFrom !== defaults.dateFrom ||
+      appliedFilters.dateTo !== defaults.dateTo
+    ) {
+      const from = appliedFilters.dateFrom
+        ? formatDateEuropean(appliedFilters.dateFrom)
+        : null;
+      const to = appliedFilters.dateTo
+        ? formatDateEuropean(appliedFilters.dateTo)
+        : null;
+      const label =
+        from && to
+          ? `${from} — ${to}`
+          : from
+          ? `od ${from}`
+          : to
+          ? `do ${to}`
+          : 'Zakres dat';
+      out.push({ key: 'date', label, onClose: removeDateGroup });
+    }
+    if (appliedFilters.amountMin != null || appliedFilters.amountMax != null) {
+      const min =
+        appliedFilters.amountMin != null
+          ? `${appliedFilters.amountMin} zł`
+          : null;
+      const max =
+        appliedFilters.amountMax != null
+          ? `${appliedFilters.amountMax} zł`
+          : null;
+      const label =
+        min && max
+          ? `${min} — ${max}`
+          : min
+          ? `>= ${min}`
+          : `<= ${max}`;
+      out.push({ key: 'amount', label, onClose: removeAmountGroup });
+    }
+    if (
+      appliedFilters.transactionType &&
+      appliedFilters.transactionType !== 'all'
+    ) {
+      const label =
+        appliedFilters.transactionType === 'income'
+          ? 'Wpływy'
+          : 'Wydatki';
+      out.push({ key: 'type', label, onClose: removeTypeGroup });
+    }
+    if (
+      appliedFilters.periodic &&
+      appliedFilters.periodic !== 'all'
+    ) {
+      const label =
+        appliedFilters.periodic === 'yes'
+          ? 'Tylko cykliczne'
+          : 'Bez cyklicznych';
+      out.push({ key: 'periodic', label, onClose: removePeriodicGroup });
+    }
+
+    return out;
+  }, [appliedFilters, defaults]);
+
+  const mapChipKeyToScreen = (key) => {
+    switch (key) {
+      case 'categories':
+        return 'categories';
+      case 'tags':
+        return 'tags';
+      case 'date':
+        return 'date';
+      case 'amount':
+        return 'price';
+      case 'type':
+        return 'type';
+      case 'periodic':
+        return 'type';
+      default:
+        return 'main';
+    }
+  };
+
+  const openSortMenu = () => setSortMenuVisible(true);
+  const closeSortMenu = () => setSortMenuVisible(false);
+  const selectSort = (option) => {
+    setSortOption(option);
+    closeSortMenu();
+  };
+
+  const currentSortLabel = useMemo(() => {
+    switch (sortOption) {
+      case 'date_desc':
+        return 'Data (najnowsze)';
+      case 'date_asc':
+        return 'Data (najstarsze)';
+      case 'amount_desc':
+        return 'Kwota (największe)';
+      case 'amount_asc':
+        return 'Kwota (najmniejsze)';
+      default:
+        return '';
+    }
+  }, [sortOption]);
 
   const renderItem = useCallback(({ item }) => {
     if (item.type === 'separator') {
@@ -270,7 +516,7 @@ export default function TransactionListScreen() {
   const renderPlaceholder = useCallback(() => <TransactionSkeleton variant="compact" />, []);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <View style={styles.searchRow}>
         <Searchbar placeholder="Szukaj" onChangeText={setSearchInput} value={searchInput} style={styles.searchbar} elevation={1} />
         <View style={styles.sortMenuWrapper}>
@@ -326,20 +572,58 @@ export default function TransactionListScreen() {
 }
 
 function transactionPassesFilters(transaction, filters) {
-  if (filters.categoryIds?.length > 0) { if (!transaction.categoryId || !filters.categoryIds.includes(transaction.categoryId)) return false; }
-  if (filters.tagIds?.length > 0) { const txTagIds = (transaction.tags || []).map(t => t.id); if (!filters.tagIds.every(tid => txTagIds.includes(tid))) return false; }
-  if (typeof transaction.transactionDate === 'number') { if (filters.dateFrom && transaction.transactionDate < filters.dateFrom) return false; if (filters.dateTo && transaction.transactionDate > filters.dateTo) return false; }
-  if (filters.transactionType === 'income' && !(transaction.amount > 0)) return false;
-  if (filters.transactionType === 'expenditure' && !(transaction.amount < 0)) return false;
+  if (filters.categoryIds?.length > 0) {
+    if (!transaction.categoryId || !filters.categoryIds.includes(transaction.categoryId)) {
+      return false;
+    }
+  }
+
+  if (filters.tagIds?.length > 0) {
+    const txTagIds = (transaction.tags || []).map(t => t.id);
+    if (!filters.tagIds.every(tid => txTagIds.includes(tid))) {
+      return false;
+    }
+  }
+
+  if (typeof transaction.transactionDate === 'number') {
+    if (filters.dateFrom && transaction.transactionDate < filters.dateFrom) {
+      return false;
+    }
+    if (filters.dateTo && transaction.transactionDate > filters.dateTo) {
+      return false;
+    }
+  }
+
+  if (filters.transactionType === 'income' && !(transaction.amount > 0)) {
+    return false;
+  }
+  if (filters.transactionType === 'expenditure' && !(transaction.amount < 0)) {
+    return false;
+  }
+
   const absAmount = Math.abs(Number(transaction.amount || 0));
-  if (filters.amountMin != null && !isNaN(filters.amountMin) && absAmount < Number(filters.amountMin)) return false;
-  if (filters.amountMax != null && !isNaN(filters.amountMax) && absAmount > Number(filters.amountMax)) return false;
-  if (filters.periodic && filters.periodic !== 'all') { const txPeriodic = Boolean(transaction.periodicTransactionId); if (filters.periodic === 'yes' && !txPeriodic) return false; if (filters.periodic === 'no' && txPeriodic) return false; }
+  if (filters.amountMin != null && !isNaN(filters.amountMin) && absAmount < Number(filters.amountMin)) {
+    return false;
+  }
+  if (filters.amountMax != null && !isNaN(filters.amountMax) && absAmount > Number(filters.amountMax)) {
+    return false;
+  }
+
+  if (filters.periodic && filters.periodic !== 'all') {
+    const txPeriodic = Boolean(transaction.periodicTransactionId);
+    if (filters.periodic === 'yes' && !txPeriodic) {
+      return false;
+    }
+    if (filters.periodic === 'no' && txPeriodic) {
+      return false;
+    }
+  }
+
   return true;
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8f9fa' },
+  container: { flex: 1 },
   searchRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8 },
   searchbar: { flex: 1, marginVertical: 8, borderRadius: 12 },
   sortMenuWrapper: { marginLeft: 4, marginRight: 6 },

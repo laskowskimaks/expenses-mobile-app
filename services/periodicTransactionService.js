@@ -1,8 +1,14 @@
 import { periodicTransactions, transactions, categories, periodicTransactionTags, tags, transactionTags } from '@/database/schema';
-import { eq, lte, sql, desc } from 'drizzle-orm';
+import { eq, lte, sql, desc, and, not, inArray, gt, or } from 'drizzle-orm';
 import { getCurrentTimestamp } from '@/utils/dateUtils';
 import { eventEmitter } from '@/utils/eventEmitter';
 import { getRandomColor } from './tagService';
+
+const calculateNextOccurrence = (currentTimestamp, interval, unit) => {
+    const currentDate = new Date(currentTimestamp * 1000);
+    const nextDate = addIntervalToDate(currentDate, interval, unit);
+    return Math.floor(nextDate.getTime() / 1000);
+};
 
 const addIntervalToDate = (date, interval, unit) => {
     const d = new Date(date);
@@ -16,51 +22,65 @@ const addIntervalToDate = (date, interval, unit) => {
     return d;
 };
 
-const calculateNextOccurrence = (currentTimestamp, interval, unit) => {
-    const currentDate = new Date(currentTimestamp * 1000);
-    const nextDate = addIntervalToDate(currentDate, interval, unit);
-    return Math.floor(nextDate.getTime() / 1000);
-};
-
+// Zeruje godzinę do 00:00:00
 const normalizeToLocalDayStart = (timestampSec) => {
     const d = new Date(timestampSec * 1000);
     d.setHours(0, 0, 0, 0);
     return Math.floor(d.getTime() / 1000);
 };
 
-const calculateOccurrences = (transaction) => {
-    const { startDate, nextOccurrenceDate, endDate, repeatInterval, repeatUnit } = transaction;
-    if (!startDate || !nextOccurrenceDate || !repeatInterval || !repeatUnit) {
+// Zachowuje oryginalną godzinę z startDate
+const normalizeToSameTime = (timestampSec, targetDayTimestamp) => {
+    const originalDate = new Date(timestampSec * 1000);
+    const targetDay = new Date(targetDayTimestamp * 1000);
+
+    targetDay.setHours(
+        originalDate.getHours(),
+        originalDate.getMinutes(),
+        originalDate.getSeconds(),
+        originalDate.getMilliseconds()
+    );
+
+    return Math.floor(targetDay.getTime() / 1000);
+};
+
+const calculateOccurrencesFromDB = async (db, periodicTransactionId, periodicTransaction) => {
+    try {
+        const currentDayStart = getCurrentTimestamp();
+        const pastResult = await db
+            .select({ count: sql`COUNT(*)` })
+            .from(transactions)
+            .where(and(
+                eq(transactions.periodicTransactionId, periodicTransactionId),
+                sql`${transactions.transactionDate} <= ${currentDayStart}`
+            ))
+            .get();
+
+        let totalOccurrences = null;
+        if (periodicTransaction.endDate !== null) {
+            totalOccurrences = 0;
+            let countDate = new Date(periodicTransaction.startDate * 1000);
+            countDate.setHours(0, 0, 0, 0);
+
+            const endDateNormalized = new Date(periodicTransaction.endDate * 1000);
+            endDateNormalized.setHours(0, 0, 0, 0);
+
+            while (countDate <= endDateNormalized) {
+                totalOccurrences++;
+                countDate = addIntervalToDate(countDate, periodicTransaction.repeatInterval, periodicTransaction.repeatUnit);
+                countDate.setHours(0, 0, 0, 0);
+                if (totalOccurrences > 10000) break;
+            }
+        }
+
+        return {
+            pastOccurrences: parseInt(pastResult.count) || 0,
+            totalOccurrences: totalOccurrences
+        };
+    } catch (error) {
+        console.error('[calculateOccurrencesFromDB] Błąd:', error);
         return { pastOccurrences: 0, totalOccurrences: null };
     }
-
-    const startTs = Math.floor(startDate);
-    const nextTs = Math.floor(nextOccurrenceDate);
-    const endTs = endDate ? Math.floor(endDate) : null;
-
-    let pastOccurrences = 0;
-    let iterDate = new Date(startTs * 1000);
-
-    while (Math.floor(iterDate.getTime() / 1000) < nextTs) {
-        pastOccurrences++;
-        iterDate = addIntervalToDate(iterDate, repeatInterval, repeatUnit);
-
-        if (pastOccurrences > 100000) break;
-    }
-
-    let totalOccurrences = null;
-    if (endTs !== null) {
-        totalOccurrences = 0;
-        let countDate = new Date(startTs * 1000);
-        const endDayStart = normalizeToLocalDayStart(endTs);
-        while (normalizeToLocalDayStart(Math.floor(countDate.getTime() / 1000)) <= endDayStart) {
-            totalOccurrences++;
-            countDate = addIntervalToDate(countDate, repeatInterval, repeatUnit);
-            if (totalOccurrences > 100000) break;
-        }
-    }
-
-    return { pastOccurrences, totalOccurrences };
 };
 
 export const getAllPeriodicTransactions = async (db) => {
@@ -90,65 +110,75 @@ export const getAllPeriodicTransactions = async (db) => {
             .groupBy(periodicTransactions.id)
             .orderBy(desc(periodicTransactions.startDate));
 
-        return results.map(row => {
-            const occurrences = calculateOccurrences(row);
-            return {
+        const processedResults = [];
+        for (const row of results) {
+            const occurrences = await calculateOccurrencesFromDB(db, row.id, row);
+            processedResults.push({
                 ...row,
                 tags: row.tags ? JSON.parse(row.tags).filter(t => t.id !== null) : [],
                 ...occurrences,
-            }
-        });
+            });
+        }
+
+        return processedResults;
     } catch (error) {
         console.error("[PeriodicTransactionService] Błąd podczas pobierania transakcji cyklicznych:", error);
         throw error;
     }
 };
 
-export const addPeriodicTransaction = async (dbOrTx, periodicTransactionData) => {
-    if (!dbOrTx) {
-        console.error("[PeriodicTransactionService] Instancja bazy danych nie została przekazana.");
+const _handleTags = async (dbTransaction, tagNames, periodicTransactionId) => {
+    if (tagNames && tagNames.length > 0) {
+        const tagIds = [];
+        for (const tagName of tagNames) {
+            const trimmedTagName = tagName.trim();
+            if (!trimmedTagName) continue;
+
+            let tag = await dbTransaction.select({ id: tags.id }).from(tags).where(eq(tags.name, trimmedTagName)).limit(1);
+            let tagId = tag[0]?.id;
+
+            if (!tagId) {
+                const newTag = await dbTransaction.insert(tags).values({ name: trimmedTagName, color: getRandomColor() }).returning({ insertedId: tags.id });
+                tagId = newTag[0].insertedId;
+                eventEmitter.emit('tagAdded', { id: tagId, name: trimmedTagName });
+            }
+            tagIds.push(tagId);
+        }
+        if (tagIds.length > 0) {
+            const tagsToInsert = tagIds.map(tagId => ({ periodicTransactionId, tagId }));
+            await dbTransaction.insert(periodicTransactionTags).values(tagsToInsert);
+        }
+        return tagIds;
+    }
+    return [];
+};
+
+export const addPeriodicTransaction = async (dbOrDbTransaction, periodicTransactionData) => {
+    if (!dbOrDbTransaction) {
         return { success: false, message: "Błąd bazy danych." };
     }
-
     try {
-        const isTransaction = !!dbOrTx.constructor.name.match(/Transaction/);
-        const performTransaction = async (tx) => {
-            const normalizedAmount = String(periodicTransactionData.amount || '0')
-                .replace(',', '.')
-                .replace(/[^0-9.]/g, '');
+        const isDbTransaction = !!dbOrDbTransaction.constructor.name.match(/Transaction/);
 
+        const performTransaction = async (dbTransaction) => {
+            const normalizedAmount = String(periodicTransactionData.amount || '0').replace(',', '.').replace(/[^0-9.]/g, '');
             let finalAmount = parseFloat(normalizedAmount);
+            if (isNaN(finalAmount) || finalAmount <= 0) throw new Error('Kwota musi być liczbą większą od 0');
+            if (periodicTransactionData.type === 'expenditure') finalAmount = -Math.abs(finalAmount);
 
-            if (isNaN(finalAmount) || finalAmount <= 0) {
-                throw new Error('Kwota musi być liczbą większą od 0');
-            }
-
-            if (periodicTransactionData.type === 'expenditure') {
-                finalAmount = -Math.abs(finalAmount);
-            }
-
+            // Zachowaj pełną datę z czasem
             const startTimestamp = Math.floor(periodicTransactionData.startDate.getTime() / 1000);
-            const endTimestamp = periodicTransactionData.endDate
-                ? Math.floor(periodicTransactionData.endDate.getTime() / 1000)
-                : null;
-
+            const endTimestamp = periodicTransactionData.endDate ? Math.floor(periodicTransactionData.endDate.getTime() / 1000) : null;
             const categoryId = periodicTransactionData.categoryId;
-            if (!categoryId) {
-                throw new Error(`ID kategorii nie zostało przekazane.`);
-            }
 
-            if (endTimestamp && endTimestamp <= startTimestamp) {
-                throw new Error('Data zakończenia musi być późniejsza niż data początku.');
-            }
+            if (!categoryId) throw new Error(`ID kategorii nie została przekazana.`);
+            if (endTimestamp && endTimestamp <= startTimestamp) throw new Error('Data zakończenia musi być późniejsza niż data początku.');
+            if (periodicTransactionData.repeatInterval < 1) throw new Error('Interwał powtarzania musi być większy od 0.');
 
-            if (periodicTransactionData.repeatInterval < 1) {
-                throw new Error('Interwał powtarzania musi być większy od 0.');
-            }
-
-            const newPeriodicTransaction = await tx.insert(periodicTransactions).values({
+            const newPeriodicTransaction = await dbTransaction.insert(periodicTransactions).values({
                 amount: finalAmount,
                 title: periodicTransactionData.title,
-                repeatInterval: periodicTransactionData.repeatInterval,
+                repeatInterval: parseInt(periodicTransactionData.repeatInterval),
                 repeatUnit: periodicTransactionData.repeatUnit,
                 startDate: startTimestamp,
                 nextOccurrenceDate: startTimestamp,
@@ -158,51 +188,12 @@ export const addPeriodicTransaction = async (dbOrTx, periodicTransactionData) =>
             }).returning({ insertedId: periodicTransactions.id });
 
             const newPeriodicTransactionId = newPeriodicTransaction[0].insertedId;
-
-            if (periodicTransactionData.tags && periodicTransactionData.tags.length > 0) {
-                const tagIds = [];
-                for (const tagName of periodicTransactionData.tags) {
-                    const trimmedTagName = tagName.trim();
-                    if (!trimmedTagName) continue;
-
-                    const existingTag = await tx.select({ id: tags.id })
-                        .from(tags)
-                        .where(eq(tags.name, trimmedTagName))
-                        .limit(1);
-
-                    let tagId;
-
-                    if (existingTag.length > 0) {
-                        tagId = existingTag[0].id;
-                    } else {
-                        const newTag = await tx.insert(tags).values({
-                            name: trimmedTagName,
-                            color: getRandomColor()
-                        }).returning({ insertedId: tags.id });
-                        tagId = newTag[0].insertedId;
-                        eventEmitter.emit('tagAdded', { id: tagId, name: trimmedTagName });
-                    }
-                    tagIds.push(tagId);
-                }
-
-                if (tagIds.length > 0) {
-                    const tagsToInsert = tagIds.map(tagId => ({
-                        periodicTransactionId: newPeriodicTransactionId,
-                        tagId: tagId,
-                    }));
-                    await tx.insert(periodicTransactionTags).values(tagsToInsert);
-                }
-            }
+            await _handleTags(dbTransaction, periodicTransactionData.tags, newPeriodicTransactionId);
 
             return { success: true, periodicTransactionId: newPeriodicTransactionId };
         };
 
-        if (isTransaction) {
-            return await performTransaction(dbOrTx);
-        } else {
-            return await dbOrTx.transaction(performTransaction);
-        }
-
+        return isDbTransaction ? await performTransaction(dbOrDbTransaction) : await dbOrDbTransaction.transaction(performTransaction);
     } catch (error) {
         console.error("[PeriodicTransactionService] Błąd podczas dodawania transakcji cyklicznej:", error);
         return { success: false, message: error.message || "Wystąpił nieoczekiwany błąd." };
@@ -210,32 +201,14 @@ export const addPeriodicTransaction = async (dbOrTx, periodicTransactionData) =>
 };
 
 
-export const processPeriodicTransactions = async (dbOrTx) => {
+export const processPeriodicTransactions = async (dbOrDbTransaction) => {
     try {
-        console.log('[PeriodicTransactionService] Rozpoczynam sprawdzanie transakcji okresowych...');
         const currentTimestamp = getCurrentTimestamp();
-        const currentDayStart = normalizeToLocalDayStart(currentTimestamp);
-
-        const overduePeriodicTransactions = await dbOrTx
-            .select({
-                id: periodicTransactions.id,
-                amount: periodicTransactions.amount,
-                title: periodicTransactions.title,
-                categoryId: periodicTransactions.categoryId,
-                repeatInterval: periodicTransactions.repeatInterval,
-                repeatUnit: periodicTransactions.repeatUnit,
-                nextOccurrenceDate: periodicTransactions.nextOccurrenceDate,
-                endDate: periodicTransactions.endDate,
-                notes: periodicTransactions.notes,
-                categoryName: categories.name
-            })
+        const overduePeriodicTransactions = await dbOrDbTransaction
+            .select()
             .from(periodicTransactions)
             .leftJoin(categories, eq(periodicTransactions.categoryId, categories.id))
-            .where(
-                lte(periodicTransactions.nextOccurrenceDate, currentTimestamp)
-            );
-
-        console.log(`[PeriodicTransactionService] Znaleziono ${overduePeriodicTransactions.length} zaległych transakcji okresowych`);
+            .where(lte(periodicTransactions.nextOccurrenceDate, currentTimestamp));
 
         if (overduePeriodicTransactions.length === 0) {
             return { success: true, addedCount: 0, addedTransactions: [], message: 'Brak zaległych transakcji okresowych' };
@@ -244,91 +217,317 @@ export const processPeriodicTransactions = async (dbOrTx) => {
         let addedTransactionsCount = 0;
         const addedTransactions = [];
 
-        for (const periodicTransaction of overduePeriodicTransactions) {
+        for (const { periodic_transactions: pt } of overduePeriodicTransactions) {
             try {
-                let nextOccurrence = periodicTransaction.nextOccurrenceDate;
+                let nextOccurrence = pt.nextOccurrenceDate;
                 const maxIterations = 1000;
                 let iterations = 0;
+                const currentDayStart = normalizeToLocalDayStart(currentTimestamp);
+                const endDayStart = pt.endDate ? normalizeToLocalDayStart(pt.endDate) : null;
 
-                const getNextOccurrenceDayStart = () => normalizeToLocalDayStart(nextOccurrence);
-                const endDayStart = periodicTransaction.endDate ? normalizeToLocalDayStart(periodicTransaction.endDate) : null;
-
-                //console.log(`[PeriodicTransactionService][DEBUG] Processing "${periodicTransaction.title}" start nextOcc=${new Date(periodicTransaction.nextOccurrenceDate * 1000).toLocaleString()} end=${periodicTransaction.endDate ? new Date(periodicTransaction.endDate * 1000).toLocaleString() : 'null'}`);
-
-                while (
-                    getNextOccurrenceDayStart() <= currentDayStart &&
-                    iterations < maxIterations &&
-                    (!endDayStart || getNextOccurrenceDayStart() <= endDayStart)
-                ) {
+                while (normalizeToLocalDayStart(nextOccurrence) <= currentDayStart && iterations < maxIterations) {
                     iterations++;
-
-                    const newTransactionData = {
-                        amount: periodicTransaction.amount,
-                        title: periodicTransaction.title,
-                        transactionDate: nextOccurrence,
-                        notes: periodicTransaction.notes ? `${periodicTransaction.notes}\n(transakcja dodana automatycznie)` : `(transakcja dodana automatycznie)`,
-                        location: null,
-                        categoryId: periodicTransaction.categoryId,
-                        periodicTransactionId: periodicTransaction.id,
-                    };
-
-                    const insertResult = await dbOrTx
-                        .insert(transactions)
-                        .values(newTransactionData)
-                        .returning();
-
-                    const newTransactionId = insertResult[0].id;
-
-                    const periodicTags = await dbOrTx
-                        .select({
-                            tagId: periodicTransactionTags.tagId,
-                            tagName: tags.name,
-                            tagColor: tags.color
-                        })
-                        .from(periodicTransactionTags)
-                        .innerJoin(tags, eq(periodicTransactionTags.tagId, tags.id))
-                        .where(eq(periodicTransactionTags.periodicTransactionId, periodicTransaction.id));
-
-                    if (periodicTags.length > 0) {
-                        const tagsToInsert = periodicTags.map(tag => ({
-                            transactionId: newTransactionId,
-                            tagId: tag.tagId,
-                        }));
-                        await dbOrTx.insert(transactionTags).values(tagsToInsert);
+                    if (endDayStart && normalizeToLocalDayStart(nextOccurrence) > endDayStart) {
+                        break;
                     }
 
-                    addedTransactions.push({
-                        ...newTransactionData,
-                        id: newTransactionId,
-                        categoryName: periodicTransaction.categoryName,
-                        tags: periodicTags.map(tag => ({ id: tag.tagId, name: tag.tagName, color: tag.tagColor }))
-                    });
+                    // Użyj oryginalnego czasu zamiast zerować godzinę
+                    const transactionTimestamp = normalizeToSameTime(pt.startDate, nextOccurrence);
 
+                    const newTransactionData = {
+                        amount: pt.amount,
+                        title: pt.title,
+                        transactionDate: transactionTimestamp, // Zachowaj oryginalny czas
+                        notes: pt.notes,
+                        categoryId: pt.categoryId,
+                        periodicTransactionId: pt.id
+                    };
+                    const newTransaction = await dbOrDbTransaction.insert(transactions).values(newTransactionData).returning();
+                    const newTransactionId = newTransaction[0].id;
+
+                    const pTags = await dbOrDbTransaction.select({ tagId: periodicTransactionTags.tagId }).from(periodicTransactionTags).where(eq(periodicTransactionTags.periodicTransactionId, pt.id));
+                    if (pTags.length > 0) {
+                        await dbOrDbTransaction.insert(transactionTags).values(pTags.map(t => ({ transactionId: newTransactionId, tagId: t.tagId })));
+                    }
+
+                    addedTransactions.push({ ...newTransactionData, id: newTransactionId });
                     addedTransactionsCount++;
-
-                    console.log(`[PeriodicTransactionService] Dodano "${periodicTransaction.title}" dla daty ${new Date(nextOccurrence * 1000).toLocaleDateString('pl-PL')}`);
-
-                    nextOccurrence = calculateNextOccurrence(nextOccurrence, periodicTransaction.repeatInterval, periodicTransaction.repeatUnit);
+                    nextOccurrence = calculateNextOccurrence(nextOccurrence, pt.repeatInterval, pt.repeatUnit);
                 }
 
-                if (iterations >= maxIterations) {
-                    console.warn(`[PeriodicTransactionService] Osiągnięto maksymalną liczbę iteracji (${maxIterations}) dla "${periodicTransaction.title}"`);
-                }
-
-                await dbOrTx.update(periodicTransactions)
-                    .set({ nextOccurrenceDate: nextOccurrence })
-                    .where(eq(periodicTransactions.id, periodicTransaction.id));
+                await dbOrDbTransaction.update(periodicTransactions).set({ nextOccurrenceDate: nextOccurrence }).where(eq(periodicTransactions.id, pt.id));
             } catch (error) {
-                console.error(`[PeriodicTransactionService] Błąd przy przetwarzaniu transakcji "${periodicTransaction.title}":`, error);
+                console.error(`[PeriodicTransactionService] Błąd przy przetwarzaniu transakcji "${pt.title}":`, error);
             }
         }
 
-        console.log(`[PeriodicTransactionService] Zakończono. Dodano ${addedTransactionsCount} nowych transakcji automatycznych.`);
-
         return { success: true, addedCount: addedTransactionsCount, addedTransactions, message: `Dodano ${addedTransactionsCount} automatycznych transakcji` };
-
     } catch (error) {
         console.error('[PeriodicTransactionService] Błąd podczas przetwarzania transakcji okresowych:', error);
         return { success: false, addedCount: 0, addedTransactions: [], message: 'Błąd podczas przetwarzania transakcji okresowych: ' + error.message };
+    }
+};
+
+export const getPeriodicTransactionById = async (db, id) => {
+    if (!db || !id) return null;
+    try {
+        const result = await db.select().from(periodicTransactions).where(eq(periodicTransactions.id, id)).get();
+        if (!result) return null;
+
+        const tagsResult = await db.select({
+            id: tags.id,
+            name: tags.name,
+            color: tags.color
+        }).from(periodicTransactionTags).innerJoin(tags, eq(periodicTransactionTags.tagId, tags.id)).where(eq(periodicTransactionTags.periodicTransactionId, id));
+
+        return { ...result, tags: tagsResult };
+    } catch (error) {
+        console.error(`[PeriodicTransactionService] Błąd pobierania transakcji cyklicznej o ID ${id}:`, error);
+        return null;
+    }
+};
+
+export const getPeriodicTransactionDefinition = async (db, id) => {
+    if (!db || !id) return null;
+    return await db.select().from(periodicTransactions).where(eq(periodicTransactions.id, id)).get();
+};
+
+export const endPeriodicSeries = async (dbTransaction, pt, newSeriesStartDate, mode = 'future') => {
+    let cutoffDate;
+
+    if (mode === 'end_series') {
+        cutoffDate = new Date(newSeriesStartDate);
+        cutoffDate.setHours(23, 59, 59, 999);
+    } else {
+        cutoffDate = new Date(newSeriesStartDate);
+        cutoffDate.setDate(cutoffDate.getDate() - 1);
+        cutoffDate.setHours(23, 59, 59, 999);
+    }
+
+    let lastValidOccurrence = null;
+    let currentOccurrence = pt.startDate;
+    let occurrenceCount = 0;
+    const cutoffTimestamp = Math.floor(cutoffDate.getTime() / 1000);
+
+    while (currentOccurrence <= cutoffTimestamp && occurrenceCount < 10000) {
+        lastValidOccurrence = currentOccurrence;
+        occurrenceCount++;
+        currentOccurrence = calculateNextOccurrence(currentOccurrence, pt.repeatInterval, pt.repeatUnit);
+    }
+
+    if (lastValidOccurrence === null || lastValidOccurrence < pt.startDate) {
+        // POPRAWKA: Przed usunięciem całej serii, usuń tagi wszystkich transakcji
+        const allTransactions = await dbTransaction
+            .select({ id: transactions.id })
+            .from(transactions)
+            .where(eq(transactions.periodicTransactionId, pt.id));
+        
+        const allTransactionIds = allTransactions.map(t => t.id);
+        
+        if (allTransactionIds.length > 0) {
+            await dbTransaction.delete(transactionTags)
+                .where(inArray(transactionTags.transactionId, allTransactionIds));
+            console.log(`[endPeriodicSeries] Usunięto tagi ${allTransactionIds.length} transakcji przed usunięciem całej serii`);
+        }
+        
+        await dbTransaction.delete(transactions).where(eq(transactions.periodicTransactionId, pt.id));
+        await dbTransaction.delete(periodicTransactionTags).where(eq(periodicTransactionTags.periodicTransactionId, pt.id));
+        await dbTransaction.delete(periodicTransactions).where(eq(periodicTransactions.id, pt.id));
+        return null;
+    } else {
+        // POPRAWKA: Usuń tagi przyszłych transakcji (po dacie zakończenia)
+        const futureTransactions = await dbTransaction
+            .select({ id: transactions.id })
+            .from(transactions)
+            .where(and(
+                eq(transactions.periodicTransactionId, pt.id),
+                gt(transactions.transactionDate, lastValidOccurrence)
+            ));
+        
+        const futureTransactionIds = futureTransactions.map(t => t.id);
+        
+        if (futureTransactionIds.length > 0) {
+            await dbTransaction.delete(transactionTags)
+                .where(inArray(transactionTags.transactionId, futureTransactionIds));
+            console.log(`[endPeriodicSeries] Usunięto tagi ${futureTransactionIds.length} przyszłych transakcji`);
+        }
+        
+        // Usuń przyszłe transakcje
+        await dbTransaction.delete(transactions)
+            .where(and(
+                eq(transactions.periodicTransactionId, pt.id),
+                gt(transactions.transactionDate, lastValidOccurrence)
+            ));
+
+        console.log(`[endPeriodicSeries] Ustawiam endDate na: ${new Date(lastValidOccurrence * 1000).toISOString()}`);
+        await dbTransaction.update(periodicTransactions)
+            .set({ endDate: lastValidOccurrence })
+            .where(eq(periodicTransactions.id, pt.id));
+        return lastValidOccurrence;
+    }
+};
+
+export const updatePeriodicTransaction = async ({ db, id, data, mode = 'all' }) => {
+    try {
+        await db.transaction(async (dbTransaction) => {
+            if (mode === 'all') {
+                const startDateTimestamp = Math.floor(data.startDate.getTime() / 1000);
+                const periodicData = {
+                    title: data.title,
+                    amount: data.type === 'expenditure' ? -Math.abs(parseFloat(data.amount)) : Math.abs(parseFloat(data.amount)),
+                    notes: data.description,
+                    categoryId: data.categoryId,
+                    repeatInterval: parseInt(data.repeatInterval),
+                    repeatUnit: data.repeatUnit,
+                    startDate: startDateTimestamp,
+                    endDate: data.endDate ? Math.floor(data.endDate.getTime() / 1000) : null,
+                    nextOccurrenceDate: startDateTimestamp,
+                };
+
+                // POPRAWKA: Usuń tagi PRZED usunięciem transakcji
+                const oldTransactions = await dbTransaction
+                    .select({ id: transactions.id })
+                    .from(transactions)
+                    .where(eq(transactions.periodicTransactionId, id));
+                
+                const oldTransactionIds = oldTransactions.map(t => t.id);
+                
+                if (oldTransactionIds.length > 0) {
+                    await dbTransaction.delete(transactionTags)
+                        .where(inArray(transactionTags.transactionId, oldTransactionIds));
+                    console.log(`[updatePeriodicTransaction] Usunięto tagi ${oldTransactionIds.length} starych transakcji (tryb 'all')`);
+                }
+
+                await dbTransaction.delete(transactions).where(eq(transactions.periodicTransactionId, id));
+                await dbTransaction.update(periodicTransactions).set(periodicData).where(eq(periodicTransactions.id, id));
+                await dbTransaction.delete(periodicTransactionTags).where(eq(periodicTransactionTags.periodicTransactionId, id));
+                await _handleTags(dbTransaction, data.tags, id);
+                await processPeriodicTransactions(dbTransaction);
+
+            } else if (mode === 'future') {
+                const oldPt = await getPeriodicTransactionDefinition(dbTransaction, id);
+                if (!oldPt) throw new Error("Nie znaleziono oryginalnej transakcji cyklicznej.");
+
+                const newEndDate = await endPeriodicSeries(dbTransaction, oldPt, data.startDate);
+
+                if (newEndDate !== null) {
+                    // POPRAWKA: Usuń tagi PRZED usunięciem transakcji
+                    const futureTransactions = await dbTransaction
+                        .select({ id: transactions.id })
+                        .from(transactions)
+                        .where(and(
+                            eq(transactions.periodicTransactionId, id),
+                            gt(transactions.transactionDate, newEndDate)
+                        ));
+                    
+                    const futureTransactionIds = futureTransactions.map(t => t.id);
+                    
+                    if (futureTransactionIds.length > 0) {
+                        await dbTransaction.delete(transactionTags)
+                            .where(inArray(transactionTags.transactionId, futureTransactionIds));
+                        console.log(`[updatePeriodicTransaction] Usunięto tagi ${futureTransactionIds.length} przyszłych transakcji (tryb 'future')`);
+                    }
+
+                    await dbTransaction.delete(transactions)
+                        .where(and(
+                            eq(transactions.periodicTransactionId, id),
+                            gt(transactions.transactionDate, newEndDate)
+                        ));
+                }
+
+                await addPeriodicTransaction(dbTransaction, data);
+                await processPeriodicTransactions(dbTransaction);
+            }
+        });
+        eventEmitter.emit('periodicTransactionChanged');
+        return { success: true };
+    } catch (error) {
+        console.error(`[PeriodicTransactionService] Błąd aktualizacji transakcji cyklicznej ${id}:`, error);
+        return { success: false, message: error.message || "Wystąpił błąd." };
+    }
+};
+
+export const deletePeriodicTransaction = async ({ db, periodicTransactionId, mode = 'delete_all' }) => {
+    try {
+        if (mode === 'end') {
+            const pt = await getPeriodicTransactionDefinition(db, periodicTransactionId);
+            if (!pt) throw new Error("Nie znaleziono transakcji cyklicznej.");
+            
+            await db.transaction(async (dbTransaction) => {
+                const newEndDate = await endPeriodicSeries(dbTransaction, pt, new Date(), 'end_series');
+                
+                if (newEndDate !== null) {
+                    // Znajdź transakcje do usunięcia (po dacie zakończenia)
+                    const futureTransactions = await dbTransaction
+                        .select({ id: transactions.id })
+                        .from(transactions)
+                        .where(and(
+                            eq(transactions.periodicTransactionId, periodicTransactionId),
+                            gt(transactions.transactionDate, newEndDate)
+                        ));
+                    
+                    const futureTransactionIds = futureTransactions.map(t => t.id);
+                    
+                    // Usuń tagi przyszłych transakcji
+                    if (futureTransactionIds.length > 0) {
+                        await dbTransaction.delete(transactionTags)
+                            .where(inArray(transactionTags.transactionId, futureTransactionIds));
+                        console.log(`[deletePeriodicTransaction] Usunięto tagi ${futureTransactionIds.length} przyszłych transakcji`);
+                    }
+                    
+                    // Usuń przyszłe transakcje
+                    await dbTransaction.delete(transactions)
+                        .where(and(
+                            eq(transactions.periodicTransactionId, periodicTransactionId),
+                            gt(transactions.transactionDate, newEndDate)
+                        ));
+                }
+            });
+        } else if (mode === 'delete_all') {
+            if (!periodicTransactionId) {
+                return { success: false, message: "Brak ID transakcji cyklicznej." };
+            }
+            
+            await db.transaction(async (dbTransaction) => {
+                console.log(`[deletePeriodicTransaction] Usuwanie transakcji cyklicznej ${periodicTransactionId} i wszystkich powiązań`);
+                
+                // 1. Znajdź wszystkie transakcje należące do tej serii
+                const relatedTransactions = await dbTransaction
+                    .select({ id: transactions.id })
+                    .from(transactions)
+                    .where(eq(transactions.periodicTransactionId, periodicTransactionId));
+                
+                const transactionIds = relatedTransactions.map(t => t.id);
+                console.log(`[deletePeriodicTransaction] Znaleziono ${transactionIds.length} powiązanych transakcji:`, transactionIds);
+
+                // 2. Usuń tagi pojedynczych transakcji
+                if (transactionIds.length > 0) {
+                    await dbTransaction.delete(transactionTags)
+                        .where(inArray(transactionTags.transactionId, transactionIds));
+                    console.log(`[deletePeriodicTransaction] Usunięto tagi ${transactionIds.length} transakcji`);
+                }
+
+                // 3. Usuń tagi transakcji cyklicznej
+                await dbTransaction.delete(periodicTransactionTags)
+                    .where(eq(periodicTransactionTags.periodicTransactionId, periodicTransactionId));
+                console.log(`[deletePeriodicTransaction] Usunięto tagi transakcji cyklicznej`);
+
+                // 4. Usuń wszystkie transakcje z tej serii
+                await dbTransaction.delete(transactions)
+                    .where(eq(transactions.periodicTransactionId, periodicTransactionId));
+                console.log(`[deletePeriodicTransaction] Usunięto ${transactionIds.length} transakcji`);
+
+                // 5. Usuń samą transakcję cykliczną
+                await dbTransaction.delete(periodicTransactions)
+                    .where(eq(periodicTransactions.id, periodicTransactionId));
+                console.log(`[deletePeriodicTransaction] Usunięto transakcję cykliczną`);
+            });
+        }
+        
+        eventEmitter.emit('periodicTransactionChanged');
+        return { success: true };
+    } catch (error) {
+        console.error(`[PeriodicTransactionService] Błąd usuwania transakcji cyklicznej ${periodicTransactionId}:`, error);
+        return { success: false, message: error.message || "Wystąpił błąd." };
     }
 };

@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native
 import { useTheme, Icon, Divider } from 'react-native-paper';
 import { Swipeable } from 'react-native-gesture-handler';
 import { LinearGradient } from 'expo-linear-gradient';
-import { formatDateOnly } from '@/utils/dateUtils';
+import { formatDateOnly, getCurrentTimestamp } from '@/utils/dateUtils';
 import { formatCurrency } from '@/services/transactionService';
 
 const formatInterval = (interval, unit) => {
@@ -24,35 +24,44 @@ const formatInterval = (interval, unit) => {
     return '';
 };
 
-const PeriodicTransactionItem = ({ transaction, maxVisibleTags = 3 }) => {
+const PeriodicTransactionItem = ({ transaction, onEdit, onDelete, maxVisibleTags = 3 }) => {
     const theme = useTheme();
     const [expanded, setExpanded] = useState(false);
     const swipeableRef = useRef(null);
 
-    const onEdit = () => console.log('Edit', transaction.id);
-    const onDelete = () => console.log('Delete', transaction.id);
+    const handleEdit = () => {
+        swipeableRef.current?.close();
+        onEdit();
+    };
+
+    const handleDelete = () => {
+        swipeableRef.current?.close();
+        onDelete();
+    };
 
     const renderRightActions = useCallback((progress, dragX) => {
         const trans = dragX.interpolate({ inputRange: [-160, 0], outputRange: [0, 160], extrapolate: 'clamp' });
         return (
             <Animated.View style={[styles.rightActionContainer, { transform: [{ translateX: trans }] }]}>
-                <TouchableOpacity style={styles.actionButton} onPress={onEdit}>
+                <TouchableOpacity style={styles.actionButton} onPress={handleEdit}>
                     <Icon source="pencil" size={28} color={theme.colors.primary} />
                     <Text style={[styles.actionText, { color: theme.colors.primary }]}>Edytuj</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.actionButton} onPress={onDelete}>
+                <TouchableOpacity style={styles.actionButton} onPress={handleDelete}>
                     <Icon source="trash-can-outline" size={28} color={theme.colors.error} />
                     <Text style={[styles.actionText, { color: theme.colors.error }]}>Usuń</Text>
                 </TouchableOpacity>
             </Animated.View>
         );
-    }, [theme]);
+    }, [theme, handleEdit, handleDelete]);
 
     const {
         title, amount, categoryName, categoryColor = '#888', categoryIcon,
         tags = [], notes, repeatInterval, repeatUnit, startDate, nextOccurrenceDate, endDate,
         pastOccurrences, totalOccurrences
     } = transaction;
+
+    const isInactive = useMemo(() => endDate && endDate < getCurrentTimestamp(), [endDate]);
 
     const { displayedTags, remainingTags } = useMemo(() => {
         const currentTags = tags || [];
@@ -63,7 +72,6 @@ const PeriodicTransactionItem = ({ transaction, maxVisibleTags = 3 }) => {
 
     const amountColor = amount < 0 ? theme.colors.error : 'green';
     const gradientColors = [categoryColor, `${categoryColor}00`];
-    const isInactive = endDate && endDate < Date.now() / 1000;
 
     return (
         <Swipeable ref={swipeableRef} renderRightActions={renderRightActions} overshootRight={false} friction={2}>

@@ -1,7 +1,7 @@
 import { transactions, categories, tags, transactionTags, periodicTransactions } from '@/database/schema';
-import { eq, desc, and, gte } from 'drizzle-orm';
+import { eq, desc, and, gte, inArray } from 'drizzle-orm';
 import { processTransactionTags } from './tagService';
-import { addPeriodicTransaction, processPeriodicTransactions } from './periodicTransactionService';
+import { addPeriodicTransaction, processPeriodicTransactions, endPeriodicSeries as endPeriodicSeriesUtil, getPeriodicTransactionDefinition } from './periodicTransactionService';
 import { eventEmitter } from '@/utils/eventEmitter';
 
 let activePromise = null;
@@ -206,29 +206,29 @@ export const updateTransaction = async (db, transactionId, data, options = { mod
               notes: data.description,
               location: data.location,
               categoryId: data.categoryId,
-              periodicTransactionId: null,
+              periodicTransactionId: null, // Odłącza od serii
             })
             .where(eq(transactions.id, transactionId));
-  
+
           await tx.delete(transactionTags).where(eq(transactionTags.transactionId, transactionId));
           if (data.tags && data.tags.length > 0) {
             await processTransactionTags(tx, transactionId, data.tags);
           }
         } else if (options.mode === 'future') {
           const originalTx = await getTransactionById(tx, transactionId);
-          if (!originalTx || !originalTx.periodicTransactionId) {
+          if (!originalTx || !originalTx.periodicTransactionId || originalTx.periodicTransactionId < 0) {
             throw new Error("Transakcja nie jest częścią serii lub nie została znaleziona.");
           }
-  
-          const dayBefore = originalTx.transactionDate - 1; 
-          await tx.update(periodicTransactions)
-            .set({ endDate: dayBefore })
-            .where(eq(periodicTransactions.id, originalTx.periodicTransactionId));
-  
+          
+          const periodicDefinition = await getPeriodicTransactionDefinition(tx, originalTx.periodicTransactionId);
+          if (!periodicDefinition) throw new Error("Nie znaleziono definicji transakcji cyklicznej.");
+
+          await endPeriodicSeriesUtil(tx, periodicDefinition, data.date);
+
           await tx.delete(transactions)
             .where(and(
               eq(transactions.periodicTransactionId, originalTx.periodicTransactionId),
-              gte(transactions.transactionDate, originalTx.transactionDate)
+              gte(transactions.transactionDate, transactionTimestamp)
             ));
           
           const newPeriodicData = {
@@ -266,29 +266,49 @@ export const deleteTransaction = async (db, transactionId, options = { mode: 'si
     if (!db) return { success: false, message: 'Brak połączenia z bazą danych.' };
 
     try {
-        await db.transaction(async (tx) => {
-        const targetTx = await tx.select()
-            .from(transactions)
-            .where(eq(transactions.id, transactionId)).limit(1);
+        await db.transaction(async (dbTransaction) => {
+            const targetTransaction = await dbTransaction.select()
+                .from(transactions)
+                .where(eq(transactions.id, transactionId)).limit(1);
 
-        if (targetTx.length === 0) throw new Error('Transakcja nie istnieje.');
+            if (targetTransaction.length === 0) throw new Error('Transakcja nie istnieje.');
 
-        const { periodicTransactionId, transactionDate } = targetTx[0];
+            const { periodicTransactionId, transactionDate } = targetTransaction[0];
 
-        if (options.mode === 'single' || !periodicTransactionId) {
-            await tx.delete(transactions).where(eq(transactions.id, transactionId));
-        } else if (options.mode === 'future') {
-            const dayBefore = transactionDate - 1;
-            await tx.update(periodicTransactions)
-                .set({ endDate: dayBefore })
-                .where(eq(periodicTransactions.id, periodicTransactionId));
+            if (options.mode === 'single' || !periodicTransactionId) {
+                await dbTransaction.delete(transactionTags)
+                    .where(eq(transactionTags.transactionId, transactionId));
+                
+                await dbTransaction.delete(transactions)
+                    .where(eq(transactions.id, transactionId));
+            } else if (options.mode === 'future') {
+                const dayBefore = transactionDate - 1;
+                
+                const futureTransactions = await dbTransaction
+                    .select({ id: transactions.id })
+                    .from(transactions)
+                    .where(and(
+                        eq(transactions.periodicTransactionId, periodicTransactionId),
+                        gte(transactions.transactionDate, transactionDate)
+                    ));
+                
+                const futureTransactionIds = futureTransactions.map(t => t.id);
+                
+                if (futureTransactionIds.length > 0) {
+                    await dbTransaction.delete(transactionTags)
+                        .where(inArray(transactionTags.transactionId, futureTransactionIds));
+                }
 
-            await tx.delete(transactions)
-                .where(and(
-                    eq(transactions.periodicTransactionId, periodicTransactionId),
-                    gte(transactions.transactionDate, transactionDate)
-                ));
-        }
+                await dbTransaction.update(periodicTransactions)
+                    .set({ endDate: dayBefore })
+                    .where(eq(periodicTransactions.id, periodicTransactionId));
+
+                await dbTransaction.delete(transactions)
+                    .where(and(
+                        eq(transactions.periodicTransactionId, periodicTransactionId),
+                        gte(transactions.transactionDate, transactionDate)
+                    ));
+            }
         });
         resetTransactionMutex();
         return { success: true };

@@ -216,6 +216,22 @@ function RootLayoutNav() {
           }}
         />
         <Stack.Screen
+          name="(modals)/EditPeriodicTransactionModal"
+          options={{
+            presentation: 'transparentModal',
+            headerShown: false,
+            animation: 'fade_from_bottom',
+          }}
+        />
+        <Stack.Screen
+          name="(modals)/PeriodicDefinitionActionModal"
+          options={{
+            presentation: 'transparentModal',
+            animation: 'fade_from_bottom',
+            headerShown: false
+          }}
+        />
+        <Stack.Screen
           name="(screens)/BarcodeScannerScreen"
           options={{
             presentation: 'modal',
