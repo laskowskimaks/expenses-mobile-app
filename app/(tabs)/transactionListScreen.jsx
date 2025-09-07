@@ -140,11 +140,13 @@ export default function TransactionListScreen() {
     eventEmitter.on('periodicTransactionAdded', handleDataChange);
     eventEmitter.on('transactionEdited', handleDataChange);
     eventEmitter.on('transactionDeleted', handleDataChange);
+    eventEmitter.on('periodicTransactionChanged', handleDataChange);
     return () => {
       eventEmitter.off('transactionAdded', handleDataChange);
       eventEmitter.off('periodicTransactionAdded', handleDataChange);
       eventEmitter.off('transactionEdited', handleDataChange);
       eventEmitter.off('transactionDeleted', handleDataChange);
+      eventEmitter.off('periodicTransactionChanged', handleDataChange);
     };
   }, [handleDataChange]);
 
@@ -206,13 +208,13 @@ export default function TransactionListScreen() {
       // Sprawdź i przetwórz zaległe transakcje okresowe
       console.log('[TransactionListScreen] Sprawdzanie zaległych transakcji okresowych...');
       const periodicResult = await processPeriodicTransactions(db);
-      
+
       if (periodicResult.success && periodicResult.addedCount > 0) {
         console.log(`[TransactionListScreen] Dodano ${periodicResult.addedCount} automatycznych transakcji`);
         if (__DEV__) {
           // W trybie development pokaż informację o dodanych transakcjach
           Alert.alert(
-            'Automatyczne transakcje', 
+            'Automatyczne transakcje',
             periodicResult.message,
             [{ text: 'OK' }]
           );
@@ -409,10 +411,10 @@ export default function TransactionListScreen() {
         from && to
           ? `${from} — ${to}`
           : from
-          ? `od ${from}`
-          : to
-          ? `do ${to}`
-          : 'Zakres dat';
+            ? `od ${from}`
+            : to
+              ? `do ${to}`
+              : 'Zakres dat';
       out.push({ key: 'date', label, onClose: removeDateGroup });
     }
     if (appliedFilters.amountMin != null || appliedFilters.amountMax != null) {
@@ -428,8 +430,8 @@ export default function TransactionListScreen() {
         min && max
           ? `${min} — ${max}`
           : min
-          ? `>= ${min}`
-          : `<= ${max}`;
+            ? `>= ${min}`
+            : `<= ${max}`;
       out.push({ key: 'amount', label, onClose: removeAmountGroup });
     }
     if (

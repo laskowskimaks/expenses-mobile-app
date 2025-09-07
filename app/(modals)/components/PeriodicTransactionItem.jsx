@@ -57,16 +57,17 @@ const PeriodicTransactionItem = ({ transaction, onEdit, onDelete, maxVisibleTags
 
     const {
         title, amount, categoryName, categoryColor = '#888', categoryIcon,
-        tags = [], notes, repeatInterval, repeatUnit, startDate, nextOccurrenceDate, endDate,
+        tags: rawTags = [], notes, repeatInterval, repeatUnit, startDate, nextOccurrenceDate, endDate,
         pastOccurrences, totalOccurrences
     } = transaction;
+
+    const tags = Array.isArray(rawTags) ? rawTags : [];
 
     const isInactive = useMemo(() => endDate && endDate < getCurrentTimestamp(), [endDate]);
 
     const { displayedTags, remainingTags } = useMemo(() => {
-        const currentTags = tags || [];
-        const displayed = expanded ? currentTags : currentTags.slice(0, maxVisibleTags);
-        const remaining = expanded ? 0 : Math.max(0, currentTags.length - maxVisibleTags);
+        const displayed = expanded ? tags : tags.slice(0, maxVisibleTags);
+        const remaining = expanded ? 0 : Math.max(0, tags.length - maxVisibleTags);
         return { displayedTags: displayed, remainingTags: remaining };
     }, [expanded, tags, maxVisibleTags]);
 

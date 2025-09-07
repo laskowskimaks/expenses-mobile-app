@@ -158,7 +158,7 @@ export const addPeriodicTransaction = async (dbOrDbTransaction, periodicTransact
         return { success: false, message: "Błąd bazy danych." };
     }
     try {
-        const isDbTransaction = !!dbOrDbTransaction.constructor.name.match(/Transaction/);
+        const isDbTransaction = typeof dbOrDbTransaction.commit === 'function';
 
         const performTransaction = async (dbTransaction) => {
             const normalizedAmount = String(periodicTransactionData.amount || '0').replace(',', '.').replace(/[^0-9.]/g, '');
@@ -181,7 +181,7 @@ export const addPeriodicTransaction = async (dbOrDbTransaction, periodicTransact
                 repeatInterval: parseInt(periodicTransactionData.repeatInterval),
                 repeatUnit: periodicTransactionData.repeatUnit,
                 startDate: startTimestamp,
-                nextOccurrenceDate: startTimestamp,
+                nextOccurrenceDate: startTimestamp, 
                 endDate: endTimestamp,
                 notes: periodicTransactionData.description || null,
                 categoryId: categoryId,
@@ -201,10 +201,10 @@ export const addPeriodicTransaction = async (dbOrDbTransaction, periodicTransact
 };
 
 
-export const processPeriodicTransactions = async (dbOrDbTransaction) => {
+export const processPeriodicTransactions = async (dbTransaction) => {
     try {
         const currentTimestamp = getCurrentTimestamp();
-        const overduePeriodicTransactions = await dbOrDbTransaction
+        const overduePeriodicTransactions = await dbTransaction
             .select()
             .from(periodicTransactions)
             .leftJoin(categories, eq(periodicTransactions.categoryId, categories.id))
@@ -231,23 +231,27 @@ export const processPeriodicTransactions = async (dbOrDbTransaction) => {
                         break;
                     }
 
-                    // Użyj oryginalnego czasu zamiast zerować godzinę
                     const transactionTimestamp = normalizeToSameTime(pt.startDate, nextOccurrence);
 
                     const newTransactionData = {
                         amount: pt.amount,
                         title: pt.title,
-                        transactionDate: transactionTimestamp, // Zachowaj oryginalny czas
+                        transactionDate: transactionTimestamp,
                         notes: pt.notes,
                         categoryId: pt.categoryId,
                         periodicTransactionId: pt.id
                     };
-                    const newTransaction = await dbOrDbTransaction.insert(transactions).values(newTransactionData).returning();
+                    
+                    const newTransaction = await dbTransaction.insert(transactions).values(newTransactionData).returning();
                     const newTransactionId = newTransaction[0].id;
 
-                    const pTags = await dbOrDbTransaction.select({ tagId: periodicTransactionTags.tagId }).from(periodicTransactionTags).where(eq(periodicTransactionTags.periodicTransactionId, pt.id));
+                    const pTags = await dbTransaction.select({ tagId: periodicTransactionTags.tagId })
+                        .from(periodicTransactionTags)
+                        .where(eq(periodicTransactionTags.periodicTransactionId, pt.id));
+                    
                     if (pTags.length > 0) {
-                        await dbOrDbTransaction.insert(transactionTags).values(pTags.map(t => ({ transactionId: newTransactionId, tagId: t.tagId })));
+                        await dbTransaction.insert(transactionTags)
+                            .values(pTags.map(t => ({ transactionId: newTransactionId, tagId: t.tagId })));
                     }
 
                     addedTransactions.push({ ...newTransactionData, id: newTransactionId });
@@ -255,7 +259,10 @@ export const processPeriodicTransactions = async (dbOrDbTransaction) => {
                     nextOccurrence = calculateNextOccurrence(nextOccurrence, pt.repeatInterval, pt.repeatUnit);
                 }
 
-                await dbOrDbTransaction.update(periodicTransactions).set({ nextOccurrenceDate: nextOccurrence }).where(eq(periodicTransactions.id, pt.id));
+                await dbTransaction.update(periodicTransactions)
+                    .set({ nextOccurrenceDate: nextOccurrence })
+                    .where(eq(periodicTransactions.id, pt.id));
+                
             } catch (error) {
                 console.error(`[PeriodicTransactionService] Błąd przy przetwarzaniu transakcji "${pt.title}":`, error);
             }
@@ -316,7 +323,6 @@ export const endPeriodicSeries = async (dbTransaction, pt, newSeriesStartDate, m
     }
 
     if (lastValidOccurrence === null || lastValidOccurrence < pt.startDate) {
-        // POPRAWKA: Przed usunięciem całej serii, usuń tagi wszystkich transakcji
         const allTransactions = await dbTransaction
             .select({ id: transactions.id })
             .from(transactions)
@@ -335,7 +341,6 @@ export const endPeriodicSeries = async (dbTransaction, pt, newSeriesStartDate, m
         await dbTransaction.delete(periodicTransactions).where(eq(periodicTransactions.id, pt.id));
         return null;
     } else {
-        // POPRAWKA: Usuń tagi przyszłych transakcji (po dacie zakończenia)
         const futureTransactions = await dbTransaction
             .select({ id: transactions.id })
             .from(transactions)
@@ -384,7 +389,6 @@ export const updatePeriodicTransaction = async ({ db, id, data, mode = 'all' }) 
                     nextOccurrenceDate: startDateTimestamp,
                 };
 
-                // POPRAWKA: Usuń tagi PRZED usunięciem transakcji
                 const oldTransactions = await dbTransaction
                     .select({ id: transactions.id })
                     .from(transactions)
@@ -411,7 +415,6 @@ export const updatePeriodicTransaction = async ({ db, id, data, mode = 'all' }) 
                 const newEndDate = await endPeriodicSeries(dbTransaction, oldPt, data.startDate);
 
                 if (newEndDate !== null) {
-                    // POPRAWKA: Usuń tagi PRZED usunięciem transakcji
                     const futureTransactions = await dbTransaction
                         .select({ id: transactions.id })
                         .from(transactions)

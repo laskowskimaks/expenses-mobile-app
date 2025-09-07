@@ -69,16 +69,17 @@ function TransactionItem({
 
   const {
     title, amount, categoryName, categoryColor = '#888', categoryIcon,
-    location, notes, tags = [], periodicTransactionId, amountFormatted,
+    location, notes, tags: rawTags = [], periodicTransactionId, amountFormatted,
   } = transaction;
+
+  const tags = Array.isArray(rawTags) ? rawTags : [];
 
   const isPeriodicTransaction = Boolean(periodicTransactionId);
   const amountColor = amount < 0 ? theme.colors.error : 'green';
 
   const { displayedTags, remainingTags } = useMemo(() => {
-    const currentTags = tags || []; // Zabezpieczenie na wypadek, gdyby `tags` było null/undefined
-    const displayed = expanded ? currentTags : currentTags.slice(0, maxVisibleTags);
-    const remaining = expanded ? 0 : Math.max(0, currentTags.length - maxVisibleTags);
+    const displayed = expanded ? tags : tags.slice(0, maxVisibleTags);
+    const remaining = expanded ? 0 : Math.max(0, tags.length - maxVisibleTags);
     return { displayedTags: displayed, remainingTags: remaining };
   }, [expanded, tags, maxVisibleTags]);
 
@@ -133,7 +134,7 @@ function TransactionItem({
               </View>
             )}
 
-            {(tags || []).length > 0 && (
+            {tags.length > 0 && (
               <View style={styles.tagsSection}>
                 {displayedTags.map((t) => (
                   <View key={t.id ?? t.name} style={[styles.tag, { borderColor: t.color, backgroundColor: `${t.color}20` }]}>
