@@ -1,5 +1,5 @@
 import { transactions, categories, tags, transactionTags, periodicTransactions } from '@/database/schema';
-import { eq, desc, and, gte, inArray } from 'drizzle-orm';
+import { eq, desc, and, gte, inArray, sql, min, max } from 'drizzle-orm';
 import { processTransactionTags } from './tagService';
 import { addPeriodicTransaction, processPeriodicTransactions, endPeriodicSeries as endPeriodicSeriesUtil, getPeriodicTransactionDefinition } from './periodicTransactionService';
 import { eventEmitter } from '@/utils/eventEmitter';
@@ -317,6 +317,34 @@ export const deleteTransaction = async (db, transactionId, options = { mode: 'si
     return { success: false, message: err.message || 'Błąd podczas usuwania transakcji.' };
   }
 };
+
+export const getTransactionDateRange = async (db) => {
+  if (!db) {
+    console.error('[TransactionService] Baza danych jest null - nie można pobrać zakresu dat.');
+    return { minDate: null, maxDate: null };
+  }
+
+  try {
+    const result = await db.select({
+      minTimestamp: min(transactions.transactionDate),
+      maxTimestamp: max(transactions.transactionDate),
+    }).from(transactions);
+
+    if (result && result.length > 0 && result[0].minTimestamp !== null) {
+      return {
+        minDate: new Date(result[0].minTimestamp * 1000),
+        maxDate: new Date(result[0].maxTimestamp * 1000),
+      };
+    }
+    
+    return { minDate: null, maxDate: null };
+
+  } catch (error) {
+    console.error('[TransactionService] Błąd podczas pobierania zakresu dat transakcji:', error);
+    return { minDate: null, maxDate: null };
+  }
+};
+
 
 export const formatCurrency = (amount) => {
   return new Intl.NumberFormat('pl-PL', {

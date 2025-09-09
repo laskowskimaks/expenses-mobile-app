@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Pressable, StyleSheet, Dimensions } from 'react-native';
 import { useRouter } from 'expo-router'
+import { useTheme } from 'react-native-paper';
 import { Feather, FontAwesome5, Foundation } from '@expo/vector-icons';
 
 const ICON_MAP = {
@@ -17,6 +18,8 @@ const TAB_WIDTH = TAB_BAR_WIDTH / 5;
 
 const CustomTabBar = ({ state }) => {
     const router = useRouter();
+    const theme = useTheme();
+    const styles = createStyles(theme);
 
     const ROUTE_MAP = {
         home: '/(tabs)/home',
@@ -71,7 +74,7 @@ const CustomTabBar = ({ state }) => {
                         >
                             {IconComponent({
                                 size: 24,
-                                color: isFocused ? '#007BFF' : '#8e8e93',
+                                color: isFocused ? theme.colors.primary : theme.colors.onSurfaceVariant,
                             })}
                         </Pressable>
                     );
@@ -81,7 +84,7 @@ const CustomTabBar = ({ state }) => {
     );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
     tabBarContainer: {
         position: 'absolute',
         left: 0,
@@ -93,13 +96,13 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         height: 65,
         width: TAB_BAR_WIDTH,
-        backgroundColor: '#ffffff',
+        backgroundColor: theme.colors.elevation.level2,
         borderRadius: 15.5,
         alignItems: 'center',
         justifyContent: 'space-around',
-        shadowColor: '#000',
+        shadowColor: theme.dark ? 'rgba(0,0,0,0.8)' : '#000',
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
+        shadowOpacity: theme.dark ? 0.3 : 0.1,
         shadowRadius: 12,
         elevation: 8,
     },
@@ -120,11 +123,11 @@ const styles = StyleSheet.create({
         width: 60,
         height: 60,
         borderRadius: 30,
-        backgroundColor: '#007BFF',
+        backgroundColor: theme.colors.primary,
         justifyContent: 'center',
         alignItems: 'center',
         transform: [{ translateY: -10 }],
-        shadowColor: '#007BFF',
+        shadowColor: theme.colors.primary,
         shadowOffset: { width: 0, height: 6 },
         shadowOpacity: 0.3,
         shadowRadius: 8,

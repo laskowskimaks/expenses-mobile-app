@@ -1,4 +1,4 @@
-import React, { memo, useRef, useCallback, useMemo } from 'react';
+import React, { memo, useRef, useCallback, useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Badge, useTheme, Icon } from 'react-native-paper';
@@ -22,7 +22,7 @@ function TransactionItem({
   openSwipeableRef
 }) {
   const theme = useTheme();
-  const [expanded, setExpanded] = React.useState(initialExpanded);
+  const [expanded, setExpanded] = useState(initialExpanded);
   const swipeableRef = useRef(null);
 
   const toggle = useCallback(() => {

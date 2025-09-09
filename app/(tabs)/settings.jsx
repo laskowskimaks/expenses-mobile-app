@@ -9,6 +9,7 @@ import { useNetworkStatus } from '@/context/NetworkContext';
 import { useThemeContext } from '@/context/ThemeContext';
 import { performUpload } from '@/services/backupService';
 import { upsertSetting, getPaymentDay, getSavingsGoal } from '@/services/authService';
+import { insertTestData } from '@/database/insertTestData';
 
 export default function SettingsScreen() {
   const theme = useTheme();
@@ -20,7 +21,7 @@ export default function SettingsScreen() {
 
   const [isBackupLoading, setIsBackupLoading] = useState(false);
   const [expandedAccordion, setExpandedAccordion] = useState(null);
-  
+
   const [paymentDay, setPaymentDay] = useState('1');
   const [savingsGoal, setSavingsGoal] = useState(null);
 
@@ -36,7 +37,7 @@ export default function SettingsScreen() {
           // Logika dla dnia płatności z wartością domyślną
           let fetchedDay = await getPaymentDay(db);
           if (!fetchedDay) {
-            fetchedDay = '1'; 
+            fetchedDay = '1';
             await upsertSetting(db, 'billing_period_start_day', '1');
           }
           setPaymentDay(fetchedDay);
@@ -77,7 +78,7 @@ export default function SettingsScreen() {
     setErrors({});
     setExpandedAccordion(null);
   };
-  
+
   const handleSaveSavingsGoal = async () => {
     const goal = parseFloat(tempSavingsGoal.replace(',', '.') || '0');
     if (isNaN(goal) || goal < 0) {
@@ -142,9 +143,45 @@ export default function SettingsScreen() {
     }
   };
 
+  const handleAddTestData = async () => {
+    if (!db) {
+      Alert.alert('Błąd', 'Baza danych nie jest dostępna');
+      return;
+    }
+    try {
+      const result = await insertTestData(db);
+      if (result.success) {
+        Alert.alert('Sukces', result.message);
+      } else {
+        Alert.alert('Błąd', result.message);
+      }
+    } catch (error) {
+      Alert.alert('Błąd', 'Wystąpił błąd podczas dodawania testowych danych.');
+      console.error('[SettingsScreen] Błąd dodawania testowych danych:', error);
+    }
+  };
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <Button
+        title={"Dodaj testowe dane"}
+        onPress={handleAddTestData}
+      />
       <ScrollView>
+        {/* TO DO - do usuniecia na koniec */}
+        {__DEV__ && (
+          <>
+            <List.Section title="Developer Tools" titleStyle={styles.sectionTitle}>
+              <List.Item
+                title="Wstaw dane testowe"
+                description="Dodaje przykładowe transakcje do bazy danych"
+                left={props => <List.Icon {...props} icon="database-plus" />}
+                onPress={handleAddTestData}
+                right={props => <List.Icon {...props} icon="chevron-right" />}
+              />
+            </List.Section>
+          </>
+        )}
         <List.Section title="Konto" titleStyle={styles.sectionTitle}>
           <List.Item
             title="Zmień email"
@@ -180,19 +217,19 @@ export default function SettingsScreen() {
             left={props => <List.Icon {...props} icon="calendar-month-outline" />}
           >
             <View style={styles.accordionContent}>
-                <TextInput
-                    mode="outlined"
-                    label="Dzień (1-31)"
-                    value={tempPaymentDay}
-                    onChangeText={setTempPaymentDay}
-                    keyboardType="number-pad"
-                    maxLength={2}
-                    error={!!errors.paymentDay}
-                />
-                <HelperText type="error" visible={!!errors.paymentDay}>{errors.paymentDay}</HelperText>
-                <View style={styles.buttonRow}>
-                    <Button mode="contained" onPress={handleSavePaymentDay}>Zapisz</Button>
-                </View>
+              <TextInput
+                mode="outlined"
+                label="Dzień (1-31)"
+                value={tempPaymentDay}
+                onChangeText={setTempPaymentDay}
+                keyboardType="number-pad"
+                maxLength={2}
+                error={!!errors.paymentDay}
+              />
+              <HelperText type="error" visible={!!errors.paymentDay}>{errors.paymentDay}</HelperText>
+              <View style={styles.buttonRow}>
+                <Button mode="contained" onPress={handleSavePaymentDay}>Zapisz</Button>
+              </View>
             </View>
           </List.Accordion>
 
@@ -206,22 +243,22 @@ export default function SettingsScreen() {
             left={props => <List.Icon {...props} icon="bullseye-arrow" />}
           >
             <View style={styles.accordionContent}>
-                <TextInput
-                    mode="outlined"
-                    label="Kwota celu"
-                    value={tempSavingsGoal}
-                    onChangeText={setTempSavingsGoal}
-                    keyboardType="numeric"
-                    error={!!errors.savingsGoal}
-                />
-                <HelperText type="error" visible={!!errors.savingsGoal}>{errors.savingsGoal}</HelperText>
-                <View style={styles.buttonRow}>
-                    {savingsGoal && parseFloat(savingsGoal) > 0 && (
-                        <Button onPress={handleRemoveSavingsGoal}>Usuń</Button>
-                    )}
-                    <Button onPress={() => handleAccordionPress(null)}>Anuluj</Button>
-                    <Button mode="contained" onPress={handleSaveSavingsGoal}>Zapisz</Button>
-                </View>
+              <TextInput
+                mode="outlined"
+                label="Kwota celu"
+                value={tempSavingsGoal}
+                onChangeText={setTempSavingsGoal}
+                keyboardType="numeric"
+                error={!!errors.savingsGoal}
+              />
+              <HelperText type="error" visible={!!errors.savingsGoal}>{errors.savingsGoal}</HelperText>
+              <View style={styles.buttonRow}>
+                {savingsGoal && parseFloat(savingsGoal) > 0 && (
+                  <Button onPress={handleRemoveSavingsGoal}>Usuń</Button>
+                )}
+                <Button onPress={() => handleAccordionPress(null)}>Anuluj</Button>
+                <Button mode="contained" onPress={handleSaveSavingsGoal}>Zapisz</Button>
+              </View>
             </View>
           </List.Accordion>
 
@@ -277,9 +314,9 @@ export default function SettingsScreen() {
             disabled={!isConnected || isBackupLoading}
             left={props => <List.Icon {...props} icon="cloud-upload-outline" />}
             onPress={handlePerformBackup}
-            right={props => 
-              isBackupLoading 
-                ? <ActivityIndicator style={{ marginRight: 14 }} /> 
+            right={props =>
+              isBackupLoading
+                ? <ActivityIndicator style={{ marginRight: 14 }} />
                 : <List.Icon {...props} icon="chevron-right" />
             }
           />

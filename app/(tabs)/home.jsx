@@ -1,243 +1,194 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { View, Text, Button, ActivityIndicator, StyleSheet, Alert } from 'react-native';
+import { View, StyleSheet, ScrollView } from 'react-native';
 import { useDb } from '@/context/DbContext';
 import { getAllSettingsAsObject } from '@/services/authService';
-import { insertTestData } from '@/database/insertTestData';
-import { getLastCheckInfo, resetPeriodicCheckTime } from '@/utils/periodicChecker';
-import { processPeriodicTransactions } from '@/services/periodicTransactionService';
-import { DB_TIMESTAMP_KEY, performUpload } from '@/services/backupService';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ActivityIndicator, useTheme } from 'react-native-paper';
+import { useFocusEffect } from '@react-navigation/native';
+import { getCategoryExpenseData } from '@/services/categoriesChartService';
+import CategoryDonutChart from '@/components/charts/CategoryDonutChart';
+import BillingPeriodSelector from '@/components/BillingPeriodSelector';
+import DateRangeModal from '@/components/DateRangeModal';
+import { getTransactionDateRange } from '@/services/transactionService';
+import { calculatePeriod, getNextPeriod, getPreviousPeriod, formatPeriodForDisplay } from '@/services/periodService';
 
 export default function HomeScreen() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const { db } = useDb();
-  const [currentUserData, setCurrentUserData] = useState(null);
-  const [isAddingTestData, setIsAddingTestData] = useState(false);
-  const [isProcessingPeriodic, setIsProcessingPeriodic] = useState(false);
-  const [lastCheckInfo, setLastCheckInfo] = useState(null);
+  const theme = useTheme();
+  const styles = createStyles(theme);
+
+  const [currentPeriod, setCurrentPeriod] = useState(null); // { startDate, endDate, type: 'billing' | 'custom' | 'all' }
+  const [billingStartDay, setBillingStartDay] = useState('1');
+  const [transactionBounds, setTransactionBounds] = useState({ minDate: null, maxDate: null });
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [isDateModalVisible, setIsDateModalVisible] = useState(false);
+
+  const [chartData, setChartData] = useState({ data: [], total: 0 });
+  const [isChartLoading, setIsChartLoading] = useState(true);
+
+  useFocusEffect(
+    useCallback(() => {
+      const refreshCoreData = async () => {
+        if (!db) return;
+        try {
+          const settings = await getAllSettingsAsObject(db);
+          const startDay = settings.billing_period_start_day || '1';
+          setBillingStartDay(startDay);
+
+          const bounds = await getTransactionDateRange(db);
+          setTransactionBounds(bounds);
+
+          if (currentPeriod === null) {
+            const initialPeriod = {
+              ...calculatePeriod(new Date(), startDay),
+              type: 'billing'
+            };
+            setCurrentPeriod(initialPeriod);
+          }
+        } catch (error) {
+          console.error("[HomeScreen] Błąd podczas odświeżania danych bazowych:", error);
+        } finally {
+          setIsInitialLoading(false);
+        }
+      };
+
+      refreshCoreData();
+    }, [db])
+  );
 
   useEffect(() => {
-    const fetchUserData = async () => {
-      if (db) {
-        console.log("[HomeScreen] Instancja bazy dostępna, pobieram dane...");
-        try {
-          const settingsObject = await getAllSettingsAsObject(db);
-          setCurrentUserData(settingsObject);
-        } catch (error) {
-          console.error("[HomeScreen] Błąd podczas pobierania danych użytkownika:", error);
-          setCurrentUserData(null);
-        }
-      } else {
-        setCurrentUserData(null);
+    const fetchChartData = async () => {
+      if (!db || !currentPeriod) {
+        return;
+      }
+
+      setIsChartLoading(true);
+
+      try {
+        const periodForQuery = currentPeriod.type === 'all' ? null : currentPeriod;
+        const { dataForChart, totalExpenses } = await getCategoryExpenseData(db, periodForQuery);
+        setChartData({ data: dataForChart, total: totalExpenses });
+      } catch (error) {
+        console.error("[HomeScreen] Błąd podczas pobierania danych do wykresu:", error);
+        setChartData({ data: [], total: 0 });
+      } finally {
+        setIsChartLoading(false);
       }
     };
-    fetchUserData();
-  }, [db]);
 
-  useEffect(() => {
-    const fetchLastCheckInfo = async () => {
-      if (__DEV__) {
-        try {
-          const info = await getLastCheckInfo();
-          setLastCheckInfo(info);
-        } catch (error) {
-          console.error("[HomeScreen] Błąd podczas pobierania info o sprawdzeniu:", error);
-        }
-      }
+    fetchChartData();
+  }, [db, currentPeriod]);
+
+  const handleConfirmDateRange = (newRange) => {
+    if (newRange === null) {
+      setCurrentPeriod({
+        startDate: transactionBounds.minDate,
+        endDate: transactionBounds.maxDate,
+        type: 'all'
+      });
+    } else {
+      setCurrentPeriod({
+        startDate: newRange.startDate,
+        endDate: newRange.endDate,
+        type: 'custom'
+      });
+    }
+    setIsDateModalVisible(false);
+  };
+
+  const handleClearDateRange = () => {
+    const defaultPeriod = {
+      ...calculatePeriod(new Date(), billingStartDay),
+      type: 'billing'
     };
-    fetchLastCheckInfo();
-  }, []);
-
-  const handleUploadBackup = async () => {
-    try {
-      await performUpload(db);
-      Alert.alert('Backup', 'Backup został wysłany do chmury.');
-    } catch (error) {
-      Alert.alert('Błąd', 'Nie udało się wykonać backupu.');
-      console.error('[HomeScreen] Błąd backupu:', error);
-    }
+    setCurrentPeriod(defaultPeriod);
+    setIsDateModalVisible(false);
   };
 
-  const handleProcessPeriodicTransactions = async () => {
-    if (!db) {
-      Alert.alert('Błąd', 'Baza danych nie jest dostępna.');
-      return;
-    }
-
-    setIsProcessingPeriodic(true);
-    try {
-      console.log("[HomeScreen] Ręczne sprawdzenie transakcji okresowych...");
-      const result = await processPeriodicTransactions(db);
-
-      if (result.success) {
-        const message = result.addedCount > 0
-          ? `Dodano ${result.addedCount} nowych transakcji automatycznych:\n\n${result.addedTransactions.map(t => `• ${t.title} (${t.amount} PLN)`).join('\n')}`
-          : 'Brak zaległych transakcji okresowych do dodania';
-
-        Alert.alert('Transakcje okresowe', message);
-
-        const info = await getLastCheckInfo();
-        setLastCheckInfo(info);
-
-      } else {
-        Alert.alert('Błąd', result.message);
-      }
-    } catch (error) {
-      Alert.alert('Błąd', 'Wystąpił błąd podczas przetwarzania transakcji okresowych.');
-      console.error('[HomeScreen] Błąd transakcji okresowych:', error);
-    } finally {
-      setIsProcessingPeriodic(false);
+  const handlePreviousPeriod = () => {
+    setCurrentPeriod(prev => ({ ...getPreviousPeriod(prev, billingStartDay), type: 'billing' }));
+  };
+  const handleNextPeriod = () => {
+    setCurrentPeriod(prev => ({ ...getNextPeriod(prev, billingStartDay), type: 'billing' }));
+  };
+  const handleGoToStart = () => {
+    if (transactionBounds.minDate) {
+      setCurrentPeriod({ ...calculatePeriod(transactionBounds.minDate, billingStartDay), type: 'billing' });
     }
   };
-
-  const handleAddTestData = async () => {
-    if (!db) {
-      Alert.alert('Błąd', 'Baza danych nie jest dostępna.');
-      return;
-    }
-
-    setIsAddingTestData(true);
-    try {
-      const result = await insertTestData(db);
-      if (result.success) {
-        Alert.alert('Sukces', result.message);
-      } else {
-        Alert.alert('Błąd', result.message);
-      }
-    } catch (error) {
-      Alert.alert('Błąd', 'Wystąpił błąd podczas dodawania testowych danych.');
-      console.error('[HomeScreen] Błąd dodawania testowych danych:', error);
-    } finally {
-      setIsAddingTestData(false);
-    }
+  const handleGoToEnd = () => {
+    setCurrentPeriod({ ...calculatePeriod(new Date(), billingStartDay), type: 'billing' });
   };
 
-  const handleResetCheckTime = async () => {
-    await resetPeriodicCheckTime();
-    Alert.alert('Reset', 'Czas ostatniego sprawdzania został zresetowany');
-    const info = await getLastCheckInfo();
-    setLastCheckInfo(info);
-  };
+  // logika Dezaktywacji Przycisków 
 
-  const handleLogLastRestoredTimestamp = async () => {
-    try {
-      const value = await AsyncStorage.getItem(DB_TIMESTAMP_KEY);
-      console.log('DB_TIMESTAMP_KEY:', value);
-    } catch (error) {
-      console.log('DB_TIMESTAMP_KEY: brak dostępu lub błąd', error);
-    }
-  };
+  const isNavigationDisabled = currentPeriod?.type === 'custom' || currentPeriod?.type === 'all';
 
-  if (!user) {
+  const previousPeriod = currentPeriod ? getPreviousPeriod(currentPeriod, billingStartDay) : null;
+  const nextPeriod = currentPeriod ? getNextPeriod(currentPeriod, billingStartDay) : null;
+
+  const isPreviousDisabled = isNavigationDisabled || !previousPeriod || (transactionBounds.minDate && previousPeriod.endDate < transactionBounds.minDate);
+  const isNextDisabled = isNavigationDisabled || !nextPeriod || nextPeriod.startDate > new Date();
+
+  const oldestPeriod = transactionBounds.minDate ? calculatePeriod(transactionBounds.minDate, billingStartDay) : null;
+  const latestPeriod = calculatePeriod(new Date(), billingStartDay);
+
+  const isGoToStartDisabled = isNavigationDisabled || !oldestPeriod || (currentPeriod && currentPeriod.startDate.getTime() <= oldestPeriod.startDate.getTime());
+  const isGoToEndDisabled = isNavigationDisabled || !latestPeriod || (currentPeriod && currentPeriod.startDate.getTime() === latestPeriod.startDate.getTime());
+
+
+  if (!user || isInitialLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007BFF" />
+        <ActivityIndicator size="large" color={theme.colors.primary} />
       </View>
-    )
-  };
+    );
+  }
 
   return (
-    <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.welcomeText}>Witaj, {user.email}!</Text>
-        <Button title="Wyloguj" onPress={logout} />
-        <Button
-          title="Backup"
-          onPress={handleUploadBackup}
-          color="#2196F3"
+    <>
+      <ScrollView style={styles.container}>
+        <BillingPeriodSelector
+          periodText={formatPeriodForDisplay(currentPeriod)}
+          onPeriodTextPress={() => setIsDateModalVisible(true)}
+          onPrevious={handlePreviousPeriod}
+          onNext={handleNextPeriod}
+          onGoToStart={handleGoToStart}
+          onGoToEnd={handleGoToEnd}
+          isPreviousDisabled={isPreviousDisabled}
+          isNextDisabled={isNextDisabled}
+          isGoToStartDisabled={isGoToStartDisabled}
+          isGoToEndDisabled={isGoToEndDisabled}
         />
-      </View>
 
-      {/* Przyciski dev */}
-      {__DEV__ && (
-        <View style={styles.devContainer}>
-          <View style={styles.testDataContainer}>
-            <Button
-              title={isAddingTestData ? "Dodaję dane..." : "Dodaj testowe dane"}
-              onPress={handleAddTestData}
-              disabled={isAddingTestData}
-            />
-          </View>
+        <CategoryDonutChart
+          data={chartData.data}
+          total={chartData.total}
+          isLoading={isChartLoading}
+        />
+      </ScrollView>
 
-          <View style={styles.periodicContainer}>
-            <Button
-              title={isProcessingPeriodic ? "Sprawdzam..." : "Sprawdź transakcje okresowe"}
-              onPress={handleProcessPeriodicTransactions}
-              disabled={isProcessingPeriodic}
-            />
-            {lastCheckInfo && (
-              <Text style={styles.lastCheckText}>
-                Ostatnie sprawdzenie: {lastCheckInfo.date ?
-                  `${lastCheckInfo.minutesAgo} min temu` : 'nigdy'}
-              </Text>
-            )}
-            <Button
-              title="Reset czasu sprawdzania"
-              onPress={handleResetCheckTime}
-            />
-            <Button style={{ padding: 16 }}
-              title="Loguj DB_TIMESTAMP_KEY"
-              onPress={handleLogLastRestoredTimestamp}
-            />
-          </View>
-        </View>
-      )}
-    </View>
+      <DateRangeModal
+        isVisible={isDateModalVisible}
+        onDismiss={() => setIsDateModalVisible(false)}
+        onConfirm={handleConfirmDateRange}
+        onClear={handleClearDateRange}
+        initialPeriod={currentPeriod}
+      />
+    </>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
-  },
-  header: {
-    backgroundColor: '#ffffff',
-    padding: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  welcomeText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2c3e50',
-  },
-  devContainer: {
-    padding: 15,
-    backgroundColor: '#fff3cd',
-    borderBottomWidth: 1,
-    borderBottomColor: '#ffeaa7',
-  },
-  testDataContainer: {
-    margin: 15,
-    padding: 10,
-    backgroundColor: '#fff3cd',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#ffeaa7',
-  },
-  periodicContainer: {
-    marginTop: 8,
-  },
-  lastCheckText: {
-    marginTop: 8,
-    fontSize: 13,
-    color: '#333',
+    backgroundColor: theme.colors.background,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: theme.colors.background,
   },
 });
