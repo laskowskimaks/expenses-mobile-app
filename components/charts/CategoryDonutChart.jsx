@@ -58,7 +58,7 @@ const CategoryDonutChart = ({ data, total, isLoading }) => {
                     height={chartSize}
                     innerRadius={({ datum }) => datum.id === selectedSliceId ? baseInnerRadius * 1.1 : baseInnerRadius}
                     outerRadius={({ datum }) => datum.id === selectedSliceId ? (chartSize / 2) + 15 : chartSize / 2}
-                    padAngle={3}
+                    padAngle={2}
                     labels={() => null}
                     animate={{ duration: 350, easing: "bounce" }}
                     style={{
@@ -107,7 +107,9 @@ const CategoryDonutChart = ({ data, total, isLoading }) => {
 
 const createStyles = (theme) => StyleSheet.create({
     card: {
-        margin: 16,
+        marginHorizontal: 16,
+        marginBottom: 16,
+        marginTop: 4,
         backgroundColor: theme.colors.elevation.level1,
     },
     placeholderContainer: {

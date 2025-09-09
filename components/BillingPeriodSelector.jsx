@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet, Pressable } from 'react-native';
+import { StyleSheet, Pressable } from 'react-native';
 import { Surface, IconButton, Text, useTheme } from 'react-native-paper';
 
 const BillingPeriodSelector = ({
@@ -60,7 +60,6 @@ const createStyles = (theme) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 8,
-    paddingVertical: 4,
     borderRadius: 50,
     marginHorizontal: 16,
     marginVertical: 12,

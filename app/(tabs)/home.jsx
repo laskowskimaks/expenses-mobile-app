@@ -6,9 +6,11 @@ import { getAllSettingsAsObject } from '@/services/authService';
 import { ActivityIndicator, useTheme } from 'react-native-paper';
 import { useFocusEffect } from '@react-navigation/native';
 import { getCategoryExpenseData } from '@/services/categoriesChartService';
+import { getSummaryData } from '@/services/summaryService';
 import CategoryDonutChart from '@/components/charts/CategoryDonutChart';
 import BillingPeriodSelector from '@/components/BillingPeriodSelector';
 import DateRangeModal from '@/components/DateRangeModal';
+import SummaryCard from '@/components/SummaryCard';
 import { getTransactionDateRange } from '@/services/transactionService';
 import { calculatePeriod, getNextPeriod, getPreviousPeriod, formatPeriodForDisplay } from '@/services/periodService';
 
@@ -23,9 +25,12 @@ export default function HomeScreen() {
   const [transactionBounds, setTransactionBounds] = useState({ minDate: null, maxDate: null });
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isDateModalVisible, setIsDateModalVisible] = useState(false);
+  const [savingsGoal, setSavingsGoal] = useState(0);
 
   const [chartData, setChartData] = useState({ data: [], total: 0 });
   const [isChartLoading, setIsChartLoading] = useState(true);
+  const [summaryData, setSummaryData] = useState({ expenses: 0, income: 0 });
+  const [isSummaryLoading, setIsSummaryLoading] = useState(true);
 
   useFocusEffect(
     useCallback(() => {
@@ -34,7 +39,9 @@ export default function HomeScreen() {
         try {
           const settings = await getAllSettingsAsObject(db);
           const startDay = settings.billing_period_start_day || '1';
+          const goal = parseFloat(settings.savings_goal) || 0;
           setBillingStartDay(startDay);
+          setSavingsGoal(goal);
 
           const bounds = await getTransactionDateRange(db);
           setTransactionBounds(bounds);
@@ -58,26 +65,36 @@ export default function HomeScreen() {
   );
 
   useEffect(() => {
-    const fetchChartData = async () => {
+    const fetchDataForPeriod = async () => {
       if (!db || !currentPeriod) {
         return;
       }
 
       setIsChartLoading(true);
+      setIsSummaryLoading(true);
 
       try {
         const periodForQuery = currentPeriod.type === 'all' ? null : currentPeriod;
-        const { dataForChart, totalExpenses } = await getCategoryExpenseData(db, periodForQuery);
-        setChartData({ data: dataForChart, total: totalExpenses });
+
+        const [chartResult, summaryResult] = await Promise.all([
+          getCategoryExpenseData(db, periodForQuery),
+          getSummaryData(db, periodForQuery)
+        ]);
+
+        setChartData({ data: chartResult.dataForChart, total: chartResult.totalExpenses });
+        setSummaryData({ expenses: summaryResult.totalExpenses, income: summaryResult.totalIncome });
+
       } catch (error) {
-        console.error("[HomeScreen] Błąd podczas pobierania danych do wykresu:", error);
+        console.error("[HomeScreen] Błąd podczas pobierania danych dla okresu:", error);
         setChartData({ data: [], total: 0 });
+        setSummaryData({ expenses: 0, income: 0 });
       } finally {
         setIsChartLoading(false);
+        setIsSummaryLoading(false);
       }
     };
 
-    fetchChartData();
+    fetchDataForPeriod();
   }, [db, currentPeriod]);
 
   const handleConfirmDateRange = (newRange) => {
@@ -121,22 +138,15 @@ export default function HomeScreen() {
     setCurrentPeriod({ ...calculatePeriod(new Date(), billingStartDay), type: 'billing' });
   };
 
-  // logika Dezaktywacji Przycisków 
-
   const isNavigationDisabled = currentPeriod?.type === 'custom' || currentPeriod?.type === 'all';
-
   const previousPeriod = currentPeriod ? getPreviousPeriod(currentPeriod, billingStartDay) : null;
   const nextPeriod = currentPeriod ? getNextPeriod(currentPeriod, billingStartDay) : null;
-
   const isPreviousDisabled = isNavigationDisabled || !previousPeriod || (transactionBounds.minDate && previousPeriod.endDate < transactionBounds.minDate);
   const isNextDisabled = isNavigationDisabled || !nextPeriod || nextPeriod.startDate > new Date();
-
   const oldestPeriod = transactionBounds.minDate ? calculatePeriod(transactionBounds.minDate, billingStartDay) : null;
   const latestPeriod = calculatePeriod(new Date(), billingStartDay);
-
   const isGoToStartDisabled = isNavigationDisabled || !oldestPeriod || (currentPeriod && currentPeriod.startDate.getTime() <= oldestPeriod.startDate.getTime());
   const isGoToEndDisabled = isNavigationDisabled || !latestPeriod || (currentPeriod && currentPeriod.startDate.getTime() === latestPeriod.startDate.getTime());
-
 
   if (!user || isInitialLoading) {
     return (
@@ -166,6 +176,13 @@ export default function HomeScreen() {
           data={chartData.data}
           total={chartData.total}
           isLoading={isChartLoading}
+        />
+
+        <SummaryCard
+          expenses={summaryData.expenses}
+          income={summaryData.income}
+          isLoading={isSummaryLoading}
+          savingsGoal={savingsGoal}
         />
       </ScrollView>
 
