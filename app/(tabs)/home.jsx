@@ -13,6 +13,8 @@ import DateRangeModal from '@/components/DateRangeModal';
 import SummaryCard from '@/components/SummaryCard';
 import { getTransactionDateRange } from '@/services/transactionService';
 import { calculatePeriod, getNextPeriod, getPreviousPeriod, formatPeriodForDisplay } from '@/services/periodService';
+import CategoryExpenseList from '@/components/CategoryExpenseList';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function HomeScreen() {
   const { user } = useAuth();
@@ -157,8 +159,8 @@ export default function HomeScreen() {
   }
 
   return (
-    <>
-      <ScrollView style={styles.container}>
+    <SafeAreaView style={styles.container}>
+      <ScrollView >
         <BillingPeriodSelector
           periodText={formatPeriodForDisplay(currentPeriod)}
           onPeriodTextPress={() => setIsDateModalVisible(true)}
@@ -184,6 +186,12 @@ export default function HomeScreen() {
           isLoading={isSummaryLoading}
           savingsGoal={savingsGoal}
         />
+
+        <CategoryExpenseList
+          data={chartData.data}
+          total={chartData.total}
+          isLoading={isChartLoading}
+        />
       </ScrollView>
 
       <DateRangeModal
@@ -193,7 +201,7 @@ export default function HomeScreen() {
         onClear={handleClearDateRange}
         initialPeriod={currentPeriod}
       />
-    </>
+    </SafeAreaView>
   );
 }
 
@@ -201,6 +209,7 @@ const createStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
+    paddingBottom: 75,
   },
   loadingContainer: {
     flex: 1,
