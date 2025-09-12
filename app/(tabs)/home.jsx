@@ -14,7 +14,11 @@ import SummaryCard from '@/components/SummaryCard';
 import { getTransactionDateRange } from '@/services/transactionService';
 import { calculatePeriod, getNextPeriod, getPreviousPeriod, formatPeriodForDisplay } from '@/services/periodService';
 import CategoryExpenseList from '@/components/CategoryExpenseList';
+import KeyIndicatorsCard from '@/components/KeyIndicatorsCard';
+import { getKeyIndicatorsData } from '@/services/keyIndicatorsService';
+import { eventEmitter } from '@/utils/eventEmitter';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
 
 export default function HomeScreen() {
   const { user } = useAuth();
@@ -33,6 +37,8 @@ export default function HomeScreen() {
   const [isChartLoading, setIsChartLoading] = useState(true);
   const [summaryData, setSummaryData] = useState({ expenses: 0, income: 0 });
   const [isSummaryLoading, setIsSummaryLoading] = useState(true);
+  const [indicatorsData, setIndicatorsData] = useState(null);
+  const [isIndicatorsLoading, setIsIndicatorsLoading] = useState(true);
 
   useFocusEffect(
     useCallback(() => {
@@ -66,38 +72,72 @@ export default function HomeScreen() {
     }, [db])
   );
 
-  useEffect(() => {
-    const fetchDataForPeriod = async () => {
-      if (!db || !currentPeriod) {
-        return;
-      }
+  const fetchDataForPeriod = useCallback(async (period = currentPeriod) => {
+    if (!db || !period) return;
 
-      setIsChartLoading(true);
-      setIsSummaryLoading(true);
+    setIsChartLoading(true);
+    setIsSummaryLoading(true);
+    setIsIndicatorsLoading(true);
+
+    try {
+      const periodForQuery = period.type === 'all' ? null : period;
+
+      const [chartResult, summaryResult, indicatorsResult] = await Promise.all([
+        getCategoryExpenseData(db, periodForQuery),
+        getSummaryData(db, periodForQuery),
+        getKeyIndicatorsData(db, period),
+      ]);
+
+      setChartData({ data: chartResult.dataForChart, total: chartResult.totalExpenses });
+      setSummaryData({ expenses: summaryResult.totalExpenses, income: summaryResult.totalIncome });
+      setIndicatorsData(indicatorsResult);
+
+    } catch (error) {
+      console.error("[HomeScreen] Błąd podczas pobierania danych dla okresu:", error);
+      setChartData({ data: [], total: 0 });
+      setSummaryData({ expenses: 0, income: 0 });
+      setIndicatorsData(null);
+    } finally {
+      setIsChartLoading(false);
+      setIsSummaryLoading(false);
+      setIsIndicatorsLoading(false);
+    }
+  }, [db, currentPeriod]);
+
+  useEffect(() => {
+    fetchDataForPeriod();
+  }, [fetchDataForPeriod]);
+
+  useEffect(() => {
+    if (!db) return;
+
+    const handleTransactionChange = async () => {
+      console.log('[HomeScreen] Odebrano event zmiany transakcji, odświeżam dane...');
+
+      await fetchDataForPeriod();
 
       try {
-        const periodForQuery = currentPeriod.type === 'all' ? null : currentPeriod;
-
-        const [chartResult, summaryResult] = await Promise.all([
-          getCategoryExpenseData(db, periodForQuery),
-          getSummaryData(db, periodForQuery)
-        ]);
-
-        setChartData({ data: chartResult.dataForChart, total: chartResult.totalExpenses });
-        setSummaryData({ expenses: summaryResult.totalExpenses, income: summaryResult.totalIncome });
-
+        const bounds = await getTransactionDateRange(db);
+        setTransactionBounds(bounds);
       } catch (error) {
-        console.error("[HomeScreen] Błąd podczas pobierania danych dla okresu:", error);
-        setChartData({ data: [], total: 0 });
-        setSummaryData({ expenses: 0, income: 0 });
-      } finally {
-        setIsChartLoading(false);
-        setIsSummaryLoading(false);
+        console.error("[HomeScreen] Błąd podczas odświeżania bounds:", error);
       }
     };
 
-    fetchDataForPeriod();
-  }, [db, currentPeriod]);
+    eventEmitter.on('transactionAdded', handleTransactionChange);
+    eventEmitter.on('transactionEdited', handleTransactionChange);
+    eventEmitter.on('transactionDeleted', handleTransactionChange);
+    eventEmitter.on('periodicTransactionChanged', handleTransactionChange);
+    eventEmitter.on('periodicTransactionAdded', handleTransactionChange);
+
+    return () => {
+      eventEmitter.off('transactionAdded', handleTransactionChange);
+      eventEmitter.off('transactionEdited', handleTransactionChange);
+      eventEmitter.off('transactionDeleted', handleTransactionChange);
+      eventEmitter.off('periodicTransactionChanged', handleTransactionChange);
+      eventEmitter.off('periodicTransactionAdded', handleTransactionChange);
+    };
+  }, [db]);
 
   const handleConfirmDateRange = (newRange) => {
     if (newRange === null) {
@@ -185,6 +225,11 @@ export default function HomeScreen() {
           income={summaryData.income}
           isLoading={isSummaryLoading}
           savingsGoal={savingsGoal}
+        />
+
+        <KeyIndicatorsCard
+          data={indicatorsData}
+          isLoading={isIndicatorsLoading}
         />
 
         <CategoryExpenseList

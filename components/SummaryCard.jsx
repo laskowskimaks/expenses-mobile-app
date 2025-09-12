@@ -1,14 +1,34 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, StyleSheet } from 'react-native';
-import { Card, Text, useTheme, ActivityIndicator, Icon } from 'react-native-paper';
+import { Card, Text, useTheme, ActivityIndicator, Icon, IconButton, Divider } from 'react-native-paper';
 import { formatCurrency } from '@/services/transactionService';
 
 const SummaryCard = ({ expenses, income, isLoading, savingsGoal = 0 }) => {
     const theme = useTheme();
+    const [isExpanded, setIsExpanded] = useState(false);
 
     const incomeColor = theme.dark ? '#66bb6a' : '#2e7d32';
-
     const styles = createStyles(theme, incomeColor);
+
+    const renderBalanceInfo = () => {
+        const balance = income - expenses;
+        const isPositive = balance >= 0;
+        const balanceColor = isPositive ? incomeColor : theme.colors.error;
+
+        return (
+            <View style={styles.expandedSectionContainer}>
+                <Icon
+                    source={isPositive ? "arrow-up-bold-outline" : "arrow-down-bold-outline"}
+                    size={20}
+                    color={balanceColor}
+                />
+                <Text style={styles.balanceLabel}>Bilans:</Text>
+                <Text style={[styles.balanceAmount, { color: balanceColor }]}>
+                    {isPositive ? '+' : ''}{formatCurrency(balance)}
+                </Text>
+            </View>
+        );
+    };
 
     const renderSavingsGoalInfo = () => {
         if (!savingsGoal || savingsGoal <= 0) {
@@ -16,11 +36,13 @@ const SummaryCard = ({ expenses, income, isLoading, savingsGoal = 0 }) => {
         }
 
         const surplus = income - expenses;
+        const percentage = ((surplus / savingsGoal) * 100);
+        const isAchieved = surplus >= savingsGoal;
 
         if (surplus < 0) {
             return (
-                <View style={styles.savingsGoalContainer}>
-                    <Icon source="alert-circle-outline" size={16} color={theme.colors.error} />
+                <View style={styles.expandedSectionContainer}>
+                    <Icon source="alert-circle-outline" size={18} color={theme.colors.error} />
                     <Text style={[styles.savingsGoalText, styles.savingsGoalDeficit]}>
                         Deficyt: {formatCurrency(surplus)}
                     </Text>
@@ -28,22 +50,19 @@ const SummaryCard = ({ expenses, income, isLoading, savingsGoal = 0 }) => {
             );
         }
 
-        const percentage = ((surplus / savingsGoal) * 100);
-        const isAchieved = surplus >= savingsGoal;
-
         if (isAchieved) {
             return (
-                <View style={styles.savingsGoalContainer}>
-                    <Icon source="trophy-variant-outline" size={16} color={styles.savingsGoalAchieved.color} />
+                <View style={styles.expandedSectionContainer}>
+                    <Icon source="trophy-variant-outline" size={18} color={styles.savingsGoalAchieved.color} />
                     <Text style={[styles.savingsGoalText, styles.savingsGoalAchieved]}>
-                        Cel osiągnięty: {formatCurrency(surplus)} / {formatCurrency(savingsGoal)} ({percentage.toFixed(0)}%)
+                        Cel: {formatCurrency(surplus)} / {formatCurrency(savingsGoal)} ({percentage.toFixed(0)}%)
                     </Text>
                 </View>
             );
         } else {
             return (
-                <View style={styles.savingsGoalContainer}>
-                    <Icon source="piggy-bank-outline" size={16} color={styles.savingsGoalInProgress.color} />
+                <View style={styles.expandedSectionContainer}>
+                    <Icon source="piggy-bank-outline" size={18} color={styles.savingsGoalInProgress.color} />
                     <Text style={[styles.savingsGoalText, styles.savingsGoalInProgress]}>
                         Cel: {formatCurrency(surplus)} / {formatCurrency(savingsGoal)} ({percentage.toFixed(0)}%)
                     </Text>
@@ -63,8 +82,6 @@ const SummaryCard = ({ expenses, income, isLoading, savingsGoal = 0 }) => {
     }
 
     const total = expenses + income;
-    const expensesPercentage = total > 0 ? (expenses / total) * 100 : 0;
-    const incomePercentage = total > 0 ? (income / total) * 100 : 0;
     const showBar = expenses > 0 || income > 0;
 
     return (
@@ -87,14 +104,27 @@ const SummaryCard = ({ expenses, income, isLoading, savingsGoal = 0 }) => {
                             <View style={[styles.progressBarExpense, { flex: expenses }]} />
                             <View style={[styles.progressBarIncome, { flex: income }]} />
                         </View>
-                        <View style={styles.percentageTextContainer}>
-                            <Text style={[styles.percentage, { textAlign: 'left' }]}>{expensesPercentage.toFixed(1)}%</Text>
-                            <Text style={[styles.percentage, { textAlign: 'right' }]}>{incomePercentage.toFixed(1)}%</Text>
-                        </View>
                     </View>
                 )}
 
-                {renderSavingsGoalInfo()}
+                {isExpanded && (
+                    <View>
+                        <Divider style={styles.divider} />
+                        {(!savingsGoal || savingsGoal <= 0)
+                            ? renderBalanceInfo()
+                            : renderSavingsGoalInfo()
+                        }
+                    </View>
+                )}
+
+                <View style={styles.chevronContainer}>
+                    <IconButton
+                        icon={isExpanded ? 'chevron-up' : 'chevron-down'}
+                        onPress={() => setIsExpanded(!isExpanded)}
+                        size={24}
+                    />
+                </View>
+
             </Card.Content>
         </Card>
     );
@@ -103,7 +133,6 @@ const SummaryCard = ({ expenses, income, isLoading, savingsGoal = 0 }) => {
 const createStyles = (theme, incomeColor) => StyleSheet.create({
     card: {
         marginHorizontal: 16,
-        marginBottom: 16,
         backgroundColor: theme.colors.elevation.level2,
     },
     loaderContainer: {
@@ -138,15 +167,14 @@ const createStyles = (theme, incomeColor) => StyleSheet.create({
         fontWeight: 'bold',
     },
     progressBarWrapper: {
-        position: 'relative',
-        height: 20,
+        height: 8,
+        borderRadius: 4,
+        overflow: 'hidden',
+        backgroundColor: theme.colors.surfaceVariant,
     },
     progressBarContainer: {
         flexDirection: 'row',
-        height: 20,
-        borderRadius: 10,
-        overflow: 'hidden',
-        backgroundColor: theme.colors.surfaceVariant,
+        height: '100%',
     },
     progressBarExpense: {
         backgroundColor: theme.colors.error,
@@ -154,30 +182,32 @@ const createStyles = (theme, incomeColor) => StyleSheet.create({
     progressBarIncome: {
         backgroundColor: incomeColor,
     },
-    percentageTextContainer: {
-        position: 'absolute',
-        top: 0,
-        left: 8,
-        right: 8,
-        bottom: 0,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
+    chevronContainer: {
         alignItems: 'center',
+        marginTop: -8,
+        marginBottom: -20,
     },
-    percentage: {
-        fontSize: 12,
-        color: theme.colors.onPrimary,
-        fontWeight: 'bold',
-        flex: 1,
+    divider: {
+        marginTop: 12,
+        marginBottom: 8,
     },
-    savingsGoalContainer: {
+    expandedSectionContainer: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        marginTop: 16,
-        padding: 8,
+        paddingVertical: 8,
+        paddingHorizontal: 16,
         borderRadius: 8,
         backgroundColor: theme.colors.elevation.level1,
+    },
+    balanceLabel: {
+        marginHorizontal: 8,
+        fontSize: 16,
+        color: theme.colors.onSurfaceVariant,
+    },
+    balanceAmount: {
+        fontSize: 16,
+        fontWeight: 'bold',
     },
     savingsGoalText: {
         marginLeft: 8,
