@@ -113,7 +113,6 @@ const styles = StyleSheet.create({
     },
     content: {
         flex: 1,
-        // Usunięto padding, aby FlatList dochodził do krawędzi
     },
     footer: {
         padding: 20,

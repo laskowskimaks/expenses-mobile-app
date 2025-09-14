@@ -34,7 +34,6 @@ export default function SettingsScreen() {
     useCallback(() => {
       const loadSettings = async () => {
         if (db) {
-          // Logika dla dnia płatności z wartością domyślną
           let fetchedDay = await getPaymentDay(db);
           if (!fetchedDay) {
             fetchedDay = '1';
@@ -43,7 +42,6 @@ export default function SettingsScreen() {
           setPaymentDay(fetchedDay);
           setTempPaymentDay(fetchedDay);
 
-          // Logika dla celu oszczędnościowego
           const fetchedGoal = await getSavingsGoal(db);
           setSavingsGoal(fetchedGoal);
           setTempSavingsGoal(fetchedGoal || '');
@@ -163,10 +161,6 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <Button
-        title={"Dodaj testowe dane"}
-        onPress={handleAddTestData}
-      />
       <ScrollView>
         {/* TO DO - do usuniecia na koniec */}
         {__DEV__ && (
@@ -285,13 +279,7 @@ export default function SettingsScreen() {
             onPress={handleManagePeriodic}
             right={props => <List.Icon {...props} icon="chevron-right" />}
           />
-          <Divider />
-          <List.Item
-            title="Zarządzaj powiadomieniami"
-            left={props => <List.Icon {...props} icon="bell-outline" />}
-            onPress={handleManageNotifications}
-            right={props => <List.Icon {...props} icon="chevron-right" />}
-          />
+
         </List.Section>
         <Divider />
         <List.Subheader>Motyw aplikacji</List.Subheader>

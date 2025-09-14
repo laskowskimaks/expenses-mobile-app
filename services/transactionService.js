@@ -60,7 +60,8 @@ export const getAllTransactionsSorted = async (db) => {
         tagColor: tags.color,
       })
       .from(transactionTags)
-      .innerJoin(tags, eq(transactionTags.tagId, tags.id));
+      .innerJoin(tags, eq(transactionTags.tagId, tags.id))
+      .orderBy(sql`lower(${tags.name})`);
 
     const tagsByTransaction = allTransactionTags.reduce((acc, tagRow) => {
       if (!acc[tagRow.transactionId]) acc[tagRow.transactionId] = [];
@@ -164,7 +165,8 @@ export const getTransactionById = async (db, transactionId) => {
       })
       .from(transactionTags)
       .innerJoin(tags, eq(transactionTags.tagId, tags.id))
-      .where(eq(transactionTags.transactionId, transactionId));
+      .where(eq(transactionTags.transactionId, transactionId))
+      .orderBy(sql`lower(${tags.name})`);
 
     let periodicPattern = null;
     if (tx.periodicTransactionId) {
@@ -206,7 +208,7 @@ export const updateTransaction = async (db, transactionId, data, options = { mod
             notes: data.description,
             location: data.location,
             categoryId: data.categoryId,
-            periodicTransactionId: null, // Odłącza od serii
+            periodicTransactionId: null,
           })
           .where(eq(transactions.id, transactionId));
 
@@ -336,7 +338,7 @@ export const getTransactionDateRange = async (db) => {
         maxDate: new Date(result[0].maxTimestamp * 1000),
       };
     }
-    
+
     return { minDate: null, maxDate: null };
 
   } catch (error) {

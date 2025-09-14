@@ -20,7 +20,6 @@ class EventEmitter {
     this.events[event].forEach(callback => callback(data));
   }
 
-  // Dodatkowe funkcje dla wygody
   once(event, callback) {
     const onceCallback = (data) => {
       callback(data);

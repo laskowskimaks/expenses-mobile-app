@@ -1,5 +1,6 @@
 import { categories, transactions } from '../database/schema';
 import { eq, and, sql, not, desc } from 'drizzle-orm';
+import { eventEmitter } from '@/utils/eventEmitter';
 
 export const getAllCategories = async (db) => {
   if (!db) {
@@ -29,6 +30,7 @@ export const addCategory = async (db, categoryData) => {
       iconName: categoryData.iconName,
       isDeletable: true,
     });
+    eventEmitter.emit('categoriesChanged');
     return { success: true };
   } catch (error) {
     console.error("[categoryService] Błąd podczas dodawania kategorii:", error);
@@ -54,8 +56,9 @@ export const updateCategory = async (db, id, categoryData) => {
       updateData.name = categoryData.name.trim();
       updateData.iconName = categoryData.iconName;
     }
-    
+
     await db.update(categories).set(updateData).where(eq(categories.id, id));
+    eventEmitter.emit('categoriesChanged');
     return { success: true };
   } catch (error) {
     console.error(`[categoryService] Błąd podczas aktualizacji kategorii ${id}:`, error);
@@ -74,7 +77,7 @@ export const deleteCategory = async (db, id) => {
       if (!categoryToDelete.isDeletable) {
         throw new Error('Tej kategorii nie można usunąć.');
       }
-      
+
       const otherCategory = await tx.select().from(categories).where(eq(categories.name, 'Inne')).get();
       if (!otherCategory) {
         throw new Error('Nie znaleziono domyślnej kategorii "Inne".');
@@ -83,9 +86,10 @@ export const deleteCategory = async (db, id) => {
       await tx.update(transactions)
         .set({ categoryId: otherCategory.id })
         .where(eq(transactions.categoryId, id));
-      
+
       await tx.delete(categories).where(eq(categories.id, id));
     });
+    eventEmitter.emit('categoriesChanged');
     return { success: true };
   } catch (error) {
     console.error(`[categoryService] Błąd podczas usuwania kategorii ${id}:`, error);

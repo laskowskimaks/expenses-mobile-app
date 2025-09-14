@@ -1,12 +1,20 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { Card, Text, useTheme, ProgressBar, Avatar } from 'react-native-paper';
+import { Card, Text, useTheme, ProgressBar, Avatar, IconButton } from 'react-native-paper';
 
-const CategoryListItem = ({ iconName, name, color, amount, percentage }) => {
+const CategoryListItem = ({
+    iconName,
+    name,
+    color,
+    amount,
+    percentage,
+    transactionCount,
+    avgDailyExpense,
+    onPress
+}) => {
     const theme = useTheme();
     const styles = createStyles(theme, color);
 
-    // Zabezpieczenie przed nieprawidłowymi wartościami progress
     const progressValue = Math.max(0, Math.min(1, percentage / 100));
 
     return (
@@ -17,15 +25,31 @@ const CategoryListItem = ({ iconName, name, color, amount, percentage }) => {
                     <Text variant="bodyLarge" style={styles.categoryName}>{name}</Text>
                     <View style={styles.progressRow}>
                         <Text variant="labelSmall" style={styles.percentageText}>{`${Math.round(percentage)}%`}</Text>
-                        {/* Dodajemy View-kontener, który będzie tłem (torem) dla paska postępu */}
                         <View style={styles.progressBarContainer}>
                             <ProgressBar progress={progressValue} color={color} style={styles.progressBar} />
                         </View>
+                    </View>
+                    <View style={styles.statsRow}>
+                        <Text variant="labelSmall" style={styles.statsText}>
+                            {transactionCount} {transactionCount === 1 ? 'transakcja' : transactionCount < 5 ? 'transakcje' : 'transakcji'}
+                        </Text>
+                        <Text variant="labelSmall" style={styles.statsText}>
+                            Śr. {avgDailyExpense.toFixed(2)} zł/dzień
+                        </Text>
                     </View>
                 </View>
                 <Text variant="bodyLarge" style={styles.amountText}>
                     {`${amount.toFixed(2)} zł`}
                 </Text>
+                {onPress && (
+                    <IconButton
+                        icon="chevron-right"
+                        size={28}
+                        iconColor={theme.colors.onSurfaceVariant}
+                        onPress={onPress}
+                        style={styles.chevronButton}
+                    />
+                )}
             </View>
         </Card>
     );
@@ -40,7 +64,9 @@ const createStyles = (theme, color) => StyleSheet.create({
     container: {
         flexDirection: 'row',
         alignItems: 'center',
-        padding: 12,
+        paddingVertical: 12,
+        paddingLeft: 12,
+        paddingRight: 4,
     },
     icon: {
         backgroundColor: color || theme.colors.primary,
@@ -74,10 +100,23 @@ const createStyles = (theme, color) => StyleSheet.create({
         height: '100%',
         borderRadius: 6,
     },
+    statsRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginTop: 4,
+    },
+    statsText: {
+        color: theme.colors.onSurfaceVariant,
+        fontSize: 11,
+    },
     amountText: {
         fontWeight: 'bold',
         color: theme.colors.onSurface,
+        marginRight: 4,
     },
+    chevronButton: {
+        margin: 0,
+    }
 });
 
 export default CategoryListItem;

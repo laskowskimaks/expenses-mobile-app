@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 
 export default function useDebounce(value, delay) {
-  // Stan przechowujący opóźnioną wartość
   const [debouncedValue, setDebouncedValue] = useState(value);
 
   useEffect(() => {

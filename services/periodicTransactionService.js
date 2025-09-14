@@ -22,14 +22,12 @@ const addIntervalToDate = (date, interval, unit) => {
     return d;
 };
 
-// Zeruje godzinę do 00:00:00
 const normalizeToLocalDayStart = (timestampSec) => {
     const d = new Date(timestampSec * 1000);
     d.setHours(0, 0, 0, 0);
     return Math.floor(d.getTime() / 1000);
 };
 
-// Zachowuje oryginalną godzinę z startDate
 const normalizeToSameTime = (timestampSec, targetDayTimestamp) => {
     const originalDate = new Date(timestampSec * 1000);
     const targetDay = new Date(targetDayTimestamp * 1000);
@@ -101,7 +99,7 @@ export const getAllPeriodicTransactions = async (db) => {
                 categoryName: categories.name,
                 categoryColor: categories.color,
                 categoryIcon: categories.iconName,
-                tags: sql`json_group_array(json_object('id', ${tags.id}, 'name', ${tags.name}, 'color', ${tags.color}))`.mapWith(String),
+                tags: sql`json_group_array(json_object('id', ${tags.id}, 'name', ${tags.name}, 'color', ${tags.color}) ORDER BY lower(${tags.name}))`.mapWith(String),
             })
             .from(periodicTransactions)
             .leftJoin(categories, eq(periodicTransactions.categoryId, categories.id))
@@ -166,7 +164,6 @@ export const addPeriodicTransaction = async (dbOrDbTransaction, periodicTransact
             if (isNaN(finalAmount) || finalAmount <= 0) throw new Error('Kwota musi być liczbą większą od 0');
             if (periodicTransactionData.type === 'expenditure') finalAmount = -Math.abs(finalAmount);
 
-            // Zachowaj pełną datę z czasem
             const startTimestamp = Math.floor(periodicTransactionData.startDate.getTime() / 1000);
             const endTimestamp = periodicTransactionData.endDate ? Math.floor(periodicTransactionData.endDate.getTime() / 1000) : null;
             const categoryId = periodicTransactionData.categoryId;
@@ -181,7 +178,7 @@ export const addPeriodicTransaction = async (dbOrDbTransaction, periodicTransact
                 repeatInterval: parseInt(periodicTransactionData.repeatInterval),
                 repeatUnit: periodicTransactionData.repeatUnit,
                 startDate: startTimestamp,
-                nextOccurrenceDate: startTimestamp, 
+                nextOccurrenceDate: startTimestamp,
                 endDate: endTimestamp,
                 notes: periodicTransactionData.description || null,
                 categoryId: categoryId,
@@ -241,14 +238,14 @@ export const processPeriodicTransactions = async (dbTransaction) => {
                         categoryId: pt.categoryId,
                         periodicTransactionId: pt.id
                     };
-                    
+
                     const newTransaction = await dbTransaction.insert(transactions).values(newTransactionData).returning();
                     const newTransactionId = newTransaction[0].id;
 
                     const pTags = await dbTransaction.select({ tagId: periodicTransactionTags.tagId })
                         .from(periodicTransactionTags)
                         .where(eq(periodicTransactionTags.periodicTransactionId, pt.id));
-                    
+
                     if (pTags.length > 0) {
                         await dbTransaction.insert(transactionTags)
                             .values(pTags.map(t => ({ transactionId: newTransactionId, tagId: t.tagId })));
@@ -262,7 +259,7 @@ export const processPeriodicTransactions = async (dbTransaction) => {
                 await dbTransaction.update(periodicTransactions)
                     .set({ nextOccurrenceDate: nextOccurrence })
                     .where(eq(periodicTransactions.id, pt.id));
-                
+
             } catch (error) {
                 console.error(`[PeriodicTransactionService] Błąd przy przetwarzaniu transakcji "${pt.title}":`, error);
             }
@@ -285,7 +282,10 @@ export const getPeriodicTransactionById = async (db, id) => {
             id: tags.id,
             name: tags.name,
             color: tags.color
-        }).from(periodicTransactionTags).innerJoin(tags, eq(periodicTransactionTags.tagId, tags.id)).where(eq(periodicTransactionTags.periodicTransactionId, id));
+        }).from(periodicTransactionTags)
+            .innerJoin(tags, eq(periodicTransactionTags.tagId, tags.id))
+            .where(eq(periodicTransactionTags.periodicTransactionId, id))
+            .orderBy(sql`lower(${tags.name})`);
 
         return { ...result, tags: tagsResult };
     } catch (error) {
@@ -327,15 +327,15 @@ export const endPeriodicSeries = async (dbTransaction, pt, newSeriesStartDate, m
             .select({ id: transactions.id })
             .from(transactions)
             .where(eq(transactions.periodicTransactionId, pt.id));
-        
+
         const allTransactionIds = allTransactions.map(t => t.id);
-        
+
         if (allTransactionIds.length > 0) {
             await dbTransaction.delete(transactionTags)
                 .where(inArray(transactionTags.transactionId, allTransactionIds));
             console.log(`[endPeriodicSeries] Usunięto tagi ${allTransactionIds.length} transakcji przed usunięciem całej serii`);
         }
-        
+
         await dbTransaction.delete(transactions).where(eq(transactions.periodicTransactionId, pt.id));
         await dbTransaction.delete(periodicTransactionTags).where(eq(periodicTransactionTags.periodicTransactionId, pt.id));
         await dbTransaction.delete(periodicTransactions).where(eq(periodicTransactions.id, pt.id));
@@ -348,16 +348,15 @@ export const endPeriodicSeries = async (dbTransaction, pt, newSeriesStartDate, m
                 eq(transactions.periodicTransactionId, pt.id),
                 gt(transactions.transactionDate, lastValidOccurrence)
             ));
-        
+
         const futureTransactionIds = futureTransactions.map(t => t.id);
-        
+
         if (futureTransactionIds.length > 0) {
             await dbTransaction.delete(transactionTags)
                 .where(inArray(transactionTags.transactionId, futureTransactionIds));
             console.log(`[endPeriodicSeries] Usunięto tagi ${futureTransactionIds.length} przyszłych transakcji`);
         }
-        
-        // Usuń przyszłe transakcje
+
         await dbTransaction.delete(transactions)
             .where(and(
                 eq(transactions.periodicTransactionId, pt.id),
@@ -393,9 +392,9 @@ export const updatePeriodicTransaction = async ({ db, id, data, mode = 'all' }) 
                     .select({ id: transactions.id })
                     .from(transactions)
                     .where(eq(transactions.periodicTransactionId, id));
-                
+
                 const oldTransactionIds = oldTransactions.map(t => t.id);
-                
+
                 if (oldTransactionIds.length > 0) {
                     await dbTransaction.delete(transactionTags)
                         .where(inArray(transactionTags.transactionId, oldTransactionIds));
@@ -422,9 +421,9 @@ export const updatePeriodicTransaction = async ({ db, id, data, mode = 'all' }) 
                             eq(transactions.periodicTransactionId, id),
                             gt(transactions.transactionDate, newEndDate)
                         ));
-                    
+
                     const futureTransactionIds = futureTransactions.map(t => t.id);
-                    
+
                     if (futureTransactionIds.length > 0) {
                         await dbTransaction.delete(transactionTags)
                             .where(inArray(transactionTags.transactionId, futureTransactionIds));
@@ -455,12 +454,11 @@ export const deletePeriodicTransaction = async ({ db, periodicTransactionId, mod
         if (mode === 'end') {
             const pt = await getPeriodicTransactionDefinition(db, periodicTransactionId);
             if (!pt) throw new Error("Nie znaleziono transakcji cyklicznej.");
-            
+
             await db.transaction(async (dbTransaction) => {
                 const newEndDate = await endPeriodicSeries(dbTransaction, pt, new Date(), 'end_series');
-                
+
                 if (newEndDate !== null) {
-                    // Znajdź transakcje do usunięcia (po dacie zakończenia)
                     const futureTransactions = await dbTransaction
                         .select({ id: transactions.id })
                         .from(transactions)
@@ -468,17 +466,15 @@ export const deletePeriodicTransaction = async ({ db, periodicTransactionId, mod
                             eq(transactions.periodicTransactionId, periodicTransactionId),
                             gt(transactions.transactionDate, newEndDate)
                         ));
-                    
+
                     const futureTransactionIds = futureTransactions.map(t => t.id);
-                    
-                    // Usuń tagi przyszłych transakcji
+
                     if (futureTransactionIds.length > 0) {
                         await dbTransaction.delete(transactionTags)
                             .where(inArray(transactionTags.transactionId, futureTransactionIds));
                         console.log(`[deletePeriodicTransaction] Usunięto tagi ${futureTransactionIds.length} przyszłych transakcji`);
                     }
-                    
-                    // Usuń przyszłe transakcje
+
                     await dbTransaction.delete(transactions)
                         .where(and(
                             eq(transactions.periodicTransactionId, periodicTransactionId),
@@ -490,43 +486,38 @@ export const deletePeriodicTransaction = async ({ db, periodicTransactionId, mod
             if (!periodicTransactionId) {
                 return { success: false, message: "Brak ID transakcji cyklicznej." };
             }
-            
+
             await db.transaction(async (dbTransaction) => {
                 console.log(`[deletePeriodicTransaction] Usuwanie transakcji cyklicznej ${periodicTransactionId} i wszystkich powiązań`);
-                
-                // 1. Znajdź wszystkie transakcje należące do tej serii
+
                 const relatedTransactions = await dbTransaction
                     .select({ id: transactions.id })
                     .from(transactions)
                     .where(eq(transactions.periodicTransactionId, periodicTransactionId));
-                
+
                 const transactionIds = relatedTransactions.map(t => t.id);
                 console.log(`[deletePeriodicTransaction] Znaleziono ${transactionIds.length} powiązanych transakcji:`, transactionIds);
 
-                // 2. Usuń tagi pojedynczych transakcji
                 if (transactionIds.length > 0) {
                     await dbTransaction.delete(transactionTags)
                         .where(inArray(transactionTags.transactionId, transactionIds));
                     console.log(`[deletePeriodicTransaction] Usunięto tagi ${transactionIds.length} transakcji`);
                 }
 
-                // 3. Usuń tagi transakcji cyklicznej
                 await dbTransaction.delete(periodicTransactionTags)
                     .where(eq(periodicTransactionTags.periodicTransactionId, periodicTransactionId));
                 console.log(`[deletePeriodicTransaction] Usunięto tagi transakcji cyklicznej`);
 
-                // 4. Usuń wszystkie transakcje z tej serii
                 await dbTransaction.delete(transactions)
                     .where(eq(transactions.periodicTransactionId, periodicTransactionId));
                 console.log(`[deletePeriodicTransaction] Usunięto ${transactionIds.length} transakcji`);
 
-                // 5. Usuń samą transakcję cykliczną
                 await dbTransaction.delete(periodicTransactions)
                     .where(eq(periodicTransactions.id, periodicTransactionId));
                 console.log(`[deletePeriodicTransaction] Usunięto transakcję cykliczną`);
             });
         }
-        
+
         eventEmitter.emit('periodicTransactionChanged');
         return { success: true };
     } catch (error) {

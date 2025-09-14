@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { View, StyleSheet } from 'react-native';
-import { Card, Text, useTheme, ActivityIndicator, Icon, IconButton, Divider } from 'react-native-paper';
+import { Card, Text, useTheme, Icon, IconButton, Divider } from 'react-native-paper';
 import { formatCurrency } from '@/services/transactionService';
+import SummaryCardSkeleton from '@/components/skeletons/SummaryCardSkeleton';
 
 const SummaryCard = ({ expenses, income, isLoading, savingsGoal = 0 }) => {
     const theme = useTheme();
@@ -72,13 +73,7 @@ const SummaryCard = ({ expenses, income, isLoading, savingsGoal = 0 }) => {
     };
 
     if (isLoading) {
-        return (
-            <Card style={styles.card}>
-                <View style={styles.loaderContainer}>
-                    <ActivityIndicator animating={true} />
-                </View>
-            </Card>
-        );
+        return <SummaryCardSkeleton />;
     }
 
     const total = expenses + income;
@@ -133,6 +128,7 @@ const SummaryCard = ({ expenses, income, isLoading, savingsGoal = 0 }) => {
 const createStyles = (theme, incomeColor) => StyleSheet.create({
     card: {
         marginHorizontal: 16,
+        marginVertical: 4,
         backgroundColor: theme.colors.elevation.level2,
     },
     loaderContainer: {

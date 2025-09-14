@@ -118,7 +118,6 @@ export const DbProvider = ({ children }) => {
                     const periodicResult = await processPeriodicTransactions(newDrizzleDb);
 
                     if (periodicResult.success) {
-                        // Oznaczenie sprawdzenia jako wykonane
                         try {
                             await markPeriodicCheckCompleted();
                         } catch (markError) {

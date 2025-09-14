@@ -72,10 +72,16 @@ const CustomTabBar = ({ state }) => {
                             onPress={onPress}
                             style={styles.tabItem}
                         >
-                            {IconComponent({
-                                size: 24,
-                                color: isFocused ? theme.colors.primary : theme.colors.onSurfaceVariant,
-                            })}
+                            <View style={[
+                                styles.iconContainer,
+                                isFocused && styles.iconContainerFocused
+                            ]}>
+                                {IconComponent({
+                                    size: isFocused ? 26 : 24,
+                                    color: isFocused ? theme.colors.primary : theme.colors.onSurfaceVariant,
+                                })}
+                            </View>
+                            {isFocused && <View style={[styles.activeIndicator, { backgroundColor: theme.colors.primary }]} />}
                         </Pressable>
                     );
                 })}
@@ -112,6 +118,25 @@ const createStyles = (theme) => StyleSheet.create({
         justifyContent: 'center',
         height: '100%',
         width: TAB_WIDTH,
+    },
+    iconContainer: {
+        padding: 6,
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+        minWidth: 40,
+        minHeight: 40,
+    },
+    iconContainerFocused: {
+        backgroundColor: theme.colors.primaryContainer,
+        transform: [{ scale: 1.1 }],
+    },
+    activeIndicator: {
+        position: 'absolute',
+        bottom: 6,
+        width: 20,
+        height: 2,
+        borderRadius: 1,
     },
     centralButtonContainer: {
         width: TAB_WIDTH,

@@ -127,7 +127,6 @@ const TransactionSkeleton = ({ variant = 'random' }) => {
     if (variant === 'medium') return <TransactionSkeletonMedium />;
     if (variant === 'expanded') return <TransactionSkeletonExpanded />;
 
-    // Random variant
     const variants = [
         <TransactionSkeletonCompact key="compact" />,
         <TransactionSkeletonMedium key="medium" />,
@@ -142,7 +141,7 @@ export const TransactionSkeletonList = ({ count = 5 }) => {
     return (
         <>
             {Array.from({ length: count }, (_, index) => {
-                const variants = ['compact', 'medium', 'expanded', 'expanded', 'medium']; 
+                const variants = ['compact', 'medium', 'expanded', 'expanded', 'medium'];
                 const variant = variants[index % variants.length];
                 return <TransactionSkeleton key={index} variant={variant} />;
             })}

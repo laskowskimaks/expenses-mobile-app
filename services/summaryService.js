@@ -35,7 +35,7 @@ export const getSummaryData = async (db, period) => {
         const totalExpenses = Math.abs(expensesResult[0]?.total || 0);
         const totalIncome = incomeResult[0]?.total || 0;
 
-        console.log(`[summaryService] Pomyślnie pobrano podsumowanie: Wydatki - ${totalExpenses}, Wpływy - ${totalIncome}`);
+        //console.log(`[summaryService] Pomyślnie pobrano podsumowanie: Wydatki - ${totalExpenses}, Wpływy - ${totalIncome}`);
 
         return { totalExpenses, totalIncome };
 

@@ -4,7 +4,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Badge, useTheme, Icon } from 'react-native-paper';
 import { Swipeable } from 'react-native-gesture-handler';
 
-// Zachowujemy RenderIcon, ponieważ może być potrzebny do ikon z różnych rodzin
 const RenderIcon = ({ iconName, size = 32, color = '#fff' }) => {
   if (!iconName) {
     return <Icon source="shape" size={size} color={color} />;

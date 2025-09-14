@@ -30,7 +30,6 @@ function RootLayoutNav() {
   const shouldShowBanner = !isConnected && !user;
 
 
-  // Nasłuchiwanie stanu aplikacji w celu blokady
   useEffect(() => {
     const subscription = AppState.addEventListener('change', nextAppState => {
       if (
@@ -47,12 +46,10 @@ function RootLayoutNav() {
 
   useEffect(() => {
     const handleStateChange = async () => {
-      // Jeśli autentykacja jeszcze trwa to skip
       if (isAuthLoading) {
         return;
       }
 
-      // Jeśli użytkownik jest wylogowany
       if (!user) {
         if (db && !isDbLoading) {
           clearDatabase();
@@ -68,7 +65,6 @@ function RootLayoutNav() {
         return;
       }
 
-      // Jeśli trwa proces rejestracji (ustawianie PINu)
       if (needsPinSetup) {
         if (pathname !== '/pinSetting') {
           router.replace('/pinSetting');
@@ -77,7 +73,6 @@ function RootLayoutNav() {
         return;
       }
 
-      // Jeśli nie ma bazy danych i nie trwa jej ładowanie
       if (!db) {
         if (!isDbLoading) {
           initializeDatabase(user.uid);
@@ -85,7 +80,6 @@ function RootLayoutNav() {
         return;
       }
 
-      // Jeśli aplikacja jest zablokowana PINem
       if (isLocked) {
         const storedPin = await getHashedPin(db);
         if (storedPin) {
@@ -99,8 +93,6 @@ function RootLayoutNav() {
         return;
       }
 
-      // Użytkownik zalogowany, odblokowany, z gotową bazą.
-      // Powinien być w aplikacji - przekierowanie do głównej strony.
       const pagesToRedirectFrom = ['/', '/login', '/register', '/pinSetting'];
       if (pagesToRedirectFrom.includes(pathname)) {
         router.replace('/(tabs)/home');
@@ -238,7 +230,22 @@ function RootLayoutNav() {
             headerShown: false
           }}
         />
+        <Stack.Screen
+          name="(screens)/ExpenseDetailsScreen"
+          options={{
+            presentation: 'modal',
+            headerShown: false
+          }}
+        />
+        <Stack.Screen
+          name="(screens)/TagDetailsScreen"
+          options={{
+            presentation: 'modal',
+            headerShown: false
+          }}
+        />
       </Stack>
+
       {shouldShowBanner && <OfflineBanner />}
     </>
   );

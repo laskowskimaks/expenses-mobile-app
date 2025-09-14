@@ -3,8 +3,8 @@ import { useAuth } from '@/context/AuthContext';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import { useDb } from '@/context/DbContext';
 import { getAllSettingsAsObject } from '@/services/authService';
-import { ActivityIndicator, useTheme } from 'react-native-paper';
-import { useFocusEffect } from '@react-navigation/native';
+import { ActivityIndicator, useTheme, Text } from 'react-native-paper';
+import { useRouter } from 'expo-router';
 import { getCategoryExpenseData } from '@/services/categoriesChartService';
 import { getSummaryData } from '@/services/summaryService';
 import CategoryDonutChart from '@/components/charts/CategoryDonutChart';
@@ -13,20 +13,27 @@ import DateRangeModal from '@/components/DateRangeModal';
 import SummaryCard from '@/components/SummaryCard';
 import { getTransactionDateRange } from '@/services/transactionService';
 import { calculatePeriod, getNextPeriod, getPreviousPeriod, formatPeriodForDisplay } from '@/services/periodService';
-import CategoryExpenseList from '@/components/CategoryExpenseList';
 import KeyIndicatorsCard from '@/components/KeyIndicatorsCard';
 import { getKeyIndicatorsData } from '@/services/keyIndicatorsService';
 import { eventEmitter } from '@/utils/eventEmitter';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
+import { TapGestureHandler, State } from 'react-native-gesture-handler';
+import { getTagsSummaryData } from '@/services/summaryTagService';
+import TagsSummaryCard from '@/components/TagsSummaryCard';
+import HomeSkeleton from '@/components/skeletons/HomeSkeleton';
+import CategoryDonutChartSkeleton from '@/components/skeletons/CategoryDonutChartSkeleton';
+import SummaryCardSkeleton from '@/components/skeletons/SummaryCardSkeleton';
+import KeyIndicatorsCardSkeleton from '@/components/skeletons/KeyIndicatorsCardSkeleton';
+import TagsSummaryCardSkeleton from '@/components/skeletons/TagsSummaryCardSkeleton';
 
 export default function HomeScreen() {
   const { user } = useAuth();
   const { db } = useDb();
   const theme = useTheme();
   const styles = createStyles(theme);
+  const router = useRouter();
 
-  const [currentPeriod, setCurrentPeriod] = useState(null); // { startDate, endDate, type: 'billing' | 'custom' | 'all' }
+  const [currentPeriod, setCurrentPeriod] = useState(null);
   const [billingStartDay, setBillingStartDay] = useState('1');
   const [transactionBounds, setTransactionBounds] = useState({ minDate: null, maxDate: null });
   const [isInitialLoading, setIsInitialLoading] = useState(true);
@@ -34,73 +41,71 @@ export default function HomeScreen() {
   const [savingsGoal, setSavingsGoal] = useState(0);
 
   const [chartData, setChartData] = useState({ data: [], total: 0 });
-  const [isChartLoading, setIsChartLoading] = useState(true);
+  const [isDataLoading, setIsDataLoading] = useState(true);
   const [summaryData, setSummaryData] = useState({ expenses: 0, income: 0 });
-  const [isSummaryLoading, setIsSummaryLoading] = useState(true);
   const [indicatorsData, setIndicatorsData] = useState(null);
-  const [isIndicatorsLoading, setIsIndicatorsLoading] = useState(true);
+  const [tagsSummaryData, setTagsSummaryData] = useState([]);
 
-  useFocusEffect(
-    useCallback(() => {
-      const refreshCoreData = async () => {
-        if (!db) return;
-        try {
-          const settings = await getAllSettingsAsObject(db);
-          const startDay = settings.billing_period_start_day || '1';
-          const goal = parseFloat(settings.savings_goal) || 0;
-          setBillingStartDay(startDay);
-          setSavingsGoal(goal);
+  useEffect(() => {
+    if (!db) return;
 
-          const bounds = await getTransactionDateRange(db);
-          setTransactionBounds(bounds);
+    const refreshCoreData = async () => {
+      setIsInitialLoading(true);
+      try {
+        const settings = await getAllSettingsAsObject(db);
+        const startDay = settings.billing_period_start_day || '1';
+        const goal = parseFloat(settings.savings_goal) || 0;
+        setBillingStartDay(startDay);
+        setSavingsGoal(goal);
 
-          if (currentPeriod === null) {
-            const initialPeriod = {
-              ...calculatePeriod(new Date(), startDay),
-              type: 'billing'
-            };
-            setCurrentPeriod(initialPeriod);
-          }
-        } catch (error) {
-          console.error("[HomeScreen] Błąd podczas odświeżania danych bazowych:", error);
-        } finally {
-          setIsInitialLoading(false);
+        const bounds = await getTransactionDateRange(db);
+        setTransactionBounds(bounds);
+
+        if (currentPeriod === null) {
+          const initialPeriod = {
+            ...calculatePeriod(new Date(), startDay),
+            type: 'billing'
+          };
+          setCurrentPeriod(initialPeriod);
         }
-      };
+      } catch (error) {
+        console.error("[HomeScreen] Błąd podczas odświeżania danych bazowych:", error);
+      } finally {
+        setIsInitialLoading(false);
+      }
+    };
 
-      refreshCoreData();
-    }, [db])
-  );
+    refreshCoreData();
+  }, [db]);
 
   const fetchDataForPeriod = useCallback(async (period = currentPeriod) => {
     if (!db || !period) return;
 
-    setIsChartLoading(true);
-    setIsSummaryLoading(true);
-    setIsIndicatorsLoading(true);
+    setIsDataLoading(true);
 
     try {
       const periodForQuery = period.type === 'all' ? null : period;
 
-      const [chartResult, summaryResult, indicatorsResult] = await Promise.all([
+      const [chartResult, summaryResult, indicatorsResult, tagsResult] = await Promise.all([
         getCategoryExpenseData(db, periodForQuery),
         getSummaryData(db, periodForQuery),
         getKeyIndicatorsData(db, period),
+        getTagsSummaryData(db, periodForQuery),
       ]);
 
       setChartData({ data: chartResult.dataForChart, total: chartResult.totalExpenses });
       setSummaryData({ expenses: summaryResult.totalExpenses, income: summaryResult.totalIncome });
       setIndicatorsData(indicatorsResult);
+      setTagsSummaryData(tagsResult);
 
     } catch (error) {
       console.error("[HomeScreen] Błąd podczas pobierania danych dla okresu:", error);
       setChartData({ data: [], total: 0 });
       setSummaryData({ expenses: 0, income: 0 });
       setIndicatorsData(null);
+      setTagsSummaryData([]);
     } finally {
-      setIsChartLoading(false);
-      setIsSummaryLoading(false);
-      setIsIndicatorsLoading(false);
+      setIsDataLoading(false);
     }
   }, [db, currentPeriod]);
 
@@ -113,7 +118,6 @@ export default function HomeScreen() {
 
     const handleTransactionChange = async () => {
       console.log('[HomeScreen] Odebrano event zmiany transakcji, odświeżam dane...');
-
       await fetchDataForPeriod();
 
       try {
@@ -124,11 +128,53 @@ export default function HomeScreen() {
       }
     };
 
+    const handleCategoriesChange = async () => {
+      console.log('[HomeScreen] Odebrano event zmiany kategorii, odświeżam dane wykresów...');
+      if (currentPeriod) {
+        setIsDataLoading(true);
+
+        try {
+          const periodForQuery = currentPeriod.type === 'all' ? null : currentPeriod;
+
+          const [chartResult, indicatorsResult] = await Promise.all([
+            getCategoryExpenseData(db, periodForQuery),
+            getKeyIndicatorsData(db, currentPeriod),
+          ]);
+
+          setChartData({ data: chartResult.dataForChart, total: chartResult.totalExpenses });
+          setIndicatorsData(indicatorsResult);
+        } catch (error) {
+          console.error("[HomeScreen] Błąd podczas odświeżania po zmianie kategorii:", error);
+        } finally {
+          setIsDataLoading(false);
+        }
+      }
+    };
+
+    const handleTagsChange = async () => {
+      console.log('[HomeScreen] Odebrano event zmiany tagów, odświeżam dane tagów...');
+      if (currentPeriod) {
+        setIsDataLoading(true);
+        try {
+          const periodForQuery = currentPeriod.type === 'all' ? null : currentPeriod;
+          const tagsSummary = await getTagsSummaryData(db, periodForQuery);
+          setTagsSummaryData(tagsSummary);
+        } catch (error) {
+          console.error("[HomeScreen] Błąd podczas odświeżania tagów:", error);
+          setTagsSummaryData([]);
+        } finally {
+          setIsDataLoading(false);
+        }
+      }
+    };
+
     eventEmitter.on('transactionAdded', handleTransactionChange);
     eventEmitter.on('transactionEdited', handleTransactionChange);
     eventEmitter.on('transactionDeleted', handleTransactionChange);
     eventEmitter.on('periodicTransactionChanged', handleTransactionChange);
     eventEmitter.on('periodicTransactionAdded', handleTransactionChange);
+    eventEmitter.on('categoriesChanged', handleCategoriesChange);
+    eventEmitter.on('tagsChanged', handleTagsChange);
 
     return () => {
       eventEmitter.off('transactionAdded', handleTransactionChange);
@@ -136,8 +182,10 @@ export default function HomeScreen() {
       eventEmitter.off('transactionDeleted', handleTransactionChange);
       eventEmitter.off('periodicTransactionChanged', handleTransactionChange);
       eventEmitter.off('periodicTransactionAdded', handleTransactionChange);
+      eventEmitter.off('categoriesChanged', handleCategoriesChange);
+      eventEmitter.off('tagsChanged', handleTagsChange);
     };
-  }, [db]);
+  }, [db, fetchDataForPeriod, currentPeriod]);
 
   const handleConfirmDateRange = (newRange) => {
     if (newRange === null) {
@@ -180,6 +228,45 @@ export default function HomeScreen() {
     setCurrentPeriod({ ...calculatePeriod(new Date(), billingStartDay), type: 'billing' });
   };
 
+  const handleChartDoubleClick = () => {
+    if (!isDataLoading && chartData.data && chartData.data.length > 0 && currentPeriod) {
+      router.push({
+        pathname: '/(screens)/ExpenseDetailsScreen',
+        params: {
+          data: JSON.stringify(chartData.data),
+          total: chartData.total,
+          periodText: formatPeriodForDisplay(currentPeriod),
+          startDate: currentPeriod.startDate.toISOString(),
+          endDate: currentPeriod.endDate.toISOString(),
+        }
+      });
+    }
+  };
+
+  const handleTagPress = (tag) => {
+    if (!currentPeriod || !currentPeriod.startDate || !currentPeriod.endDate) return;
+
+    router.push({
+      pathname: '/(screens)/TagDetailsScreen',
+      params: {
+        tagId: tag.id,
+        tagName: tag.name,
+        tagColor: tag.color,
+        periodText: formatPeriodForDisplay(currentPeriod),
+        startDate: currentPeriod.startDate.toISOString(),
+        endDate: currentPeriod.endDate.toISOString(),
+      }
+    });
+  };
+
+  const hasAnyTransactions = !isDataLoading && (
+    summaryData.expenses > 0 ||
+    summaryData.income > 0 ||
+    chartData.total > 0 ||
+    (indicatorsData && indicatorsData.transactionCount &&
+      (indicatorsData.transactionCount.expenseCount > 0 || indicatorsData.transactionCount.incomeCount > 0))
+  );
+
   const isNavigationDisabled = currentPeriod?.type === 'custom' || currentPeriod?.type === 'all';
   const previousPeriod = currentPeriod ? getPreviousPeriod(currentPeriod, billingStartDay) : null;
   const nextPeriod = currentPeriod ? getNextPeriod(currentPeriod, billingStartDay) : null;
@@ -191,16 +278,12 @@ export default function HomeScreen() {
   const isGoToEndDisabled = isNavigationDisabled || !latestPeriod || (currentPeriod && currentPeriod.startDate.getTime() === latestPeriod.startDate.getTime());
 
   if (!user || isInitialLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
-      </View>
-    );
+    return <HomeSkeleton />;
   }
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView >
+      <View style={styles.stickyHeader}>
         <BillingPeriodSelector
           periodText={formatPeriodForDisplay(currentPeriod)}
           onPeriodTextPress={() => setIsDateModalVisible(true)}
@@ -213,31 +296,65 @@ export default function HomeScreen() {
           isGoToStartDisabled={isGoToStartDisabled}
           isGoToEndDisabled={isGoToEndDisabled}
         />
+      </View>
 
-        <CategoryDonutChart
-          data={chartData.data}
-          total={chartData.total}
-          isLoading={isChartLoading}
-        />
+      <View style={styles.contentWrapper}>
+        <ScrollView style={styles.scrollView}>
+          <TapGestureHandler
+            numberOfTaps={2}
+            onHandlerStateChange={({ nativeEvent }) => {
+              if (nativeEvent.state === State.ACTIVE) {
+                handleChartDoubleClick();
+              }
+            }}
+          >
+            <View>
+              <CategoryDonutChart
+                data={chartData.data}
+                total={chartData.total}
+                isLoading={isDataLoading}
+                compact={true}
+                skeleton={<CategoryDonutChartSkeleton compact={true} />}
+              />
+            </View>
+          </TapGestureHandler>
 
-        <SummaryCard
-          expenses={summaryData.expenses}
-          income={summaryData.income}
-          isLoading={isSummaryLoading}
-          savingsGoal={savingsGoal}
-        />
+          <SummaryCard
+            expenses={summaryData.expenses}
+            income={summaryData.income}
+            isLoading={isDataLoading}
+            savingsGoal={savingsGoal}
+            skeleton={<SummaryCardSkeleton />}
+          />
 
-        <KeyIndicatorsCard
-          data={indicatorsData}
-          isLoading={isIndicatorsLoading}
-        />
+          <KeyIndicatorsCard
+            data={indicatorsData}
+            isLoading={isDataLoading}
+            skeleton={<KeyIndicatorsCardSkeleton />}
+          />
 
-        <CategoryExpenseList
-          data={chartData.data}
-          total={chartData.total}
-          isLoading={isChartLoading}
-        />
-      </ScrollView>
+          <TagsSummaryCard
+            data={tagsSummaryData}
+            isLoading={isDataLoading}
+            totalExpenses={chartData.total}
+            onTagPress={handleTagPress}
+            skeleton={<TagsSummaryCardSkeleton />}
+          />
+        </ScrollView>
+
+        {!hasAnyTransactions && !isDataLoading && (
+          <View style={styles.noTransactionsOverlay}>
+            <View style={styles.noTransactionsContainer}>
+              <Text style={styles.noTransactionsText}>
+                Brak transakcji w tym okresie
+              </Text>
+              <Text style={styles.noTransactionsSubtext}>
+                Dodaj pierwszą transakcję, aby zobaczyć statystyki
+              </Text>
+            </View>
+          </View>
+        )}
+      </View>
 
       <DateRangeModal
         isVisible={isDateModalVisible}
@@ -254,6 +371,24 @@ const createStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
+  },
+  stickyHeader: {
+    backgroundColor: theme.colors.background,
+    paddingTop: 8,
+    paddingBottom: 4,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    zIndex: 10,
+  },
+  contentWrapper: {
+    flex: 1,
+    position: 'relative',
+  },
+  scrollView: {
+    flex: 1,
     paddingBottom: 75,
   },
   loadingContainer: {
@@ -261,5 +396,43 @@ const createStyles = (theme) => StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: theme.colors.background,
+  },
+  noTransactionsOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: theme.dark
+      ? 'rgba(0, 0, 0, 0.7)'
+      : 'rgba(255, 255, 255, 0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 5,
+  },
+  noTransactionsContainer: {
+    backgroundColor: theme.colors.surface,
+    padding: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    marginHorizontal: 32,
+  },
+  noTransactionsText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: theme.colors.onSurface,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  noTransactionsSubtext: {
+    fontSize: 14,
+    color: theme.colors.onSurfaceVariant,
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });

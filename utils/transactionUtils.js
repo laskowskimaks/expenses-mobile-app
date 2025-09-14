@@ -3,7 +3,7 @@ export const formatDateForHeader = (date) => {
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
 
-  // zerowanie czasu, aby porównywać tylko daty
+
   today.setHours(0, 0, 0, 0);
   yesterday.setHours(0, 0, 0, 0);
   date.setHours(0, 0, 0, 0);

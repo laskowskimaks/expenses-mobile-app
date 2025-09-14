@@ -1,19 +1,26 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, Dimensions, Pressable } from 'react-native';
-import { Card, Text, ActivityIndicator, useTheme, Icon } from 'react-native-paper';
+import { Card, Text, useTheme, Icon } from 'react-native-paper';
 import { VictoryPie } from 'victory-native';
 import { formatCurrency } from '@/services/transactionService';
+import CategoryDonutChartSkeleton from '@/components/skeletons/CategoryDonutChartSkeleton';
 
 const { width: screenWidth } = Dimensions.get('window');
 
-const CategoryDonutChart = ({ data, total, isLoading }) => {
+const CategoryDonutChart = ({ data, total, isLoading, compact = false }) => {
     const theme = useTheme();
-    const styles = createStyles(theme);
+    const styles = createStyles(theme, compact);
 
     const [selectedSliceId, setSelectedSliceId] = useState(null);
 
-    const chartSize = screenWidth * 0.65;
-    const baseInnerRadius = chartSize * 0.43;
+    const chartSize = compact
+        ? screenWidth * 0.58
+        : screenWidth * 0.65;
+
+    const baseInnerRadius = compact
+        ? chartSize * 0.4
+        : chartSize * 0.43;
+
     const selectedData = selectedSliceId ? data.find(d => d.id === selectedSliceId) : null;
 
     const renderCenterContent = () => {
@@ -23,7 +30,11 @@ const CategoryDonutChart = ({ data, total, isLoading }) => {
                 <View style={styles.centerLabelContainer}>
                     <Text style={styles.totalAmountText}>{formatCurrency(selectedData.y)}</Text>
                     <View style={styles.categoryDetailsContainer}>
-                        <Icon source={selectedData.iconName} size={22} color={theme.colors.onSurface} />
+                        <Icon
+                            source={selectedData.iconName}
+                            size={compact ? 18 : 22}
+                            color={theme.colors.onSurface}
+                        />
                         <Text style={styles.categoryNameText}>{selectedData.x}</Text>
                     </View>
                     <Text style={styles.percentageText}>{percentage}%</Text>
@@ -41,10 +52,14 @@ const CategoryDonutChart = ({ data, total, isLoading }) => {
 
     const renderContent = () => {
         if (isLoading) {
-            return <View style={styles.placeholderContainer}><ActivityIndicator animating={true} size="large" /></View>;
+            return <CategoryDonutChartSkeleton compact={compact} />;
         }
         if (!data || data.length === 0) {
-            return <View style={styles.placeholderContainer}><Text style={styles.placeholderText}>Brak wydatków do wyświetlenia</Text></View>;
+            return (
+                <View style={styles.placeholderContainer}>
+                    <Text style={styles.placeholderText}>Brak wydatków do wyświetlenia</Text>
+                </View>
+            );
         }
 
         return (
@@ -56,23 +71,54 @@ const CategoryDonutChart = ({ data, total, isLoading }) => {
                     colorScale={data.map(item => item.color)}
                     width={chartSize}
                     height={chartSize}
-                    innerRadius={({ datum }) => datum.id === selectedSliceId ? baseInnerRadius * 1.1 : baseInnerRadius}
-                    outerRadius={({ datum }) => datum.id === selectedSliceId ? (chartSize / 2) + 15 : chartSize / 2}
+                    innerRadius={({ datum }) => {
+                        if (selectedSliceId === null) {
+                            return baseInnerRadius * 1.1;
+                        } else if (datum.id === selectedSliceId) {
+                            return baseInnerRadius * 1.1;
+                        } else {
+                            return baseInnerRadius;
+                        }
+                    }}
+                    outerRadius={({ datum }) => {
+                        if (selectedSliceId === null) {
+                            return (chartSize / 2) + 15;
+                        } else if (datum.id === selectedSliceId) {
+                            return (chartSize / 2) + 15;
+                        } else {
+                            return chartSize / 2;
+                        }
+                    }}
                     padAngle={2}
                     labels={() => null}
                     animate={{ duration: 350, easing: "bounce" }}
                     style={{
                         data: {
-                            fillOpacity: ({ datum }) => datum.id === selectedSliceId ? 1 : 0.9,
+                            fillOpacity: ({ datum }) => {
+                                if (selectedSliceId === null) {
+                                    return 1;
+                                } else if (datum.id === selectedSliceId) {
+                                    return 1;
+                                } else {
+                                    return 0.6;
+                                }
+                            },
                             stroke: theme.colors.surface,
-                            strokeWidth: ({ datum }) => datum.id === selectedSliceId ? 3 : 1,
+                            strokeWidth: ({ datum }) => {
+                                if (selectedSliceId === null) {
+                                    return 3;
+                                } else if (datum.id === selectedSliceId) {
+                                    return 3;
+                                } else {
+                                    return 1;
+                                }
+                            },
                         },
                     }}
                     events={[{
                         target: "data",
                         eventHandlers: {
                             onPress: () => {
-
                                 return [{
                                     target: "data",
                                     mutation: (props) => {
@@ -105,26 +151,26 @@ const CategoryDonutChart = ({ data, total, isLoading }) => {
     );
 };
 
-const createStyles = (theme) => StyleSheet.create({
+const createStyles = (theme, compact) => StyleSheet.create({
     card: {
         marginHorizontal: 16,
-        marginBottom: 16,
+        marginBottom: compact ? 4 : 16,
         marginTop: 4,
         backgroundColor: theme.colors.elevation.level1,
     },
     placeholderContainer: {
-        height: screenWidth * 0.7,
+        height: compact ? screenWidth * 0.45 : screenWidth * 0.7,
         justifyContent: 'center',
         alignItems: 'center',
     },
     placeholderText: {
         color: theme.colors.onSurfaceVariant,
-        fontSize: 16,
+        fontSize: compact ? 14 : 16,
     },
     chartContainer: {
         justifyContent: 'center',
         alignItems: 'center',
-        height: screenWidth * 0.7,
+        height: compact ? screenWidth * 0.45 : screenWidth * 0.7,
     },
     pressableCenter: {
         position: 'absolute',
@@ -138,12 +184,12 @@ const createStyles = (theme) => StyleSheet.create({
         alignItems: 'center',
     },
     totalAmountText: {
-        fontSize: 24,
+        fontSize: compact ? 18 : 24,
         fontWeight: 'bold',
         color: theme.colors.onSurface,
     },
     totalLabelText: {
-        fontSize: 14,
+        fontSize: compact ? 12 : 14,
         color: theme.colors.onSurfaceVariant,
     },
     categoryDetailsContainer: {
@@ -152,12 +198,12 @@ const createStyles = (theme) => StyleSheet.create({
         marginTop: 4,
     },
     categoryNameText: {
-        fontSize: 16,
+        fontSize: compact ? 14 : 16,
         marginLeft: 8,
         color: theme.colors.onSurface,
     },
     percentageText: {
-        fontSize: 12,
+        fontSize: compact ? 10 : 12,
         marginTop: 4,
         color: theme.colors.onSurfaceVariant,
     },

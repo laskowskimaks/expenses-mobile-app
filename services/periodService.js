@@ -1,41 +1,67 @@
-const startOfDay = (date) => {
-  const newDate = new Date(date);
-  newDate.setHours(0, 0, 0, 0);
-  return newDate;
+export const calculateDaysInPeriod = (startDate, endDate) => {
+  if (!startDate || !endDate) {
+    return 1;
+  }
+
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+
+  start.setHours(0, 0, 0, 0);
+  end.setHours(0, 0, 0, 0);
+
+  if (end < start) {
+    return 1;
+  }
+
+  let dayCount = 0;
+  const current = new Date(start);
+
+  while (current <= end) {
+    dayCount++;
+    current.setDate(current.getDate() + 1);
+  }
+
+  return dayCount;
 };
 
-const endOfDay = (date) => {
-  const newDate = new Date(date);
-  newDate.setHours(23, 59, 59, 999);
-  return newDate;
+export const getPeriodTimestamps = (period) => {
+  if (!period || !period.startDate || !period.endDate) {
+    return { startTimestamp: null, endTimestamp: null };
+  }
+
+  const startDate = new Date(period.startDate);
+  startDate.setHours(0, 0, 0, 0);
+  const startTimestamp = Math.floor(startDate.getTime() / 1000);
+
+  const endDate = new Date(period.endDate);
+  endDate.setHours(23, 59, 59, 999);
+  const endTimestamp = Math.floor(endDate.getTime() / 1000);
+
+  return { startTimestamp, endTimestamp };
 };
 
 export const calculatePeriod = (targetDate, startDay) => {
-  const parsedStartDay = parseInt(startDay, 10);
-  const year = targetDate.getFullYear();
-  const month = targetDate.getMonth(); // (0 = styczeń)
-  const day = targetDate.getDate();
+  const target = new Date(targetDate);
+  const today = new Date();
 
-  let startDate, endDate;
+  let startDate = new Date(target.getFullYear(), target.getMonth(), startDay);
 
-  if (day >= parsedStartDay) {
-
-    startDate = new Date(year, month, parsedStartDay);
-
-    const nextMonth = new Date(year, month + 1, parsedStartDay);
-    endDate = new Date(nextMonth.getTime() - 1);
-  } else {
-
-    const currentMonthStart = new Date(year, month, parsedStartDay);
-    endDate = new Date(currentMonthStart.getTime() - 1);
-
-    startDate = new Date(year, month - 1, parsedStartDay);
+  if (startDate > target) {
+    startDate.setMonth(startDate.getMonth() - 1);
   }
 
-  return {
-    startDate: startOfDay(startDate),
-    endDate: endOfDay(endDate),
-  };
+  let endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, startDay - 1);
+
+  if (endDate > today) {
+    endDate = new Date(today);
+    endDate.setHours(23, 59, 59, 999);
+  } else {
+    endDate.setHours(23, 59, 59, 999);
+  }
+
+  startDate.setHours(0, 0, 0, 0);
+
+  return { startDate, endDate };
 };
 
 export const getPreviousPeriod = (currentPeriod, startDay) => {

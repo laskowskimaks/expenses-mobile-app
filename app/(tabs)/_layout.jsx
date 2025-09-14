@@ -12,14 +12,14 @@ export default function TabsLayout() {
         headerShown: false,
       }}
     >
-      <Tabs.Screen 
+      <Tabs.Screen
         name='home'
         options={{
           title: 'Główna',
           tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="home-variant" color={color} size={size} />,
         }}
       />
-      <Tabs.Screen 
+      <Tabs.Screen
         name='transactionListScreen'
         options={{
           title: 'Transakcje',
@@ -35,18 +35,18 @@ export default function TabsLayout() {
           },
         }}
       />
-      <Tabs.Screen 
+      <Tabs.Screen
         name='cards'
         options={{
           title: 'Karty',
           tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="credit-card-outline" color={color} size={size} />,
         }}
       />
-      <Tabs.Screen 
+      <Tabs.Screen
         name='settings'
         options={{
           title: 'Ustawienia',
-          headerShown: false,
+
           tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="cog-outline" color={color} size={size} />,
         }}
       />

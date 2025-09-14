@@ -9,13 +9,13 @@ import {
 } from 'react-native';
 import { Searchbar, Chip, IconButton, Menu, useTheme } from 'react-native-paper';
 import RNModal from 'react-native-modal';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { FlashList } from '@shopify/flash-list';
 
 import { useDb } from '@/context/DbContext';
 import TransactionItem from '@/components/TransactionItem';
-import TransactionSkeleton from '@/components/TransactionSkeleton';
-import { TransactionSkeletonList } from '@/components/TransactionSkeleton';
+import TransactionSkeleton from '@/components/skeletons/TransactionSkeleton';
+import { TransactionSkeletonList } from '@/components/skeletons/TransactionSkeleton';
 import DateSeparator from '@/components/DateSeparator';
 import { getAllTransactionsSorted, deleteTransaction, formatCurrency } from '@/services/transactionService';
 import { eventEmitter } from '@/utils/eventEmitter';
@@ -91,6 +91,7 @@ export default function TransactionListScreen() {
   const { db } = useDb();
   const theme = useTheme();
   const router = useRouter();
+  const params = useLocalSearchParams();
 
   const [searchInput, setSearchInput] = useState('');
   const debouncedSearchQuery = useDebounce(searchInput, 100);
@@ -104,7 +105,20 @@ export default function TransactionListScreen() {
   const [categoriesOptions, setCategoriesOptions] = useState([]);
   const [tagsOptions, setTagsOptions] = useState([]);
 
-  const [appliedFilters, setAppliedFilters] = useState(() => createDefaultFilters());
+  const [appliedFilters, setAppliedFilters] = useState(() => {
+    const { filterTagId, filterCategoryId, filterDateFrom, filterDateTo } = params;
+    const hasDateFilter = filterDateFrom && filterDateTo;
+
+    if ((filterTagId || filterCategoryId) && hasDateFilter) {
+      const initialFilters = createDefaultFilters();
+      initialFilters.dateFrom = parseInt(filterDateFrom, 10);
+      initialFilters.dateTo = parseInt(filterDateTo, 10);
+      initialFilters.tagIds = filterTagId ? [parseInt(filterTagId, 10)] : [];
+      initialFilters.categoryIds = filterCategoryId ? [parseInt(filterCategoryId, 10)] : [];
+      return initialFilters;
+    }
+    return createDefaultFilters();
+  });
   const [sortOption, setSortOption] = useState('date_desc');
   const [sortMenuVisible, setSortMenuVisible] = useState(false);
   const [periodicModalVisible, setPeriodicModalVisible] = useState(false);
@@ -119,6 +133,21 @@ export default function TransactionListScreen() {
       loadFilterOptions();
     }
   }, [db]);
+
+  useEffect(() => {
+    const { filterTagId, filterCategoryId, filterDateFrom, filterDateTo } = params;
+    const hasDateFilter = filterDateFrom && filterDateTo;
+
+    if ((filterTagId || filterCategoryId) && hasDateFilter) {
+      console.log('[TransactionListScreen] Wykryto parametry nawigacji, aktualizuję filtry...');
+      const newFilters = createDefaultFilters();
+      newFilters.dateFrom = parseInt(filterDateFrom, 10);
+      newFilters.dateTo = parseInt(filterDateTo, 10);
+      newFilters.tagIds = filterTagId ? [parseInt(filterTagId, 10)] : [];
+      newFilters.categoryIds = filterCategoryId ? [parseInt(filterCategoryId, 10)] : [];
+      setAppliedFilters(newFilters);
+    }
+  }, [params.filterTagId, params.filterCategoryId, params.filterDateFrom, params.filterDateTo]);
 
   useEffect(() => {
     const reload = () => loadFilterOptions();
@@ -205,14 +234,12 @@ export default function TransactionListScreen() {
     if (!db) return;
     if (showLoading) setIsLoadingTransactions(true);
     try {
-      // Sprawdź i przetwórz zaległe transakcje okresowe
       console.log('[TransactionListScreen] Sprawdzanie zaległych transakcji okresowych...');
       const periodicResult = await processPeriodicTransactions(db);
 
       if (periodicResult.success && periodicResult.addedCount > 0) {
         console.log(`[TransactionListScreen] Dodano ${periodicResult.addedCount} automatycznych transakcji`);
         if (__DEV__) {
-          // W trybie development pokaż informację o dodanych transakcjach
           Alert.alert(
             'Automatyczne transakcje',
             periodicResult.message,
@@ -221,7 +248,6 @@ export default function TransactionListScreen() {
         }
       }
 
-      // Pobierz transakcje z bazy danych
       const transactionsFromDb = await getAllTransactionsSorted(db);
       setAllTransactions(transactionsFromDb);
     } catch (error) {
@@ -582,7 +608,7 @@ function transactionPassesFilters(transaction, filters) {
 
   if (filters.tagIds?.length > 0) {
     const txTagIds = (transaction.tags || []).map(t => t.id);
-    if (!filters.tagIds.every(tid => txTagIds.includes(tid))) {
+    if (!txTagIds.length || !filters.tagIds.every(tid => txTagIds.includes(tid))) {
       return false;
     }
   }

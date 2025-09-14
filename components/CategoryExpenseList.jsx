@@ -3,7 +3,7 @@ import { View, StyleSheet } from 'react-native';
 import { ActivityIndicator, Text, useTheme, Subheading } from 'react-native-paper';
 import CategoryListItem from './CategoryListItem';
 
-const CategoryExpenseList = ({ data, total, isLoading }) => {
+const CategoryExpenseList = ({ data, total, isLoading, onCategoryPress }) => {
   const theme = useTheme();
   const styles = createStyles(theme);
 
@@ -24,7 +24,6 @@ const CategoryExpenseList = ({ data, total, isLoading }) => {
     );
   }
 
-  // Sortowanie danych od największych wydatków do najmniejszych
   const sortedData = [...data].sort((a, b) => b.y - a.y);
 
   return (
@@ -40,6 +39,9 @@ const CategoryExpenseList = ({ data, total, isLoading }) => {
             color={item.color}
             iconName={item.iconName}
             percentage={percentage}
+            transactionCount={item.transactionCount || 0}
+            avgDailyExpense={item.avgDailyExpense || 0}
+            onPress={() => onCategoryPress && onCategoryPress(item)}
           />
         );
       })}

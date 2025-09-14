@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { Card, ActivityIndicator, Text, useTheme, Avatar } from 'react-native-paper';
+import { Card, Text, useTheme, Avatar } from 'react-native-paper';
+import KeyIndicatorsCardSkeleton from '@/components/skeletons/KeyIndicatorsCardSkeleton';
 
 const IndicatorColumn = ({ icon, label, subLabel, value }) => {
     const theme = useTheme();
@@ -21,13 +22,7 @@ const KeyIndicatorsCard = ({ data, isLoading }) => {
     const styles = createCardStyles(theme);
 
     if (isLoading) {
-        return (
-            <Card style={styles.card}>
-                <Card.Content>
-                    <ActivityIndicator />
-                </Card.Content>
-            </Card>
-        );
+        return <KeyIndicatorsCardSkeleton />;
     }
 
     if (!data) {
@@ -70,7 +65,8 @@ const KeyIndicatorsCard = ({ data, isLoading }) => {
 const createCardStyles = (theme) => StyleSheet.create({
     card: {
         marginHorizontal: 16,
-        marginTop: 16,
+        marginTop: 4,
+        marginBottom: 4,
     },
     cardContent: {
         flexDirection: 'row',
@@ -88,7 +84,6 @@ const createColumnStyles = (theme) => StyleSheet.create({
     container: {
         flex: 1,
         alignItems: 'center',
-        paddingVertical: 8,
         paddingHorizontal: 4,
     },
     icon: {

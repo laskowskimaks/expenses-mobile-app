@@ -49,7 +49,7 @@ export const ThemeProvider = ({ children }) => {
   }, [themePreference, colorScheme]);
 
   if (isThemeLoading) {
-    return null; // Zapobiega "mignięciu" motywu przy starcie
+    return null;
   }
 
   const value = {
