@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, } from 'react';
-import { View, StyleSheet, Pressable, Alert, ScrollView, Platform } from 'react-native';
+import { View, StyleSheet, Pressable, ScrollView, Platform } from 'react-native';
 import { Text, useTheme, ActivityIndicator, Button, IconButton } from 'react-native-paper';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import * as Brightness from 'expo-brightness';
@@ -7,12 +7,15 @@ import * as Brightness from 'expo-brightness';
 import { useDb } from '@/context/DbContext';
 import { getLoyaltyCardById, deleteLoyaltyCard } from '@/services/loyaltyCardService';
 import LoyaltyCardPreview from './components/LoyaltyCardPreview';
+import { useDialog } from '@/utils/useDialog';
+import ConfirmationDialog from '@/components/ConfirmationDialog';
 
 export default function CardDetailModal() {
     const theme = useTheme();
     const router = useRouter();
     const { db } = useDb();
     const params = useLocalSearchParams();
+    const { dialog, showDialog, hideDialog } = useDialog();
     const cardId = params.cardId ? parseInt(params.cardId, 10) : null;
 
     const [card, setCard] = useState(null);
@@ -60,22 +63,33 @@ export default function CardDetailModal() {
     };
 
     const handleDelete = () => {
-        Alert.alert("Potwierdź usunięcie", `Czy na pewno chcesz usunąć kartę "${card.name}"?`,
-            [
-                { text: "Anuluj", style: "cancel" },
-                {
-                    text: "Usuń", style: "destructive", onPress: async () => {
-                        const result = await deleteLoyaltyCard(db, card.id);
-                        if (result.success) { router.back(); }
-                        else { Alert.alert("Błąd", result.message || "Nie udało się usunąć karty."); }
-                    },
-                },
-            ]
-        );
+        showDialog({
+            title: "Potwierdź usunięcie",
+            content: `Czy na pewno chcesz usunąć kartę "${card.name}"?`,
+            onConfirm: async () => {
+                const result = await deleteLoyaltyCard(db, card.id);
+                if (result.success) {
+                    router.back();
+                } else {
+                    showDialog({
+                        title: 'Błąd',
+                        content: result.message || 'Nie udało się usunąć karty.',
+                        confirmText: 'OK',
+                        onConfirm: () => { },
+                        dangerous: false
+                    });
+                }
+            },
+            dangerous: true
+        });
     };
 
     if (isLoading) { return <View style={styles.centered}><ActivityIndicator size="large" /></View>; }
-    if (!card) { return (<View style={styles.centered}><Text>Nie znaleziono karty.</Text><Button onPress={() => router.back()} style={{ marginTop: 16 }}>Wróć</Button></View>); }
+    if (!card) {
+        return (<View style={styles.centered}>
+            <Text>Nie znaleziono karty.</Text><Button onPress={() => router.back()} style={{ marginTop: 16 }}>Wróć</Button>
+        </View>);
+    }
 
     return (
         <>
@@ -107,21 +121,74 @@ export default function CardDetailModal() {
                     <Button mode="contained" onPress={() => router.back()} style={styles.flexOne}>Zamknij</Button>
                 </View>
             </View>
+            <ConfirmationDialog {...dialog} onDismiss={hideDialog} />
         </>
     );
 }
 
 const styles = StyleSheet.create({
-    centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' },
-    modalSheet: { position: 'absolute', bottom: 0, left: 0, right: 0, maxHeight: '80%', borderTopLeftRadius: 20, borderTopRightRadius: 20, overflow: 'hidden' },
-    scrollContainer: { padding: 20, paddingBottom: 40 },
-    headerTitle: { textAlign: 'center', marginBottom: 24, fontWeight: 'bold' },
-    barcodeCard: { marginBottom: 24, paddingVertical: 20, backgroundColor: 'white' },
-    barcodeContainer: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10, minHeight: 120 },
-    barcodeImage: { width: '100%', height: 150 },
-    errorText: { textAlign: 'center', color: 'red', marginVertical: 20 },
-    notes: { fontSize: 16, lineHeight: 24, textAlign: 'center' },
-    footer: { flexDirection: 'row', paddingVertical: 10, paddingHorizontal: 16, borderTopWidth: StyleSheet.hairlineWidth, alignItems: 'center' },
-    flexOne: { flex: 1, marginLeft: 12 },
+    centered: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center'
+    },
+    backdrop: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0,0,0,0.5)'
+    },
+    modalSheet: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        maxHeight: '80%',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        overflow: 'hidden'
+    },
+    scrollContainer: {
+        padding: 20,
+        paddingBottom: 40
+    },
+    headerTitle: {
+        textAlign: 'center',
+        marginBottom: 24,
+        fontWeight: 'bold'
+    },
+    barcodeCard: {
+        marginBottom: 24,
+        paddingVertical: 20,
+        backgroundColor: 'white'
+    },
+    barcodeContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 10,
+        minHeight: 120
+    },
+    barcodeImage: {
+        width: '100%',
+        height: 150
+    },
+    errorText: {
+        textAlign: 'center',
+        color: 'red',
+        marginVertical: 20
+    },
+    notes: {
+        fontSize: 16,
+        lineHeight: 24,
+        textAlign: 'center'
+    },
+    footer: {
+        flexDirection: 'row',
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+        borderTopWidth: StyleSheet.hairlineWidth,
+        alignItems: 'center'
+    },
+    flexOne: {
+        flex: 1,
+        marginLeft: 12
+    },
 });

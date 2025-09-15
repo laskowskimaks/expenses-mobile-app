@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
-import { ScrollView, StyleSheet, View, Alert } from 'react-native';
-import { List, SegmentedButtons, useTheme, Divider, ActivityIndicator, TextInput, Button, HelperText } from 'react-native-paper';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import { List, SegmentedButtons, useTheme, Divider, ActivityIndicator, TextInput, Button, HelperText, Portal, Modal, Text } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
@@ -10,6 +10,9 @@ import { useThemeContext } from '@/context/ThemeContext';
 import { performUpload } from '@/services/backupService';
 import { upsertSetting, getPaymentDay, getSavingsGoal } from '@/services/authService';
 import { insertTestData } from '@/database/insertTestData';
+import ConfirmationDialog from '@/components/ConfirmationDialog';
+import InformationDialog from '@/components/InformationDialog';
+import { useDialog } from '@/utils/useDialog';
 
 export default function SettingsScreen() {
   const theme = useTheme();
@@ -20,6 +23,7 @@ export default function SettingsScreen() {
   const { themePreference, updateThemePreference } = useThemeContext();
 
   const [isBackupLoading, setIsBackupLoading] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [expandedAccordion, setExpandedAccordion] = useState(null);
 
   const [paymentDay, setPaymentDay] = useState('1');
@@ -29,6 +33,7 @@ export default function SettingsScreen() {
   const [tempSavingsGoal, setTempSavingsGoal] = useState('');
 
   const [errors, setErrors] = useState({});
+  const { dialog, showDialog, hideDialog, infoDialog, showInfoDialog, hideInfoDialog } = useDialog();
 
   useFocusEffect(
     useCallback(() => {
@@ -110,51 +115,97 @@ export default function SettingsScreen() {
     setIsBackupLoading(true);
     try {
       await performUpload();
-      Alert.alert('Sukces', 'Kopia zapasowa została wykonana pomyślnie.');
+      showInfoDialog({
+        title: 'Sukces',
+        content: 'Kopia zapasowa została wykonana pomyślnie.',
+        type: 'success'
+      });
     } catch (error) {
       console.error("[SettingsScreen] Błąd backupu:", error);
-      Alert.alert('Błąd', 'Wystąpił błąd podczas tworzenia kopii zapasowej.');
+      showInfoDialog({
+        title: 'Błąd',
+        content: 'Wystąpił błąd podczas tworzenia kopii zapasowej.',
+        type: 'error'
+      });
     } finally {
       setIsBackupLoading(false);
     }
   };
 
+  const performLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      await logout();
+    } catch (error) {
+      console.error("[SettingsScreen] Błąd wylogowywania:", error);
+      showInfoDialog({
+        title: 'Błąd',
+        content: 'Wystąpił błąd podczas wylogowywania.',
+        type: 'error'
+      });
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
+
   const handleLogout = () => {
     if (isConnected) {
-      Alert.alert(
-        'Wylogowanie',
-        'Czy na pewno chcesz się wylogować? Twoje dane zostaną zsynchronizowane.',
-        [
-          { text: 'Anuluj', style: 'cancel' },
-          { text: 'Wyloguj', style: 'destructive', onPress: () => logout() }
-        ]
-      );
+      showDialog({
+        title: 'Wylogowanie',
+        content: 'Czy na pewno chcesz się wylogować? Twoje dane zostaną zsynchronizowane.',
+        confirmText: 'Wyloguj',
+        onConfirm: performLogout,
+        dangerous: true
+      });
     } else {
-      Alert.alert(
-        'Brak połączenia z internetem',
-        'Nie można wykonać synchronizacji. Wszystkie zmiany wprowadzone od ostatniego backupu mogą zostać utracone. Czy na pewno chcesz kontynuować?',
-        [
-          { text: 'Anuluj', style: 'cancel' },
-          { text: 'Wyloguj mimo to', style: 'destructive', onPress: () => logout() }
-        ]
-      );
+      showDialog({
+        title: 'Brak połączenia z internetem',
+        content: 'Nie można wykonać synchronizacji. Wszystkie zmiany wprowadzone od ostatniego backupu mogą zostać utracone. Czy na pewno chcesz kontynuować?',
+        confirmText: 'Wyloguj mimo to',
+        onConfirm: performLogout,
+        dangerous: true
+      });
     }
   };
 
   const handleAddTestData = async () => {
     if (!db) {
-      Alert.alert('Błąd', 'Baza danych nie jest dostępna');
+      showDialog({
+        title: 'Błąd',
+        content: 'Baza danych nie jest dostępna',
+        confirmText: 'OK',
+        onConfirm: () => { },
+        dangerous: false
+      });
       return;
     }
     try {
       const result = await insertTestData(db);
       if (result.success) {
-        Alert.alert('Sukces', result.message);
+        showDialog({
+          title: 'Sukces',
+          content: result.message,
+          confirmText: 'OK',
+          onConfirm: () => { },
+          dangerous: false
+        });
       } else {
-        Alert.alert('Błąd', result.message);
+        showDialog({
+          title: 'Błąd',
+          content: result.message,
+          confirmText: 'OK',
+          onConfirm: () => { },
+          dangerous: false
+        });
       }
     } catch (error) {
-      Alert.alert('Błąd', 'Wystąpił błąd podczas dodawania testowych danych.');
+      showDialog({
+        title: 'Błąd',
+        content: 'Wystąpił błąd podczas dodawania testowych danych.',
+        confirmText: 'OK',
+        onConfirm: () => { },
+        dangerous: false
+      });
       console.error('[SettingsScreen] Błąd dodawania testowych danych:', error);
     }
   };
@@ -260,6 +311,13 @@ export default function SettingsScreen() {
 
         <List.Section title="Zarządzaj" titleStyle={styles.sectionTitle}>
           <List.Item
+            title="Zarządzaj transakcjami cyklicznymi"
+            left={props => <List.Icon {...props} icon="calendar-sync-outline" />}
+            onPress={handleManagePeriodic}
+            right={props => <List.Icon {...props} icon="chevron-right" />}
+          />
+          <Divider />
+          <List.Item
             title="Zarządzaj kategoriami"
             left={props => <List.Icon {...props} icon="shape-outline" />}
             onPress={handleManageCategories}
@@ -272,14 +330,6 @@ export default function SettingsScreen() {
             onPress={handleManageTags}
             right={props => <List.Icon {...props} icon="chevron-right" />}
           />
-          <Divider />
-          <List.Item
-            title="Zarządzaj transakcjami cyklicznymi"
-            left={props => <List.Icon {...props} icon="calendar-sync-outline" />}
-            onPress={handleManagePeriodic}
-            right={props => <List.Icon {...props} icon="chevron-right" />}
-          />
-
         </List.Section>
         <Divider />
         <List.Subheader>Motyw aplikacji</List.Subheader>
@@ -314,10 +364,27 @@ export default function SettingsScreen() {
             titleStyle={{ color: theme.colors.error }}
             left={props => <List.Icon {...props} color={theme.colors.error} icon="logout" />}
             onPress={handleLogout}
+            disabled={isLoggingOut}
           />
         </List.Section>
-
       </ScrollView>
+
+      <Portal>
+        <Modal visible={isLoggingOut} dismissable={false} contentContainerStyle={[styles.loadingModal, { backgroundColor: theme.colors.surface }]}>
+          <View style={styles.loadingContent}>
+            <ActivityIndicator size="large" color={theme.colors.primary} />
+            <Text variant="titleMedium" style={[styles.loadingText, { color: theme.colors.onSurface }]}>
+              Wylogowywanie...
+            </Text>
+            <Text variant="bodyMedium" style={[styles.loadingSubtext, { color: theme.colors.onSurfaceVariant }]}>
+              Synchronizacja danych z chmurą
+            </Text>
+          </View>
+        </Modal>
+      </Portal>
+
+      <InformationDialog {...infoDialog} onDismiss={hideInfoDialog} />
+      <ConfirmationDialog {...dialog} onDismiss={hideDialog} />
     </SafeAreaView>
   );
 }
@@ -345,5 +412,23 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     alignItems: 'center',
     marginTop: 8,
-  }
+  },
+  loadingModal: {
+    margin: 20,
+    borderRadius: 16,
+    padding: 24,
+  },
+  loadingContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  loadingSubtext: {
+    marginTop: 8,
+    textAlign: 'center',
+  },
 });

@@ -1,27 +1,44 @@
-import { useState } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, Alert, Pressable } from 'react-native';
+import { useState, useRef } from 'react';
+import { View, StyleSheet, Pressable, TextInput as RNTextInput } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { useDb } from '../context/DbContext';
 import { useRouter } from 'expo-router';
 import { getHashedPin, getPinSalt } from '@/services/authService';
 import { useNetworkStatus } from '../context/NetworkContext';
 import { hashData } from '@/utils/hashUtils';
+import { Text, Button, useTheme, Surface } from 'react-native-paper';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import ConfirmationDialog from '@/components/ConfirmationDialog';
+import InformationDialog from '@/components/InformationDialog';
+import { useDialog } from '@/utils/useDialog';
 
 export default function PinCheckingScreen() {
-    const { user, unlockApp, logout } = useAuth();
+    const theme = useTheme();
+    const styles = createStyles(theme);
+    const { unlockApp, logout } = useAuth();
     const { isConnected } = useNetworkStatus();
     const { db } = useDb();
     const router = useRouter();
     const [pin, setPin] = useState('');
+    const pinInputRef = useRef(null);
+    const { dialog, showDialog, hideDialog, infoDialog, showInfoDialog, hideInfoDialog } = useDialog();
 
     const handleCheckPin = async () => {
         if (!pin || pin.length !== 4) {
-            Alert.alert('Błąd', 'PIN musi składać się z 4 cyfr.');
+            showInfoDialog({
+                title: 'Błąd',
+                content: 'PIN musi składać się z 4 cyfr.',
+                type: 'error'
+            });
             return;
         }
 
-        if (!db || !user) {
-            Alert.alert('Błąd', 'Aplikacja nie jest gotowa. Spróbuj ponownie.');
+        if (!db) {
+            showInfoDialog({
+                title: 'Błąd',
+                content: 'Aplikacja nie jest gotowa. Spróbuj ponownie.',
+                type: 'error'
+            });
             return;
         }
 
@@ -32,101 +49,152 @@ export default function PinCheckingScreen() {
             if (storedHashedPin && storedPinSalt) {
                 const hashedInputPin = await hashData(pin, storedPinSalt);
                 if (hashedInputPin === storedHashedPin) {
-                    console.log('[PinChecking] PIN poprawny. Odblokowuję aplikację.');
                     unlockApp();
                     router.back();
                 } else {
-                    alert('Nieprawidłowy PIN');
-                    setPin('');
+                    showDialog({
+                        title: 'Nieprawidłowy PIN',
+                        content: 'Wprowadzony PIN jest nieprawidłowy. Spróbuj ponownie.',
+                        confirmText: 'OK',
+                        onConfirm: () => setPin(''),
+                        dangerous: false
+                    });
                 }
             } else {
-                alert('Błąd konfiguracji PIN. Zaloguj się ponownie.');
-                await logout();
+                showDialog({
+                    title: 'Błąd konfiguracji PIN',
+                    content: 'Resetowanie aplikacji. Zaloguj się ponownie.',
+                    confirmText: 'OK',
+                    onConfirm: async () => await logout(),
+                    dangerous: true
+                });
             }
         } catch (e) {
             console.error('[PinChecking] Błąd podczas weryfikacji PINu:', e);
-            alert('Wystąpił błąd podczas sprawdzania PINu.');
+            showInfoDialog({
+                title: 'Błąd',
+                content: 'Wystąpił błąd podczas sprawdzania PINu.',
+                type: 'error'
+            });
         }
     };
 
+    const handleForgotPin = async () => {
+        if (!isConnected) {
+            showInfoDialog({
+                title: "Brak internetu",
+                content: "Nie możesz zresetować PINu bez połączenia z internetem, bo możesz utracić dane. Połącz się z internetem i spróbuj ponownie.",
+                type: 'warning'
+            });
+            return;
+        }
+        showDialog({
+            title: "Resetowanie PINu",
+            content: "Resetowanie PINu wymaga wylogowania. Spowoduje to usunięcie lokalnych danych i synchronizację z chmurą przy następnym logowaniu. Czy na pewno chcesz kontynuować?",
+            confirmText: "Wyloguj i zresetuj",
+            onConfirm: async () => await logout(),
+            dangerous: true
+        });
+    };
+
+    const pinDigits = Array.from({ length: 4 });
+
     return (
-        <View style={styles.container}>
-            <Text style={styles.title}>Wprowadź PIN, aby kontynuować</Text>
-            <TextInput
-                style={styles.input}
-                value={pin}
-                onChangeText={setPin}
-                keyboardType="number-pad"
-                maxLength={4}
-                secureTextEntry
-                autoFocus={true}
-                textAlign="center"
-            />
-            <Button title="Odblokuj" onPress={handleCheckPin} />
-            <Pressable
-                style={styles.forgotPinContainer}
-                onPress={async () => {
-                    if (!isConnected) {
-                        Alert.alert(
-                            "Brak internetu",
-                            "Nie możesz zresetować PINu bez połączenia z internetem, bo możesz utracić dane. Połącz się z internetem i spróbuj ponownie."
-                        );
-                        return;
-                    }
-                    Alert.alert(
-                        "Resetowanie PINu",
-                        "Resetowanie PINu wymaga wylogowania. Czy na pewno chcesz kontynuować?",
-                        [
-                            { text: "Anuluj", style: "cancel" },
-                            {
-                                text: "Wyloguj i zresetuj PIN",
-                                style: "destructive",
-                                onPress: async () => {
-                                    await logout();
-                                }
-                            }
-                        ]
-                    );
-                }}
-            >
-                <Text style={styles.forgotPinText}>
+        <SafeAreaView style={styles.container}>
+            <View style={styles.content}>
+                <Text variant="headlineSmall" style={styles.title}>Wprowadź kod PIN</Text>
+                <Text variant="bodyMedium" style={styles.subtitle}>Aby odblokować aplikację</Text>
+
+                <Pressable onPress={() => pinInputRef.current?.focus()}>
+                    <View style={styles.pinContainer}>
+                        {pinDigits.map((_, index) => (
+                            <Surface key={index} style={[styles.pinBox, pin.length === index && styles.pinBoxFocused]} elevation={2}>
+                                {pin[index] ? <View style={styles.pinDot} /> : null}
+                            </Surface>
+                        ))}
+                    </View>
+                </Pressable>
+
+                <RNTextInput
+                    ref={pinInputRef}
+                    style={styles.hiddenInput}
+                    value={pin}
+                    onChangeText={setPin}
+                    keyboardType="number-pad"
+                    maxLength={4}
+                    caretHidden
+                    autoFocus
+                />
+
+                <Button mode="contained" onPress={handleCheckPin} style={styles.button}>
+                    Odblokuj
+                </Button>
+
+                <Button mode="text" onPress={handleForgotPin} style={styles.forgotPinButton}>
                     Zapomniałem PINu
-                </Text>
-            </Pressable>
-        </View >
+                </Button>
+            </View>
+            <ConfirmationDialog {...dialog} onDismiss={hideDialog} />
+            <InformationDialog {...infoDialog} onDismiss={hideInfoDialog} />
+        </SafeAreaView>
     );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
     container: {
+        flex: 1,
+        backgroundColor: theme.colors.background,
+    },
+    content: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
         padding: 20,
-        backgroundColor: '#f5f5f5',
     },
     title: {
-        fontSize: 18,
-        marginBottom: 20,
-        textAlign: 'center',
+        marginBottom: 8,
+        color: theme.colors.onSurface,
     },
-    input: {
-        width: 150,
-        height: 50,
-        borderColor: 'gray',
-        borderWidth: 1,
-        borderRadius: 8,
-        padding: 10,
-        fontSize: 24,
-        letterSpacing: 15,
-        marginBottom: 20,
+    subtitle: {
+        marginBottom: 40,
+        color: theme.colors.onSurfaceVariant,
     },
-    forgotPinContainer: {
-        marginTop: 15,
+    pinContainer: {
+        flexDirection: 'row',
+        marginBottom: 30,
+    },
+    pinBox: {
+        width: 50,
+        height: 60,
+        justifyContent: 'center',
         alignItems: 'center',
+        marginHorizontal: 10,
+        borderRadius: theme.roundness,
+        backgroundColor: theme.colors.surface,
+        borderWidth: 1,
+        borderColor: theme.colors.outline,
     },
-    forgotPinText: {
-        color: '#007BFF',
-        textDecorationLine: 'underline',
-    }
+    pinBoxFocused: {
+        borderColor: theme.colors.primary,
+        borderWidth: 2,
+    },
+    pinDot: {
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        backgroundColor: theme.colors.onSurface,
+    },
+    hiddenInput: {
+        position: 'absolute',
+        width: 1,
+        height: 1,
+        opacity: 0,
+    },
+    button: {
+        width: '80%',
+        marginTop: 20,
+    },
+    forgotPinButton: {
+        marginTop: 20,
+    },
 });

@@ -1,21 +1,31 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Pressable, Alert, Keyboard } from 'react-native';
+import { View, StyleSheet, Pressable, Keyboard } from 'react-native';
 import { Text, TextInput, Button, useTheme, HelperText } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useNetworkStatus } from '@/context/NetworkContext';
+import { useDialog } from '@/utils/useDialog';
+import InformationDialog from '@/components/InformationDialog';
 
 export default function ChangePasswordModal() {
     const theme = useTheme();
     const router = useRouter();
     const { changePassword } = useAuth();
     const { isConnected } = useNetworkStatus();
+    const { infoDialog, showInfoDialog, hideInfoDialog } = useDialog();
 
     const [currentPassword, setCurrentPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [error, setError] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
+
+    const handleInfoDialogDismiss = () => {
+        hideInfoDialog();
+        if (infoDialog.type === 'success') {
+            router.back();
+        }
+    };
 
     const handleSave = async () => {
         Keyboard.dismiss();
@@ -46,11 +56,20 @@ export default function ChangePasswordModal() {
         setIsProcessing(false);
 
         if (result.success) {
-            Alert.alert('Sukces', 'Hasło zostało pomyślnie zmienione.', [
-                { text: 'OK', onPress: () => router.back() }
-            ]);
+            showInfoDialog({
+                title: 'Sukces',
+                content: 'Hasło zostało pomyślnie zmienione.',
+                type: 'success',
+            });
         } else {
-            setError(result.message || 'Wystąpił nieoczekiwany błąd.');
+            if (result.message === 'auth/invalid-credential') {
+                showInfoDialog({
+                    title: 'Nieprawidłowe hasło',
+                    content: 'Sprawdź podane aktualne hasło i spróbuj ponownie.',
+                    type: 'warning'
+                });
+                return;
+            }
         }
     };
 
@@ -87,7 +106,7 @@ export default function ChangePasswordModal() {
                         secureTextEntry
                         style={styles.input}
                     />
-                    
+
                     <HelperText type="error" visible={!!error} style={styles.errorText}>{error}</HelperText>
 
                     <Button
@@ -104,16 +123,40 @@ export default function ChangePasswordModal() {
                     Anuluj
                 </Button>
             </View>
+            <InformationDialog {...infoDialog} onDismiss={handleInfoDialogDismiss} />
         </>
     );
 }
 
 const styles = StyleSheet.create({
-    backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' },
-    modalSheet: { position: 'absolute', bottom: 0, left: 0, right: 0, height: '95%', borderTopLeftRadius: 20, borderTopRightRadius: 20, overflow: 'hidden', padding: 20 },
-    contentContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    headerTitle: { textAlign: 'center', marginBottom: 24 },
-    input: { width: '100%', marginBottom: 12 },
+    backdrop: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0,0,0,0.5)'
+    },
+    modalSheet: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: '95%',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        overflow: 'hidden',
+        padding: 20
+    },
+    contentContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center'
+    },
+    headerTitle: {
+        textAlign: 'center',
+        marginBottom: 24
+    },
+    input: {
+        width: '100%',
+        marginBottom: 12
+    },
     errorText: { textAlign: 'center' },
     button: { marginTop: 20, width: '100%' },
     cancelButton: { marginBottom: 20, borderColor: 'transparent' },

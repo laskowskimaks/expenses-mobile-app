@@ -1,10 +1,10 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import * as SecureStore from 'expo-secure-store';
-import { 
-  createUserWithEmailAndPassword, 
-  signInWithEmailAndPassword, 
-  signOut, 
-  onAuthStateChanged, 
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
   sendPasswordResetEmail,
   EmailAuthProvider,
   reauthenticateWithCredential,
@@ -53,7 +53,7 @@ export const AuthProvider = ({ children }) => {
         const userData = { uid: firebaseUser.uid, email: firebaseUser.email };
         setUser(userData);
         await SecureStore.setItemAsync('lastUser', JSON.stringify(userData));
-        
+
         if (db) {
           const localEmail = await getUserEmail(db);
           if (localEmail && localEmail !== firebaseUser.email) {
@@ -148,14 +148,14 @@ export const AuthProvider = ({ children }) => {
       await updatePassword(firebaseUser, newPassword);
       return { success: true };
     } catch (error) {
-      console.error('[AuthContext] Błąd zmiany hasła:', error.code);
+      console.log('[AuthContext] Błąd zmiany hasła:', error.code);
       if (error.code === 'auth/wrong-password') {
         return { success: false, message: 'Nieprawidłowe aktualne hasło.' };
       }
       if (error.code === 'auth/network-request-failed') {
         return { success: false, message: 'Błąd sieci. Sprawdź połączenie z internetem.' };
       }
-      return { success: false, message: 'Wystąpił nieoczekiwany błąd.' };
+      return { success: false, message: error.code };
     }
   };
 
@@ -171,30 +171,21 @@ export const AuthProvider = ({ children }) => {
       await verifyBeforeUpdateEmail(firebaseUser, newEmail);
       return { success: true };
     } catch (error) {
-      console.error('[AuthContext] Błąd zmiany adresu e-mail:', error.code);
-      if (error.code === 'auth/wrong-password') {
-        return { success: false, message: 'Nieprawidłowe aktualne hasło.' };
-      }
-      if (error.code === 'auth/email-already-in-use') {
-        return { success: false, message: 'Ten adres e-mail jest już zajęty.' };
-      }
-      if (error.code === 'auth/network-request-failed') {
-        return { success: false, message: 'Błąd sieci. Sprawdź połączenie z internetem.' };
-      }
-      return { success: false, message: 'Wystąpił nieoczekiwany błąd.' };
+      console.log('[AuthContext] Błąd zmiany adresu e-mail:', error.code);
+      return { success: false, message: error.code };
     }
   };
-  
+
   const logoutAfterAction = async () => {
     try {
       console.log('[AuthContext] Rozpoczynanie czystego wylogowania po akcji...');
       await resetPeriodicCheckTime();
       await AsyncStorage.removeItem(DB_TIMESTAMP_KEY);
     } catch (error) {
-        console.log('[AuthContext] Błąd podczas czyszczenia danych po akcji:', error);
+      console.log('[AuthContext] Błąd podczas czyszczenia danych po akcji:', error);
     } finally {
-        await signOut(firebaseAuth);
-        console.log('[AuthContext] Użytkownik wylogowany z Firebase.');
+      await signOut(firebaseAuth);
+      console.log('[AuthContext] Użytkownik wylogowany z Firebase.');
     }
   };
 
@@ -206,10 +197,10 @@ export const AuthProvider = ({ children }) => {
       await resetPeriodicCheckTime();
       await AsyncStorage.removeItem(DB_TIMESTAMP_KEY);
     } catch (error) {
-        console.log('[AuthContext] Błąd podczas operacji przed wylogowaniem:', error);
+      console.log('[AuthContext] Błąd podczas operacji przed wylogowaniem:', error);
     } finally {
-        await signOut(firebaseAuth);
-        console.log('[AuthContext] Użytkownik wylogowany z Firebase.');
+      await signOut(firebaseAuth);
+      console.log('[AuthContext] Użytkownik wylogowany z Firebase.');
     }
   };
 

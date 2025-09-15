@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { View, Pressable, ScrollView, StyleSheet, Alert, InteractionManager } from 'react-native';
+import { View, Pressable, ScrollView, StyleSheet, InteractionManager } from 'react-native';
 import { Text, TextInput, Button, SegmentedButtons, Switch, Chip, ActivityIndicator, useTheme } from 'react-native-paper';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -16,6 +16,8 @@ import CategoryPicker from './components/CategoryPicker';
 import TagsModal from './components/TagsModal';
 import RepeatUnitPicker from './components/RepeatUnitPicker';
 import { useTransactionForm, ACTIONS } from '@/utils/useTransactionForm';
+import ConfirmationDialog from '@/components/ConfirmationDialog';
+import { useDialog } from '@/utils/useDialog';
 
 const REPEAT_UNITS = [
   { value: 'day', label: 'Dni', labelSingle: 'dzień', labelPlural: 'dni' },
@@ -113,6 +115,7 @@ export default function AddTransactionModal() {
   const { db } = useDb();
   const params = useLocalSearchParams();
   const { state, dispatch, actions, isButtonDisabled, debouncedTagSearchText } = useTransactionForm();
+  const { dialog, showDialog, hideDialog } = useDialog();
 
   const isEditMode = useMemo(() => !!params.transactionId, [params.transactionId]);
   const transactionId = useMemo(() => params.transactionId ? parseInt(params.transactionId, 10) : null, [params.transactionId]);
@@ -149,14 +152,26 @@ export default function AddTransactionModal() {
               payload: { ...txData, categories: cats, editMode: editMode }
             });
           } else if (mounted) {
-            Alert.alert('Błąd', 'Nie można wczytać danych transakcji.', [
-              { text: 'OK', onPress: () => router.back() }
-            ]);
+            showDialog({
+              title: 'Błąd',
+              content: 'Nie można wczytać danych transakcji.',
+              confirmText: 'OK',
+              onConfirm: () => router.back(),
+              dangerous: false
+            });
           }
         }
       } catch (err) {
         console.error('fetchData error', err);
-        if (mounted) Alert.alert('Błąd', 'Nie udało się pobrać danych początkowych.');
+        if (mounted) {
+          showDialog({
+            title: 'Błąd',
+            content: 'Nie udało się pobrać danych początkowych.',
+            confirmText: 'OK',
+            onConfirm: () => { },
+            dangerous: false
+          });
+        }
       } finally {
         if (mounted) {
           setIsLoading(false);
@@ -167,11 +182,11 @@ export default function AddTransactionModal() {
     InteractionManager.runAfterInteractions(() => {
       fetchData();
       if (!isEditMode) {
-        actions.setTime(new Date()); // Ustaw aktualny czas tylko przy dodawaniu nowej transakcji
+        actions.setTime(new Date());
       }
     });
     return () => { mounted = false; };
-  }, [db, isEditMode, transactionId, editMode]); // Zależności pozostają bez zmian
+  }, [db, isEditMode, transactionId, editMode]);
 
   const filteredTags = useMemo(() => {
     const q = (debouncedTagSearchText || '').trim().toLowerCase();
@@ -253,14 +268,26 @@ export default function AddTransactionModal() {
   const handleSaveTransaction = useCallback(async () => {
     if (isButtonDisabled || state.isSaving) return;
     if (!state.selectedCategory?.id) {
-      Alert.alert('Błąd', 'Wybierz kategorię.');
+      showDialog({
+        title: 'Błąd',
+        content: 'Wybierz kategorię.',
+        confirmText: 'OK',
+        onConfirm: () => { },
+        dangerous: false
+      });
       return;
     }
     const isPeriodicAction = (isEditMode && editMode === 'future') || (!isEditMode && state.isPeriodic);
     if (isPeriodicAction) {
       const intervalInt = parseInt(state.repeatInterval, 10);
       if (isNaN(intervalInt) || intervalInt < 1 || intervalInt > 1000) {
-        Alert.alert('Błąd', 'Interwał powtórzeń musi być liczbą całkowitą od 1 do 1000.');
+        showDialog({
+          title: 'Błąd',
+          content: 'Interwał powtórzeń musi być liczbą całkowitą od 1 do 1000.',
+          confirmText: 'OK',
+          onConfirm: () => { },
+          dangerous: false
+        });
         return;
       }
     }
@@ -295,7 +322,13 @@ export default function AddTransactionModal() {
         if (result.success) {
           router.back();
         } else {
-          Alert.alert('Błąd', result.message || 'Błąd aktualizacji transakcji.');
+          showDialog({
+            title: 'Błąd',
+            content: result.message || 'Błąd aktualizacji transakcji.',
+            confirmText: 'OK',
+            onConfirm: () => { },
+            dangerous: false
+          });
         }
       } else {
         if (state.isPeriodic) {
@@ -318,7 +351,13 @@ export default function AddTransactionModal() {
             eventEmitter.emit('periodicTransactionAdded');
             router.back();
           } else {
-            Alert.alert('Błąd', res.message || 'Błąd dodawania cyklicznej.');
+            showDialog({
+              title: 'Błąd',
+              content: res.message || 'Błąd dodawania cyklicznej.',
+              confirmText: 'OK',
+              onConfirm: () => { },
+              dangerous: false
+            });
           }
         } else {
           const transactionData = {
@@ -336,17 +375,29 @@ export default function AddTransactionModal() {
             eventEmitter.emit('transactionAdded');
             router.back();
           } else {
-            Alert.alert('Błąd', result.message || 'Błąd dodawania transakcji.');
+            showDialog({
+              title: 'Błąd',
+              content: result.message || 'Błąd dodawania transakcji.',
+              confirmText: 'OK',
+              onConfirm: () => { },
+              dangerous: false
+            });
           }
         }
       }
     } catch (err) {
       console.error(err);
-      Alert.alert('Błąd', 'Nieoczekiwany błąd.');
+      showDialog({
+        title: 'Błąd',
+        content: 'Nieoczekiwany błąd.',
+        confirmText: 'OK',
+        onConfirm: () => { },
+        dangerous: false
+      });
     } finally {
       actions.setIsSaving(false);
     }
-  }, [isButtonDisabled, state, actions, db, router, isEditMode, transactionId, editMode]);
+  }, [isButtonDisabled, state, actions, db, router, isEditMode, transactionId, editMode, showDialog]);
 
   if (isFormLoading) {
     return (
@@ -486,7 +537,14 @@ export default function AddTransactionModal() {
               getRepeatUnitLabel={getRepeatUnitLabel}
             />
           )}
-
+          <TextInput
+            mode="outlined"
+            label="Lokalizacja (opcjonalna)"
+            value={state.location}
+            onChangeText={actions.setLocation}
+            style={styles.formField}
+            accessibilityLabel="Lokalizacja"
+          />
           <TextInput
             mode="outlined"
             label="Opis (opcjonalny)"
@@ -497,15 +555,6 @@ export default function AddTransactionModal() {
             style={styles.formField}
             accessibilityLabel="Opis transakcji"
           />
-          <TextInput
-            mode="outlined"
-            label="Lokalizacja (opcjonalna)"
-            value={state.location}
-            onChangeText={actions.setLocation}
-            style={styles.formField}
-            accessibilityLabel="Lokalizacja"
-          />
-
           <View style={styles.tagsSection}>
             <Text variant="labelLarge" style={styles.sectionTitle}>
               Tagi
@@ -613,6 +662,7 @@ export default function AddTransactionModal() {
           minimumDate={state.date}
         />
       )}
+      <ConfirmationDialog {...dialog} onDismiss={hideDialog} />
     </>
   );
 }

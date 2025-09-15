@@ -137,34 +137,34 @@ function transactionFormReducer(state, action) {
     case ACTIONS.SET_FIELD:
       return { ...state, [action.field]: action.value };
     case ACTIONS.POPULATE_FORM_FOR_EDIT: {
-        const { categories, editMode, ...transactionAndPattern } = action.payload;
+      const { categories, editMode, ...transactionAndPattern } = action.payload;
 
-        if (!transactionAndPattern) return state;
+      if (!transactionAndPattern) return state;
 
-        const { periodicPattern, ...transactionData } = transactionAndPattern;
-        const transactionDate = new Date(transactionData.transactionDate * 1000);
-        const category = categories.find(c => c.id === transactionData.categoryId);
+      const { periodicPattern, ...transactionData } = transactionAndPattern;
+      const transactionDate = new Date(transactionData.transactionDate * 1000);
+      const category = categories.find(c => c.id === transactionData.categoryId);
 
-        const originalNotes = transactionData.notes || '';
-        const autoTextRegex = /\s*\n?\(transakcja dodana automatycznie\)$/;
-        const cleanedDescription = originalNotes.replace(autoTextRegex, '').trim();
+      const originalNotes = transactionData.notes || '';
+      const autoTextRegex = /\s*\n?\(transakcja dodana automatycznie\)$/;
+      const cleanedDescription = originalNotes.replace(autoTextRegex, '').trim();
 
-        return {
-            ...state,
-            type: transactionData.amount > 0 ? 'income' : 'expenditure',
-            title: transactionData.title || '',
-            amount: String(Math.abs(transactionData.amount)),
-            description: cleanedDescription,
-            location: transactionData.location || '',
-            selectedCategory: category || null,
-            date: transactionDate,
-            time: transactionDate,
-            tags: (transactionData.tags || []).map(t => t.name),
-            isPeriodic: editMode === 'future',
-            repeatInterval: periodicPattern ? String(periodicPattern.repeatInterval) : '1',
-            repeatUnit: periodicPattern ? periodicPattern.repeatUnit : 'month',
-            endDate: periodicPattern && periodicPattern.endDate ? new Date(periodicPattern.endDate * 1000) : null,
-        };
+      return {
+        ...state,
+        type: transactionData.amount > 0 ? 'income' : 'expenditure',
+        title: transactionData.title || '',
+        amount: String(Math.abs(transactionData.amount)),
+        description: cleanedDescription,
+        location: transactionData.location || '',
+        selectedCategory: category || null,
+        date: transactionDate,
+        time: transactionDate,
+        tags: (transactionData.tags || []).map(t => t.name),
+        isPeriodic: editMode === 'future',
+        repeatInterval: periodicPattern ? String(periodicPattern.repeatInterval) : '1',
+        repeatUnit: periodicPattern ? periodicPattern.repeatUnit : 'month',
+        endDate: periodicPattern && periodicPattern.endDate ? new Date(periodicPattern.endDate * 1000) : null,
+      };
     }
     default:
       return state;
@@ -179,14 +179,14 @@ export function useTransactionForm() {
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedTagSearchText(state.tagSearchText);
-    }, 300);
+    }, 150);
     return () => clearTimeout(handler);
   }, [state.tagSearchText]);
 
   const isButtonDisabled = useMemo(() => {
     const amountNumber = parseFloat((state.amount || '').replace(',', '.'));
     const isValidAmount = !isNaN(amountNumber) && amountNumber > 0;
-    
+
     const isPeriodicAction = state.isPeriodic;
     const intervalInt = parseInt(state.repeatInterval, 10);
     const isValidInterval = !isPeriodicAction || (!isNaN(intervalInt) && intervalInt >= 1 && intervalInt <= 1000);

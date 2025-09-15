@@ -1,25 +1,31 @@
 import React, { useEffect, useRef } from 'react';
 import { Stack, useRouter, usePathname } from 'expo-router';
-import { AppState, View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { AppState, View, StyleSheet, ActivityIndicator } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { DbProvider, useDb } from '@/context/DbContext';
 import { NetworkProvider, useNetworkStatus } from '@/context/NetworkContext';
 import { getHashedPin } from '@/services/authService';
-import { PaperProvider } from 'react-native-paper';
+import { PaperProvider, Text, useTheme } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemeProvider, useThemeContext } from '@/context/ThemeContext';
 
 SplashScreen.preventAutoHideAsync();
 
-const OfflineBanner = () => (
-  <View style={styles.bannerContainer}>
-    <Text style={styles.bannerText}>Brak połączenia z internetem</Text>
-  </View>
-);
+const OfflineBanner = () => {
+  const theme = useTheme();
+  const styles = createGlobalStyles(theme);
+  return (
+    <View style={styles.bannerContainer}>
+      <Text style={styles.bannerText}>Brak połączenia z internetem</Text>
+    </View>
+  );
+};
 
 function RootLayoutNav() {
+  const theme = useTheme();
+  const styles = createGlobalStyles(theme);
   const { user, isAuthLoading, isLocked, lockApp, unlockApp, needsPinSetup, isExternalActivity } = useAuth();
   const { isConnected } = useNetworkStatus();
   const { db, initializeDatabase, clearDatabase, isLoading: isDbLoading } = useDb();
@@ -53,7 +59,6 @@ function RootLayoutNav() {
       if (!user) {
         if (db && !isDbLoading) {
           clearDatabase();
-          return;
         }
 
         const protectedRoutes = ['/pinSetting', '/pinChecking'];
@@ -107,8 +112,8 @@ function RootLayoutNav() {
 
   if (isAuthLoading || isDbLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#007BFF" />
+      <View style={styles.loaderContainer}>
+        <ActivityIndicator size="large" />
       </View>
     );
   }
@@ -117,10 +122,10 @@ function RootLayoutNav() {
     <>
       <Stack>
         <Stack.Screen name="index" options={{ headerShown: false }} />
-        <Stack.Screen name="login" options={{ title: 'Logowanie' }} />
-        <Stack.Screen name="register" options={{ title: 'Rejestracja' }} />
-        <Stack.Screen name="forgotPassword" options={{ title: 'Resetowanie Hasła' }} />
-        <Stack.Screen name="pinSetting" options={{ title: 'Ustaw PIN' }} />
+        <Stack.Screen name="login" options={{ title: 'Logowanie', headerShown: false }} />
+        <Stack.Screen name="register" options={{ title: 'Rejestracja', headerShown: false }} />
+        <Stack.Screen name="forgotPassword" options={{ title: 'Resetowanie Hasła', headerShown: false }} />
+        <Stack.Screen name="pinSetting" options={{ title: 'Ustaw PIN', headerShown: false }} />
         <Stack.Screen
           name="pinChecking"
           options={{ title: 'Weryfikacja PIN', headerShown: false, gestureEnabled: false }}
@@ -130,7 +135,6 @@ function RootLayoutNav() {
           name="(modals)/AddTransactionModal"
           options={{
             presentation: 'transparentModal',
-            title: 'Nowa Transakcja',
             animation: 'fade_from_bottom',
             headerShown: false,
           }}
@@ -139,7 +143,6 @@ function RootLayoutNav() {
           name="(modals)/AddLoyaltyCardModal"
           options={{
             presentation: 'transparentModal',
-            title: 'Nowa Karta Lojalnościowa',
             animation: 'fade_from_bottom',
             headerShown: false,
           }}
@@ -258,7 +261,7 @@ function ThemedApp() {
       <NetworkProvider>
         <DbProvider>
           <AuthProvider>
-            <SafeAreaView style={{ flex: 1 }}>
+            <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }}>
               <RootLayoutNav />
             </SafeAreaView>
           </AuthProvider>
@@ -278,20 +281,26 @@ export default function RootLayout() {
   );
 }
 
-const styles = StyleSheet.create({
+const createGlobalStyles = (theme) => StyleSheet.create({
   bannerContainer: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#c23616',
+    backgroundColor: theme.colors.errorContainer,
     padding: 10,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1000,
   },
   bannerText: {
-    color: '#ffffff',
+    color: theme.colors.onErrorContainer,
     fontWeight: 'bold',
+  },
+  loaderContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: theme.colors.background,
   },
 });

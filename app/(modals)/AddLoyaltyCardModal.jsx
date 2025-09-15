@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { View, StyleSheet, Pressable, ScrollView, Alert } from 'react-native';
+import { View, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { Text, TextInput, Button, useTheme, ActivityIndicator, Icon } from 'react-native-paper';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 
@@ -10,6 +10,8 @@ import { useDb } from '@/context/DbContext';
 import { getLoyaltyCardById, addLoyaltyCard, updateLoyaltyCard } from '@/services/loyaltyCardService';
 import LoyaltyCardPreview from './components/LoyaltyCardPreview';
 import { useAuth } from '@/context/AuthContext';
+import ConfirmationDialog from '@/components/ConfirmationDialog';
+import { useDialog } from '@/utils/useDialog';
 
 export default function AddLoyaltyCardModal() {
     const theme = useTheme();
@@ -17,6 +19,7 @@ export default function AddLoyaltyCardModal() {
     const { db } = useDb();
     const { setIsExternalActivity } = useAuth();
     const params = useLocalSearchParams();
+    const { dialog, showDialog, hideDialog } = useDialog();
 
     const cardId = useMemo(() => params.cardId ? parseInt(params.cardId, 10) : null, [params.cardId]);
     const isEditMode = useMemo(() => !!cardId, [cardId]);
@@ -59,7 +62,13 @@ export default function AddLoyaltyCardModal() {
                     setBarcodeFormat(card.barcodeFormat);
                     setImageUri(card.imageUri);
                 } else {
-                    Alert.alert('Błąd', 'Nie znaleziono karty.', [{ text: 'OK', onPress: () => router.back() }]);
+                    showDialog({
+                        title: 'Błąd',
+                        content: 'Nie znaleziono karty.',
+                        confirmText: 'OK',
+                        onConfirm: () => router.back(),
+                        dangerous: false
+                    });
                 }
                 setIsLoading(false);
             };
@@ -68,13 +77,41 @@ export default function AddLoyaltyCardModal() {
     }, [isEditMode, cardId, db]);
 
     const handleSave = async () => {
-        if (!name.trim()) { Alert.alert('Błąd', 'Nazwa karty jest wymagana.'); return; }
-        if (!barcodeData && !imageUri) { Alert.alert('Błąd', 'Musisz zeskanować lub dodać kod kreskowy.'); return; }
+        if (!name.trim()) {
+            showDialog({
+                title: 'Błąd',
+                content: 'Nazwa karty jest wymagana.',
+                confirmText: 'OK',
+                onConfirm: () => { },
+                dangerous: false
+            });
+            return;
+        }
+        if (!barcodeData && !imageUri) {
+            showDialog({
+                title: 'Błąd',
+                content: 'Musisz zeskanować lub dodać kod kreskowy.',
+                confirmText: 'OK',
+                onConfirm: () => { },
+                dangerous: false
+            });
+            return;
+        }
         setIsSaving(true);
         const cardData = { name, notes, barcodeData, barcodeFormat, imageUri };
         const result = isEditMode ? await updateLoyaltyCard(db, cardId, cardData) : await addLoyaltyCard(db, cardData);
         setIsSaving(false);
-        if (result.success) { router.back(); } else { Alert.alert('Błąd', result.message || 'Nie udało się zapisać karty.'); }
+        if (result.success) {
+            router.back();
+        } else {
+            showDialog({
+                title: 'Błąd',
+                content: result.message || 'Nie udało się zapisać karty.',
+                confirmText: 'OK',
+                onConfirm: () => { },
+                dangerous: false
+            });
+        }
     };
 
     const handleScanLive = () => {
@@ -102,7 +139,13 @@ export default function AddLoyaltyCardModal() {
                 setBarcodeFormat(null);
             }
         } catch (error) {
-            Alert.alert('Błąd', 'Nie udało się przetworzyć zdjęcia. Spróbuj ponownie.');
+            showDialog({
+                title: 'Błąd',
+                content: 'Nie udało się przetworzyć zdjęcia. Spróbuj ponownie.',
+                confirmText: 'OK',
+                onConfirm: () => { },
+                dangerous: false
+            });
             console.error('[AddLoyaltyCardModal] Błąd ImageManipulator:', error);
         }
         setIsExternalActivity(false);
@@ -149,23 +192,81 @@ export default function AddLoyaltyCardModal() {
                     <Button mode="contained" onPress={handleSave} style={[styles.flexOne, { marginLeft: 12 }]} loading={isSaving} disabled={isSaving}>{isEditMode ? 'Zapisz zmiany' : 'Dodaj kartę'}</Button>
                 </View>
             </View>
+            <ConfirmationDialog {...dialog} onDismiss={hideDialog} />
         </>
     );
 }
 
 const styles = StyleSheet.create({
-    centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' },
-    modalSheet: { position: 'absolute', bottom: 0, left: 0, right: 0, height: '95%', borderTopLeftRadius: 20, borderTopRightRadius: 20, overflow: 'hidden' },
-    scrollContainer: { flexGrow: 1, padding: 20 },
-    headerTitle: { textAlign: 'center', marginBottom: 24 },
-    formField: { marginBottom: 16 },
-    scanButtonsContainer: { flexDirection: 'row', justifyContent: 'space-around', marginVertical: 24 },
-    scanButton: { borderWidth: 1, borderColor: '#ccc', borderRadius: 12, padding: 20, alignItems: 'center', justifyContent: 'center', width: '45%', minHeight: 110 },
-    scanButtonText: { marginTop: 8, fontWeight: '500' },
-    barcodeCard: { backgroundColor: 'white', marginTop: 16 },
-    barcodeContainer: { alignItems: 'center', justifyContent: 'center', padding: 16, minHeight: 120 },
-    errorText: { color: 'red', textAlign: 'center' },
-    footer: { flexDirection: 'row', padding: 20, borderTopWidth: StyleSheet.hairlineWidth },
-    flexOne: { flex: 1 },
+    centered: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center'
+    },
+    backdrop: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0,0,0,0.5)'
+    },
+    modalSheet: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: '95%',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        overflow: 'hidden'
+    },
+    scrollContainer: {
+        flexGrow: 1,
+        padding: 20
+    },
+    headerTitle: {
+        textAlign: 'center',
+        marginBottom: 24
+    },
+    formField: {
+        marginBottom: 16
+    },
+    scanButtonsContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+        marginVertical: 24
+    },
+    scanButton: {
+        borderWidth: 1,
+        borderColor: '#ccc',
+        borderRadius: 12,
+        padding: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: '45%',
+        minHeight: 110
+    },
+    scanButtonText: {
+        marginTop: 8,
+        fontWeight: '500'
+    },
+    barcodeCard: {
+        backgroundColor: 'white',
+        marginTop: 16
+    },
+    barcodeContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 16,
+        minHeight: 120
+    },
+    errorText: {
+        color: 'red',
+        textAlign: 'center'
+    },
+    footer: {
+        flexDirection: 'row',
+        padding: 20,
+        borderTopWidth: StyleSheet.hairlineWidth
+    },
+    flexOne: {
+        flex: 1
+    },
 });

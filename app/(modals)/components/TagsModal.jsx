@@ -2,14 +2,6 @@ import React, { useState, useEffect, memo, useCallback } from 'react';
 import { View, FlatList, TouchableOpacity, StyleSheet, Pressable } from 'react-native';
 import { Text, TextInput, Button, Chip, useTheme } from 'react-native-paper';
 
-// Funkcja pomocnicza do rozjaśniania kolorów dla tła
-const lightenColor = (color, percent) => {
-    if (!color) return '#e0e0e0';
-    let f = parseInt(color.slice(1), 16), t = percent < 0 ? 0 : 255, p = percent < 0 ? percent * -1 : percent, R = f >> 16, G = f >> 8 & 0x00FF, B = f & 0x0000FF;
-    return "#" + (0x1000000 + (Math.round((t - R) * p) + R) * 0x10000 + (Math.round((t - G) * p) + G) * 0x100 + (Math.round((t - B) * p) + B)).toString(16).slice(1);
-};
-
-
 const TagItem = memo(({ item, isSelected, onSelectTag }) => (
     <TouchableOpacity
         style={[
@@ -30,8 +22,14 @@ const TagItem = memo(({ item, isSelected, onSelectTag }) => (
 ));
 
 const SelectedTagChip = memo(({ tag, onRemove }) => {
-    const chipBackgroundColor = lightenColor(tag.color, 0.8);
-    const chipTextColor = tag.color || '#000000';
+    const theme = useTheme();
+    const chipColor = tag.color || theme.colors.primary;
+    const chipBackgroundColor = tag.color
+        ? `${tag.color}20`
+        : theme.colors.primaryContainer;
+    const chipTextColor = tag.color
+        ? tag.color
+        : theme.colors.onPrimaryContainer;
 
     return (
         <Chip

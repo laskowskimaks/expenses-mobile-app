@@ -1,11 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
     View,
-    Text,
     StyleSheet,
     FlatList,
     Pressable,
-    TextInput,
     ScrollView,
     Platform,
     SafeAreaView,
@@ -19,22 +17,14 @@ import {
     List,
     SegmentedButtons,
     Divider,
+    useTheme,
+    Text,
+    TextInput,
 } from 'react-native-paper';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 const DEFAULT_MIN_AMOUNT = 0;
 const DEFAULT_MAX_AMOUNT = 20000;
-
-const lightenColor = (color, percent) => {
-    if (!color) return '#e0e0e0';
-    let f = parseInt(color.slice(1), 16),
-        t = percent < 0 ? 0 : 255,
-        p = percent < 0 ? percent * -1 : percent,
-        R = f >> 16,
-        G = f >> 8 & 0x00FF,
-        B = f & 0x0000FF;
-    return "#" + (0x1000000 + (Math.round((t - R) * p) + R) * 0x10000 + (Math.round((t - G) * p) + G) * 0x100 + (Math.round((t - B) * p) + B)).toString(16).slice(1);
-};
 
 const formatDateEuropean = (timestamp) => {
     if (timestamp === null || typeof timestamp === 'undefined') return '';
@@ -45,8 +35,7 @@ const formatDateEuropean = (timestamp) => {
     });
 };
 
-// Widok główny z listą filtrów
-const MainView = ({ localFilters, dynamicMaxAmount, setScreen, onClose }) => (
+const MainView = ({ localFilters, dynamicMaxAmount, setScreen, onClose, styles }) => (
     <ScrollView contentContainerStyle={{ paddingBottom: 180 }} keyboardShouldPersistTaps="always">
         <View style={styles.innerContent}>
             <View style={styles.headerRow}>
@@ -94,8 +83,7 @@ const MainView = ({ localFilters, dynamicMaxAmount, setScreen, onClose }) => (
     </ScrollView>
 );
 
-// Widok wyboru kategorii
-const CategoriesView = ({ setScreen, categories, localFilters, toggleCategory }) => {
+const CategoriesView = ({ setScreen, categories, localFilters, toggleCategory, styles, theme }) => {
     const renderCategoryItem = ({ item }) => {
         const selected = (localFilters.categoryIds || []).includes(item.id);
         return (
@@ -103,8 +91,21 @@ const CategoriesView = ({ setScreen, categories, localFilters, toggleCategory })
                 title={item.name}
                 titleStyle={styles.listTitle}
                 onPress={() => toggleCategory(item.id)}
-                left={() => <Avatar.Icon size={40} icon={item.iconName || 'folder'} style={{ backgroundColor: item.color ?? '#ddd' }} />}
-                right={() => <Checkbox.Android status={selected ? 'checked' : 'unchecked'} onPress={() => toggleCategory(item.id)} />}
+                left={() => (
+                    <Avatar.Icon
+                        size={40}
+                        icon={item.iconName || 'folder'}
+                        style={{ backgroundColor: item.color ?? theme.colors.surfaceVariant }}
+                        color="#fff"
+                    />
+                )}
+                right={() => (
+                    <Checkbox.Android
+                        status={selected ? 'checked' : 'unchecked'}
+                        onPress={() => toggleCategory(item.id)}
+                    />
+                )}
+                style={styles.categoryListItem}
             />
         );
     };
@@ -123,14 +124,13 @@ const CategoriesView = ({ setScreen, categories, localFilters, toggleCategory })
                 renderItem={renderCategoryItem}
                 ItemSeparatorComponent={() => <Divider style={{ marginLeft: 72 }} />}
                 keyboardShouldPersistTaps="always"
-                contentContainerStyle={{ paddingBottom: 200 }}
+                contentContainerStyle={styles.categoryListContent}
             />
         </View>
     );
 };
 
-// Widok wyboru tagów
-const TagsView = ({ setScreen, tagQuery, setTagQuery, filteredTags, localFilters, toggleTag }) => (
+const TagsView = ({ setScreen, tagQuery, setTagQuery, filteredTags, localFilters, toggleTag, styles }) => (
     <View style={{ flex: 1 }}>
         <View style={styles.headerRow}>
             <IconButton icon="arrow-left" onPress={() => setScreen('main')} />
@@ -138,12 +138,12 @@ const TagsView = ({ setScreen, tagQuery, setTagQuery, filteredTags, localFilters
             <View style={{ width: 48 }} />
         </View>
         <Divider />
-        <ScrollView contentContainerStyle={{ paddingBottom: 180, padding: 12 }} keyboardShouldPersistTaps="always">
+        <ScrollView contentContainerStyle={styles.subScreenScrollView} keyboardShouldPersistTaps="always">
             <TextInput
+                mode="outlined"
                 placeholder="Szukaj tagów..."
                 value={tagQuery}
                 onChangeText={setTagQuery}
-                style={styles.tagSearchInput}
                 returnKeyType="done"
                 blurOnSubmit={false}
                 autoCapitalize="none"
@@ -160,7 +160,7 @@ const TagsView = ({ setScreen, tagQuery, setTagQuery, filteredTags, localFilters
                             onPress={() => toggleTag(tag.id)}
                             style={[
                                 styles.chip,
-                                selected && { backgroundColor: lightenColor(tag.color, 0.8) },
+                                selected && { backgroundColor: `${tag.color}20` },
                                 { borderColor: tag.color }
                             ]}
                             textStyle={{ color: selected ? tag.color : tag.color }}
@@ -174,8 +174,7 @@ const TagsView = ({ setScreen, tagQuery, setTagQuery, filteredTags, localFilters
     </View>
 );
 
-// Widok wyboru zakresu dat
-const DateView = ({ setScreen, localFilters, setShowFromPicker, setShowToPicker, showFromPicker, showToPicker, onChangeFrom, onChangeTo, onClearDates }) => (
+const DateView = ({ setScreen, localFilters, setShowFromPicker, setShowToPicker, showFromPicker, showToPicker, onChangeFrom, onChangeTo, onClearDates, styles }) => (
     <View style={{ flex: 1 }}>
         <View style={styles.headerRow}>
             <IconButton icon="arrow-left" onPress={() => setScreen('main')} />
@@ -183,7 +182,7 @@ const DateView = ({ setScreen, localFilters, setShowFromPicker, setShowToPicker,
             <View style={{ width: 48 }} />
         </View>
         <Divider />
-        <ScrollView contentContainerStyle={{ paddingBottom: 180, padding: 12 }} keyboardShouldPersistTaps="always">
+        <ScrollView contentContainerStyle={styles.subScreenScrollView} keyboardShouldPersistTaps="always">
             <Text style={styles.sectionSubtitle}>Wybierz zakres dat lub wyświetl wszystkie transakcje.</Text>
             <PaperButton
                 mode={localFilters.dateFrom === null && localFilters.dateTo === null ? "contained" : "outlined"}
@@ -199,7 +198,7 @@ const DateView = ({ setScreen, localFilters, setShowFromPicker, setShowToPicker,
             <PaperButton mode="outlined" onPress={() => setShowFromPicker(true)}>
                 {localFilters.dateFrom ? formatDateEuropean(localFilters.dateFrom) : 'Wybierz datę'}
             </PaperButton>
-            <Text style={{ marginVertical: 12, textAlign: 'center', fontSize: 16, color: '#666' }}>do</Text>
+            <Text style={styles.centeredText}>do</Text>
             <Text style={styles.inputLabel}>Data do:</Text>
             <PaperButton mode="outlined" onPress={() => setShowToPicker(true)}>
                 {localFilters.dateTo ? formatDateEuropean(localFilters.dateTo) : 'Wybierz datę'}
@@ -210,8 +209,7 @@ const DateView = ({ setScreen, localFilters, setShowFromPicker, setShowToPicker,
     </View>
 );
 
-// Widok wyboru zakresu kwot
-const PriceView = ({ setScreen, localFilters, onManualMinChange, onManualMaxChange }) => (
+const PriceView = ({ setScreen, localFilters, onManualMinChange, onManualMaxChange, styles }) => (
     <View style={{ flex: 1 }}>
         <View style={styles.headerRow}>
             <IconButton icon="arrow-left" onPress={() => setScreen('main')} />
@@ -219,21 +217,35 @@ const PriceView = ({ setScreen, localFilters, onManualMinChange, onManualMaxChan
             <View style={{ width: 48 }} />
         </View>
         <Divider />
-        <ScrollView contentContainerStyle={{ paddingBottom: 180, padding: 12 }} keyboardShouldPersistTaps="always">
+        <ScrollView contentContainerStyle={styles.subScreenScrollView} keyboardShouldPersistTaps="always">
             <Text style={styles.sectionSubtitle}>Wpisz zakres kwot do filtrowania transakcji.</Text>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                 <View style={{ flex: 1, marginRight: 8 }}>
-                    <Text style={styles.inputLabel}>Kwota od:</Text>
-                    <TextInput placeholder="0" keyboardType="numeric" value={localFilters.amountMin != null ? String(localFilters.amountMin) : ''} onChangeText={onManualMinChange} style={styles.manualInput} blurOnSubmit={false} />
+                    <TextInput
+                        mode="outlined"
+                        label="Kwota od"
+                        placeholder="0"
+                        keyboardType="numeric"
+                        value={localFilters.amountMin != null ? String(localFilters.amountMin) : ''}
+                        onChangeText={onManualMinChange}
+                        blurOnSubmit={false}
+                    />
                 </View>
-                <Text style={{ fontSize: 16, color: '#666', marginTop: 20 }}>do</Text>
+                <Text style={styles.centeredText}>do</Text>
                 <View style={{ flex: 1, marginLeft: 8 }}>
-                    <Text style={styles.inputLabel}>Kwota do:</Text>
-                    <TextInput placeholder="Bez limitu" keyboardType="numeric" value={localFilters.amountMax != null ? String(localFilters.amountMax) : ''} onChangeText={onManualMaxChange} style={styles.manualInput} blurOnSubmit={false} />
+                    <TextInput
+                        mode="outlined"
+                        label="Kwota do"
+                        placeholder="Bez limitu"
+                        keyboardType="numeric"
+                        value={localFilters.amountMax != null ? String(localFilters.amountMax) : ''}
+                        onChangeText={onManualMaxChange}
+                        blurOnSubmit={false}
+                    />
                 </View>
             </View>
             {(localFilters.amountMin != null || localFilters.amountMax != null) && (
-                <Text style={{ marginTop: 16, fontSize: 14, color: '#333', textAlign: 'center' }}>
+                <Text style={styles.resultText}>
                     Zakres: {localFilters.amountMin ?? '0'} zł - {localFilters.amountMax ?? '∞'} zł
                 </Text>
             )}
@@ -241,8 +253,7 @@ const PriceView = ({ setScreen, localFilters, onManualMinChange, onManualMaxChan
     </View>
 );
 
-// Widok wyboru typu transakcji
-const TypeView = ({ setScreen, localFilters, onTypeChange, onPeriodicChange }) => (
+const TypeView = ({ setScreen, localFilters, onTypeChange, onPeriodicChange, styles }) => (
     <View style={{ flex: 1 }}>
         <View style={styles.headerRow}>
             <IconButton icon="arrow-left" onPress={() => setScreen('main')} />
@@ -269,6 +280,9 @@ const FilterModal = ({
     onClose,
     initialScreen = 'main',
 }) => {
+    const theme = useTheme();
+    const styles = createStyles(theme);
+
     const [localFilters, setLocalFilters] = useState(() => initialFilters ? { ...initialFilters } : createDefaultFilters());
     const [screen, setScreen] = useState('main');
     const [tagQuery, setTagQuery] = useState('');
@@ -374,14 +388,17 @@ const FilterModal = ({
                 setScreen={setScreen}
                 categories={categories}
                 localFilters={localFilters}
-                toggleCategory={toggleCategory} />;
+                toggleCategory={toggleCategory}
+                styles={styles}
+                theme={theme} />;
             case 'tags': return <TagsView
                 setScreen={setScreen}
                 tagQuery={tagQuery}
                 setTagQuery={setTagQuery}
                 filteredTags={filteredTags}
                 localFilters={localFilters}
-                toggleTag={toggleTag} />;
+                toggleTag={toggleTag}
+                styles={styles} />;
             case 'date': return <DateView
                 setScreen={setScreen}
                 localFilters={localFilters}
@@ -391,22 +408,26 @@ const FilterModal = ({
                 showToPicker={showToPicker}
                 onChangeFrom={onChangeFrom}
                 onChangeTo={onChangeTo}
-                onClearDates={onClearDates} />;
+                onClearDates={onClearDates}
+                styles={styles} />;
             case 'price': return <PriceView
                 setScreen={setScreen}
                 localFilters={localFilters}
                 onManualMinChange={onManualMinChange}
-                onManualMaxChange={onManualMaxChange} />;
+                onManualMaxChange={onManualMaxChange}
+                styles={styles} />;
             case 'type': return <TypeView
                 setScreen={setScreen}
                 localFilters={localFilters}
                 onTypeChange={onTypeChange}
-                onPeriodicChange={onPeriodicChange} />;
+                onPeriodicChange={onPeriodicChange}
+                styles={styles} />;
             default: return <MainView
                 localFilters={localFilters}
                 dynamicMaxAmount={dynamicMaxAmount}
                 setScreen={setScreen}
-                onClose={onClose} />;
+                onClose={onClose}
+                styles={styles} />;
         }
     };
 
@@ -459,28 +480,33 @@ export const getActiveFiltersCount = (filters) => {
     return count;
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: 'white'
+        backgroundColor: theme.colors.background,
     },
     innerContent: {
         paddingTop: 8,
         paddingBottom: 16,
-        paddingHorizontal: 8
+        paddingHorizontal: 8,
+    },
+    subScreenScrollView: {
+        paddingBottom: 180,
+        padding: 12,
     },
     headerRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 8,
-        paddingVertical: 6
+        paddingVertical: 6,
     },
     headerTitle: {
         fontSize: 18,
         fontWeight: '700',
         flex: 1,
-        textAlign: 'center'
+        textAlign: 'center',
+        color: theme.colors.onSurface,
     },
     row: {
         padding: 16,
@@ -488,58 +514,53 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         borderBottomWidth: 1,
-        borderBottomColor: '#f0f0f0'
+        borderBottomColor: theme.colors.outlineVariant,
     },
     rowTitle: {
-        fontSize: 16
+        fontSize: 16,
+        color: theme.colors.onSurface,
     },
     rowSubtitle: {
-        color: '#7f8c8d'
+        color: theme.colors.onSurfaceVariant,
     },
     sectionHeader: {
         marginTop: 16,
         marginBottom: 8,
-        fontWeight: '600'
+        fontWeight: '600',
+        color: theme.colors.onSurface,
     },
     sectionSubtitle: {
         fontSize: 14,
-        color: '#666',
+        color: theme.colors.onSurfaceVariant,
         marginBottom: 16,
-        textAlign: 'center'
+        textAlign: 'center',
     },
     sectionHint: {
         fontSize: 13,
-        color: '#888',
+        color: theme.colors.onSurfaceVariant,
         marginBottom: 16,
-        textAlign: 'center'
+        textAlign: 'center',
     },
     inputLabel: {
         fontSize: 13,
-        color: '#888',
-        marginBottom: 8
-    },
-    tagSearchInput: {
-        height: 44,
-        borderWidth: 1,
-        borderColor: '#e0e0e0',
-        borderRadius: 8,
-        paddingHorizontal: 12,
-        backgroundColor: '#fff',
-        fontSize: 16
+        color: theme.colors.onSurfaceVariant,
+        marginBottom: 8,
     },
     chip: {
         marginRight: 8,
-        marginBottom: 8
+        marginBottom: 8,
     },
-    manualInput: {
-        borderWidth: 1,
-        borderColor: '#ddd',
-        borderRadius: 8,
-        height: 48,
-        paddingHorizontal: 12,
-        backgroundColor: '#fff',
+    centeredText: {
+        marginVertical: 12,
+        textAlign: 'center',
         fontSize: 16,
-        textAlign: 'center'
+        color: theme.colors.onSurfaceVariant,
+    },
+    resultText: {
+        marginTop: 16,
+        fontSize: 14,
+        color: theme.colors.onSurface,
+        textAlign: 'center',
     },
     footer: {
         position: 'absolute',
@@ -547,8 +568,8 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         borderTopWidth: 1,
-        borderTopColor: '#eee',
-        backgroundColor: '#fff',
+        borderTopColor: theme.colors.outlineVariant,
+        backgroundColor: theme.colors.surface,
         paddingHorizontal: 16,
         paddingVertical: 12,
         flexDirection: 'row',
@@ -558,10 +579,18 @@ const styles = StyleSheet.create({
     },
     footerRight: {
         flexDirection: 'row',
-        alignItems: 'center'
+        alignItems: 'center',
     },
     listTitle: {
-        fontSize: 16
+        fontSize: 16,
+        color: theme.colors.onSurface,
+    },
+    categoryListContent: {
+        paddingHorizontal: 20,
+        paddingBottom: 200,
+    },
+    categoryListItem: {
+        marginHorizontal: 4,
     },
 });
 

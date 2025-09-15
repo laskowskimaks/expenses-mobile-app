@@ -1,14 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Button, Alert } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, StyleSheet, Animated, Easing } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { IconButton } from 'react-native-paper';
+import { IconButton, Button, Text, useTheme, Surface } from 'react-native-paper';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { useAuth } from '@/context/AuthContext';
+import ConfirmationDialog from '@/components/ConfirmationDialog';
+import { useDialog } from '@/utils/useDialog';
+
+const FRAME_WIDTH_PERCENT = 80;
+const FRAME_HEIGHT_PERCENT = 30;
 
 export default function BarcodeScannerScreen() {
+    const theme = useTheme();
+    const styles = createStyles(theme);
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const [permission, requestPermission] = useCameraPermissions();
@@ -16,12 +23,43 @@ export default function BarcodeScannerScreen() {
     const [isScanningActive, setIsScanningActive] = useState(false);
     const [unsupportedFormat, setUnsupportedFormat] = useState(null);
     const { setIsExternalActivity } = useAuth();
+    const scanAnimation = useRef(new Animated.Value(0)).current;
+    const { dialog, showDialog, hideDialog } = useDialog();
 
     useEffect(() => {
         if (!permission?.granted) {
             requestPermission();
         }
     }, [permission]);
+
+    useEffect(() => {
+        const animation = Animated.loop(
+            Animated.sequence([
+                Animated.timing(scanAnimation, {
+                    toValue: 1,
+                    duration: 1500,
+                    easing: Easing.inOut(Easing.ease),
+                    useNativeDriver: true,
+                }),
+                Animated.timing(scanAnimation, {
+                    toValue: 0,
+                    duration: 1500,
+                    easing: Easing.inOut(Easing.ease),
+                    useNativeDriver: true,
+                }),
+            ])
+        );
+
+        if (isScanningActive) {
+            animation.start();
+        } else {
+            animation.stop();
+            scanAnimation.setValue(0);
+        }
+
+        return () => animation.stop();
+    }, [isScanningActive, scanAnimation]);
+
 
     const handleTakeCardPhoto = async () => {
         setIsExternalActivity(true);
@@ -37,17 +75,23 @@ export default function BarcodeScannerScreen() {
                     [{ resize: { width: 900 } }],
                     { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG }
                 );
-                router.back();
-                setTimeout(() => {
-                    router.setParams({
+                router.replace({
+                    pathname: '/(modals)/AddLoyaltyCardModal',
+                    params: {
                         barcodeData: null,
                         barcodeType: null,
                         imageUri: manipResult.uri,
-                    });
-                }, 100);
+                    }
+                });
             }
         } catch (error) {
-            Alert.alert('Błąd', 'Nie udało się przetworzyć zdjęcia. Spróbuj ponownie.');
+            showDialog({
+                title: 'Błąd',
+                content: 'Nie udało się przetworzyć zdjęcia. Spróbuj ponownie.',
+                confirmText: 'OK',
+                onConfirm: () => { },
+                dangerous: false
+            });
             console.error('[BarcodeScannerScreen] Błąd ImageManipulator:', error);
         }
         setIsExternalActivity(false);
@@ -66,7 +110,6 @@ export default function BarcodeScannerScreen() {
         setScanned(true);
         setIsScanningActive(false);
         setUnsupportedFormat(null);
-        console.log(`[BarcodeScannerScreen] Zeskanowano kod! Typ: ${type}, Dane: ${data}`);
         if (router.canGoBack()) {
             router.back();
             setTimeout(() => {
@@ -85,83 +128,102 @@ export default function BarcodeScannerScreen() {
 
     if (!permission.granted) {
         return (
-            <View style={styles.centered}>
-                <Text style={styles.permissionText}>Brak dostępu do aparatu.</Text>
-                <Text style={styles.permissionSubText}>Aby skanować kody, zezwól na dostęp w ustawieniach telefonu.</Text>
-                <Button title="Wróć" onPress={() => router.back()} />
-            </View>
+            <Surface style={styles.centered}>
+                <Text variant="headlineSmall" style={styles.permissionText}>Brak dostępu do aparatu</Text>
+                <Text variant="bodyMedium" style={styles.permissionSubText}>Aby skanować kody, zezwól na dostęp w ustawieniach telefonu.</Text>
+                <Button mode="contained" onPress={() => router.back()}>Wróć</Button>
+            </Surface>
         );
     }
+
+    const animatedStyle = {
+        transform: [{
+            translateY: scanAnimation.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0, 200],
+            })
+        }]
+    };
 
     return (
         <View style={styles.container}>
             <CameraView
                 onBarcodeScanned={handleBarCodeScanned}
                 barcodeScannerSettings={{
-                    barcodeTypes: [
-                        "aztec",
-                        "ean13",
-                        "ean8",
-                        "qr",
-                        "pdf417",
-                        "upc_e",
-                        "datamatrix",
-                        "code39",
-                        "code93",
-                        "itf14",
-                        "codabar",
-                        "code128",
-                        "upc_a"
-                    ],
+                    barcodeTypes: ["aztec", "ean13", "ean8", "qr", "pdf417", "upc_e", "datamatrix", "code39", "code93", "itf14", "codabar", "code128", "upc_a"],
                 }}
                 style={StyleSheet.absoluteFillObject}
                 facing="back"
             />
-            <View style={[styles.closeButton, { top: insets.top + 10 }]}>
+
+            <View style={styles.overlay}>
+                <View style={styles.overlayTop} />
+                <View style={styles.overlayMiddle}>
+                    <View style={styles.overlaySide} />
+                    <View style={styles.scanFrame}>
+                        <View style={[styles.corner, styles.cornerTopLeft]} />
+                        <View style={[styles.corner, styles.cornerTopRight]} />
+                        <View style={[styles.corner, styles.cornerBottomLeft]} />
+                        <View style={[styles.corner, styles.cornerBottomRight]} />
+                        {isScanningActive && <Animated.View style={[styles.scannerLine, animatedStyle]} />}
+                    </View>
+                    <View style={styles.overlaySide} />
+                </View>
+                <View style={styles.overlayBottom} />
+            </View>
+
+            <Surface style={[styles.closeButton, { top: insets.top + 10 }]}>
                 <IconButton
                     icon="close"
-                    mode="contained"
                     size={24}
                     onPress={() => router.back()}
+                    iconColor={theme.colors.onSurface}
                 />
-            </View>
-            <View style={styles.overlay}>
+            </Surface>
+
+            <View style={styles.bottomContainer}>
                 {!unsupportedFormat ? (
                     <>
                         <Text style={styles.overlayText}>Ustaw kod kreskowy w ramce</Text>
-                        <View style={styles.scanFrame} />
                         {!isScanningActive ? (
                             <Button
-                                title="Rozpocznij skanowanie"
+                                mode="contained"
                                 onPress={() => { setIsScanningActive(true); setScanned(false); }}
-                                color="#2196F3"
-                            />
+                            >
+                                Rozpocznij skanowanie
+                            </Button>
                         ) : (
-                            <Text style={{ color: 'white', marginTop: 16 }}>Skanowanie aktywne...</Text>
+                            <Text style={styles.scanningActiveText}>Skanowanie aktywne...</Text>
                         )}
                     </>
                 ) : (
-                    <View style={{ alignItems: 'center' }}>
-                        <Text style={[styles.overlayText, { color: 'red', marginBottom: 12 }]}>Format "{unsupportedFormat}" nie jest obsługiwany w podglądzie. Możesz zrobić zdjęcie karty lub spróbować ponownie.</Text>
+                    <Surface style={styles.unsupportedContainer}>
+                        <Text style={styles.unsupportedText}>Format "{unsupportedFormat}" nie jest obsługiwany w podglądzie.</Text>
+                        <Text style={styles.unsupportedSubText}>Możesz zrobić zdjęcie karty lub spróbować zeskanować inny kod.</Text>
                         <Button
-                            title="Zrób zdjęcie i dodaj"
+                            mode="contained"
                             onPress={handleTakeCardPhoto}
-                            color="#2196F3"
-                        />
-                        <View style={{ height: 12 }} />
+                            style={{ width: '100%' }}
+                        >
+                            Zrób zdjęcie i dodaj
+                        </Button>
                         <Button
-                            title="Spróbuj ponownie"
+                            mode="outlined"
                             onPress={() => { setScanned(false); setIsScanningActive(false); setUnsupportedFormat(null); }}
-                            color="#666"
-                        />
-                    </View>
+                            style={{ marginTop: 12, width: '100%' }}
+                        >
+                            Spróbuj ponownie
+                        </Button>
+                    </Surface>
                 )}
             </View>
+
+            <ConfirmationDialog {...dialog} onDismiss={hideDialog} />
         </View>
     );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: 'black',
@@ -171,25 +233,96 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         padding: 20,
+        backgroundColor: theme.colors.background,
     },
     permissionText: {
-        fontSize: 18,
-        fontWeight: 'bold',
         textAlign: 'center',
         marginBottom: 8,
     },
     permissionSubText: {
         textAlign: 'center',
         marginBottom: 16,
+        paddingHorizontal: 20,
+        color: theme.colors.onSurfaceVariant,
     },
     closeButton: {
         position: 'absolute',
         left: 10,
         zIndex: 1,
+        borderRadius: 50,
     },
     overlay: {
         ...StyleSheet.absoluteFillObject,
-        justifyContent: 'center',
+        zIndex: 0,
+    },
+    overlayTop: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+    },
+    overlayMiddle: {
+        height: `${FRAME_HEIGHT_PERCENT}%`,
+        flexDirection: 'row',
+    },
+    overlaySide: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+    },
+    overlayBottom: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+    },
+    scanFrame: {
+        width: `${FRAME_WIDTH_PERCENT}%`,
+        position: 'relative',
+        overflow: 'hidden',
+    },
+    corner: {
+        position: 'absolute',
+        width: 30,
+        height: 30,
+        borderColor: 'white',
+        borderWidth: 4,
+    },
+    cornerTopLeft: {
+        top: 0,
+        left: 0,
+        borderBottomWidth: 0,
+        borderRightWidth: 0,
+    },
+    cornerTopRight: {
+        top: 0,
+        right: 0,
+        borderBottomWidth: 0,
+        borderLeftWidth: 0,
+    },
+    cornerBottomLeft: {
+        bottom: 0,
+        left: 0,
+        borderTopWidth: 0,
+        borderRightWidth: 0,
+    },
+    cornerBottomRight: {
+        bottom: 0,
+        right: 0,
+        borderTopWidth: 0,
+        borderLeftWidth: 0,
+    },
+    scannerLine: {
+        width: '100%',
+        height: 2,
+        backgroundColor: 'white',
+        shadowColor: 'white',
+        shadowOpacity: 1,
+        shadowRadius: 10,
+        elevation: 5,
+    },
+    bottomContainer: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        padding: 30,
+        paddingBottom: 40,
         alignItems: 'center',
     },
     overlayText: {
@@ -197,16 +330,29 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: 'bold',
         marginBottom: 20,
-        backgroundColor: 'rgba(0,0,0,0.6)',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 8,
+        textAlign: 'center',
     },
-    scanFrame: {
-        width: '80%',
-        height: '30%',
-        borderWidth: 3,
-        borderColor: 'white',
-        borderRadius: 20,
+    scanningActiveText: {
+        color: 'white',
+        marginTop: 16,
+        fontSize: 16,
+    },
+    unsupportedContainer: {
+        backgroundColor: theme.colors.surface,
+        borderRadius: theme.roundness * 2,
+        padding: 20,
+        width: '100%',
+        alignItems: 'center',
+    },
+    unsupportedText: {
+        color: theme.colors.error,
+        fontWeight: 'bold',
+        textAlign: 'center',
+        marginBottom: 8,
+    },
+    unsupportedSubText: {
+        color: theme.colors.onSurfaceVariant,
+        textAlign: 'center',
+        marginBottom: 20,
     },
 });

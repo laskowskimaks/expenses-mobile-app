@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { View, StyleSheet, Pressable, FlatList, Alert } from 'react-native';
-import { useTheme, Text, Button, IconButton, Badge } from 'react-native-paper';
+import { View, StyleSheet, Pressable, FlatList } from 'react-native';
+import { useTheme, Text, IconButton, Badge } from 'react-native-paper';
 import { useFocusEffect, useRouter } from 'expo-router';
 import RNModal from 'react-native-modal';
 import { useDb } from '@/context/DbContext';
@@ -8,11 +8,13 @@ import { getAllPeriodicTransactions, deletePeriodicTransaction } from '@/service
 import { getAllCategories } from '@/services/categoryService';
 import { getAllTags } from '@/services/tagService';
 import PeriodicTransactionItem from './components/PeriodicTransactionItem';
-import SearchBar from '@/components/SearchBar'; 
-import useDebounce from '@/utils/useDebounce'; 
+import SearchBar from '@/components/SearchBar';
+import useDebounce from '@/utils/useDebounce';
 import PeriodicFilterModal, { createDefaultPeriodicFilters } from './PeriodicFilterModal';
 import PeriodicDefinitionActionModal from './PeriodicDefinitionActionModal';
 import { getCurrentTimestamp } from '@/utils/dateUtils';
+import ConfirmationDialog from '@/components/ConfirmationDialog';
+import { useDialog } from '@/utils/useDialog';
 
 const getActiveFiltersCount = (filters) => {
     const defaults = createDefaultPeriodicFilters();
@@ -31,7 +33,7 @@ export default function ManagePeriodicTransactionsModal() {
     const theme = useTheme();
     const router = useRouter();
     const { db } = useDb();
-    
+
     const [allTransactions, setAllTransactions] = useState([]);
     const [searchInput, setSearchInput] = useState('');
     const debouncedSearchQuery = useDebounce(searchInput, 300);
@@ -44,6 +46,7 @@ export default function ManagePeriodicTransactionsModal() {
     const [periodicModalVisible, setPeriodicModalVisible] = useState(false);
     const [selectedTransaction, setSelectedTransaction] = useState(null);
     const [currentActionType, setCurrentActionType] = useState(null);
+    const { dialog, showDialog, hideDialog } = useDialog();
 
     const fetchTransactions = useCallback(async () => {
         if (db) {
@@ -53,7 +56,7 @@ export default function ManagePeriodicTransactionsModal() {
     }, [db]);
 
     const loadOptions = useCallback(async () => {
-        if(db) {
+        if (db) {
             const [cats, tags] = await Promise.all([getAllCategories(db), getAllTags(db)]);
             setCategoriesOptions(cats);
             setTagsOptions(tags);
@@ -70,10 +73,10 @@ export default function ManagePeriodicTransactionsModal() {
     const filteredAndSortedTransactions = useMemo(() => {
         const currentTimestamp = getCurrentTimestamp();
         let filtered = [...allTransactions];
-        
+
         if (debouncedSearchQuery) {
             const query = debouncedSearchQuery.toLowerCase();
-            filtered = filtered.filter(tx => 
+            filtered = filtered.filter(tx =>
                 tx.title.toLowerCase().includes(query) ||
                 (tx.notes && tx.notes.toLowerCase().includes(query))
             );
@@ -90,7 +93,7 @@ export default function ManagePeriodicTransactionsModal() {
             filtered = filtered.filter(tx => tx.tags.some(tag => tagIds.includes(tag.id)));
         }
         if (transactionType !== 'all') {
-             filtered = filtered.filter(tx => transactionType === 'income' ? tx.amount > 0 : tx.amount < 0);
+            filtered = filtered.filter(tx => transactionType === 'income' ? tx.amount > 0 : tx.amount < 0);
         }
         if (amountMin) {
             filtered = filtered.filter(tx => Math.abs(tx.amount) >= parseFloat(amountMin));
@@ -98,16 +101,16 @@ export default function ManagePeriodicTransactionsModal() {
         if (amountMax) {
             filtered = filtered.filter(tx => Math.abs(tx.amount) <= parseFloat(amountMax));
         }
-        if(dateFrom) {
+        if (dateFrom) {
             filtered = filtered.filter(tx => tx.startDate >= dateFrom);
         }
-        if(dateTo) {
-             filtered = filtered.filter(tx => tx.startDate <= dateTo);
+        if (dateTo) {
+            filtered = filtered.filter(tx => tx.startDate <= dateTo);
         }
 
         const { sort } = appliedFilters;
         filtered.sort((a, b) => {
-            switch(sort) {
+            switch (sort) {
                 case 'next_occurrence_asc': return a.nextOccurrenceDate - b.nextOccurrenceDate;
                 case 'next_occurrence_desc': return b.nextOccurrenceDate - a.nextOccurrenceDate;
                 case 'start_date_desc': return b.startDate - a.startDate;
@@ -144,23 +147,28 @@ export default function ManagePeriodicTransactionsModal() {
         if (currentActionType === 'delete') {
             const result = await deletePeriodicTransaction({ db, periodicTransactionId: selectedTransaction.id, mode });
             if (result.success) {
-                //Alert.alert("Sukces", "Operacja została wykonana pomyślnie.");
                 fetchTransactions();
             } else {
-                Alert.alert("Błąd", result.message);
+                showDialog({
+                    title: "Błąd",
+                    content: result.message,
+                    confirmText: "OK",
+                    onConfirm: () => { },
+                    dangerous: false
+                });
             }
         }
 
         if (currentActionType === 'edit') {
-            router.push({ 
-                pathname: '/(modals)/EditPeriodicTransactionModal', 
-                params: { 
-                    transactionId: selectedTransaction.id, 
-                    editMode: mode 
-                } 
+            router.push({
+                pathname: '/(modals)/EditPeriodicTransactionModal',
+                params: {
+                    transactionId: selectedTransaction.id,
+                    editMode: mode
+                }
             });
         }
-        
+
         setSelectedTransaction(null);
         setCurrentActionType(null);
     };
@@ -179,12 +187,12 @@ export default function ManagePeriodicTransactionsModal() {
             <View style={[styles.modalSheet, { backgroundColor: theme.colors.background }]}>
                 <View style={styles.header}>
                     <Text variant="headlineMedium" style={styles.headerTitle}>Transakcje cykliczne</Text>
-                     <IconButton icon="close" onPress={() => router.back()} style={styles.closeButton} />
+                    <IconButton icon="close" onPress={() => router.back()} style={styles.closeButton} />
                 </View>
-                
+
                 <View style={styles.controlsContainer}>
-                    <View style={{flex: 1}}>
-                         <SearchBar 
+                    <View style={{ flex: 1 }}>
+                        <SearchBar
                             value={searchInput}
                             onChangeText={setSearchInput}
                             placeholder="Szukaj..."
@@ -206,18 +214,19 @@ export default function ManagePeriodicTransactionsModal() {
                     data={filteredAndSortedTransactions}
                     keyExtractor={(item) => item.id.toString()}
                     renderItem={({ item }) => (
-                        <PeriodicTransactionItem 
-                            transaction={item} 
+                        <PeriodicTransactionItem
+                            transaction={item}
                             onEdit={() => handleEdit(item)}
                             onDelete={() => handleDelete(item)}
                         />
-                    )}
+                    )
+                    }
                     contentContainerStyle={styles.listContent}
                     ListEmptyComponent={renderEmptyComponent}
                 />
 
                 <RNModal isVisible={filterVisible} onBackdropPress={() => setFilterVisible(false)} onBackButtonPress={() => setFilterVisible(false)} style={{ margin: 0 }} avoidKeyboard>
-                    <PeriodicFilterModal 
+                    <PeriodicFilterModal
                         initialFilters={appliedFilters}
                         onApply={filters => { setAppliedFilters(filters); setFilterVisible(false); }}
                         onClose={() => setFilterVisible(false)}
@@ -226,7 +235,7 @@ export default function ManagePeriodicTransactionsModal() {
                     />
                 </RNModal>
 
-                 <PeriodicDefinitionActionModal 
+                <PeriodicDefinitionActionModal
                     visible={periodicModalVisible}
                     onDismiss={() => setPeriodicModalVisible(false)}
                     onSelect={handlePeriodicActionSelect}
@@ -234,6 +243,7 @@ export default function ManagePeriodicTransactionsModal() {
                     transaction={selectedTransaction}
                 />
             </View>
+            <ConfirmationDialog {...dialog} onDismiss={hideDialog} />
         </>
     );
 }

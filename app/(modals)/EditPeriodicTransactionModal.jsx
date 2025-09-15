@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { View, StyleSheet, ScrollView, Alert, TouchableOpacity, Keyboard, Pressable } from 'react-native';
-import { Appbar, Button, Text, TextInput, SegmentedButtons, useTheme, HelperText, Icon, Chip } from 'react-native-paper';
+import { View, StyleSheet, ScrollView, Keyboard, Pressable } from 'react-native';
+import { Button, Text, TextInput, SegmentedButtons, useTheme, HelperText, Icon, Chip } from 'react-native-paper';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -8,11 +8,12 @@ import { useDb } from '@/context/DbContext';
 import { getPeriodicTransactionById, updatePeriodicTransaction } from '@/services/periodicTransactionService';
 import { getAllCategories } from '@/services/categoryService';
 import { getAllTags } from '@/services/tagService';
-import { formatDateOnly } from '@/utils/dateUtils';
 import CategoryPicker from './components/CategoryPicker';
 import TagsModal from './components/TagsModal';
 import RepeatUnitPicker from './components/RepeatUnitPicker';
 import useDebounce from '@/utils/useDebounce';
+import ConfirmationDialog from '@/components/ConfirmationDialog';
+import { useDialog } from '@/utils/useDialog';
 
 const REPEAT_UNITS = [
     { value: 'day', label: 'Dni', labelSingle: 'dzień', labelPlural: 'dni' },
@@ -137,6 +138,7 @@ export default function EditPeriodicTransactionModal() {
     const [availableTags, setAvailableTags] = useState([]);
     const categorySheetRef = useRef(null);
     const debouncedTagSearch = useDebounce(ui.tagSearchText, 300);
+    const { dialog, showDialog, hideDialog } = useDialog();
 
     useEffect(() => {
         const loadInitialData = async () => {
@@ -159,7 +161,7 @@ export default function EditPeriodicTransactionModal() {
                         const today = new Date();
                         today.setHours(0, 0, 0, 0);
                         startDate = today;
-                        
+
                         const originalTime = new Date(transactionData.startDate * 1000);
                         startTime = new Date();
                         startTime.setHours(originalTime.getHours(), originalTime.getMinutes(), 0, 0);
@@ -177,7 +179,7 @@ export default function EditPeriodicTransactionModal() {
                     } else {
                         startDate = new Date(transactionData.startDate * 1000);
                         startDate.setHours(0, 0, 0, 0);
-                        
+
                         const originalDateTime = new Date(transactionData.startDate * 1000);
                         startTime = new Date();
                         startTime.setHours(originalDateTime.getHours(), originalDateTime.getMinutes(), 0, 0);
@@ -202,7 +204,13 @@ export default function EditPeriodicTransactionModal() {
                         startTime: startTime
                     });
                 } else {
-                    Alert.alert("Błąd", "Nie znaleziono transakcji.", [{ text: "OK", onPress: () => router.back() }]);
+                    showDialog({
+                        title: "Błąd",
+                        content: "Nie znaleziono transakcji.",
+                        confirmText: "OK",
+                        onConfirm: () => router.back(),
+                        dangerous: false
+                    });
                 }
             }
         };
@@ -238,13 +246,18 @@ export default function EditPeriodicTransactionModal() {
     const handleSave = async () => {
         Keyboard.dismiss();
         if (!form.title.trim() || !form.amount || !form.selectedCategory) {
-            Alert.alert("Błąd", "Tytuł, kwota i kategoria są wymagane.");
+            showDialog({
+                title: "Błąd",
+                content: "Tytuł, kwota i kategoria są wymagane.",
+                confirmText: "OK",
+                onConfirm: () => { },
+                dangerous: false
+            });
             return;
         }
 
         updateUi('isSaving', true);
-        
-        // Połącz datę i czas
+
         const finalStartDate = new Date(
             form.startDate.getFullYear(),
             form.startDate.getMonth(),
@@ -256,19 +269,25 @@ export default function EditPeriodicTransactionModal() {
         const result = await updatePeriodicTransaction({
             db,
             id: parseInt(params.transactionId),
-            data: { 
-                ...form, 
+            data: {
+                ...form,
                 categoryId: form.selectedCategory.id,
                 startDate: finalStartDate
             },
-            mode: params.editMode 
+            mode: params.editMode
         });
         updateUi('isSaving', false);
 
         if (result.success) {
             router.back();
         } else {
-            Alert.alert("Błąd", result.message || "Nie udało się zapisać zmian.");
+            showDialog({
+                title: "Błąd",
+                content: result.message || "Nie udało się zapisać zmian.",
+                confirmText: "OK",
+                onConfirm: () => { },
+                dangerous: false
+            });
         }
     };
 
@@ -465,10 +484,11 @@ export default function EditPeriodicTransactionModal() {
                 <TagsModal visible={ui.isTagsModalVisible} onClose={() => updateUi('isTagsModalVisible', false)} tags={form.tags} availableTags={availableTags} filteredTags={filteredTags} tagSearchText={ui.tagSearchText} onTagSearchChange={(val) => updateUi('tagSearchText', val)} onSelectTag={handleSelectTag} onAddNewTag={handleAddNewTag} />
                 <RepeatUnitPicker visible={ui.isRepeatUnitPickerVisible} onClose={() => updateUi('isRepeatUnitPickerVisible', false)} repeatUnits={REPEAT_UNITS} selectedUnit={form.repeatUnit} onSelectUnit={(unit) => { updateForm('repeatUnit', unit); updateUi('isRepeatUnitPickerVisible', false) }} />
 
-                {ui.showStartDatePicker && <DateTimePicker value={form.startDate} mode="date" display="default" onChange={(e, d) => {updateUi('showStartDatePicker', false); if(d) updateForm('startDate', d)}} />}
-                {ui.showStartTimePicker && <DateTimePicker value={form.startTime} mode="time" display="default" onChange={(e, t) => {updateUi('showStartTimePicker', false); if(t) updateForm('startTime', t)}} />}
-                {ui.showEndDatePicker && <DateTimePicker value={form.endDate || new Date()} mode="date" display="default" onChange={(e, d) => {updateUi('showEndDatePicker', false); if(d) updateForm('endDate', d)}} minimumDate={form.startDate}/>}
+                {ui.showStartDatePicker && <DateTimePicker value={form.startDate} mode="date" display="default" onChange={(e, d) => { updateUi('showStartDatePicker', false); if (d) updateForm('startDate', d) }} />}
+                {ui.showStartTimePicker && <DateTimePicker value={form.startTime} mode="time" display="default" onChange={(e, t) => { updateUi('showStartTimePicker', false); if (t) updateForm('startTime', t) }} />}
+                {ui.showEndDatePicker && <DateTimePicker value={form.endDate || new Date()} mode="date" display="default" onChange={(e, d) => { updateUi('showEndDatePicker', false); if (d) updateForm('endDate', d) }} minimumDate={form.startDate} />}
             </View>
+            <ConfirmationDialog {...dialog} onDismiss={hideDialog} />
         </>
     );
 }

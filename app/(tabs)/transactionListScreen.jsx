@@ -26,6 +26,8 @@ import FilterModal, { getActiveFiltersCount, createDefaultFilters } from '@/comp
 import PeriodicActionChoiceModal from '@/components/PeriodicActionChoiceModal';
 import { getAllCategories } from '@/services/categoryService';
 import { getAllTags } from '@/services/tagService';
+import { useDialog } from '@/utils/useDialog';
+import ConfirmationDialog from '@/components/ConfirmationDialog';
 
 function getDateKey(tx) {
   const ts = typeof tx.transactionDate === 'number' ? tx.transactionDate * 1000 : Date.now();
@@ -92,6 +94,7 @@ export default function TransactionListScreen() {
   const theme = useTheme();
   const router = useRouter();
   const params = useLocalSearchParams();
+  const { dialog, showDialog, hideDialog } = useDialog();
 
   const [searchInput, setSearchInput] = useState('');
   const debouncedSearchQuery = useDebounce(searchInput, 100);
@@ -239,13 +242,6 @@ export default function TransactionListScreen() {
 
       if (periodicResult.success && periodicResult.addedCount > 0) {
         console.log(`[TransactionListScreen] Dodano ${periodicResult.addedCount} automatycznych transakcji`);
-        if (__DEV__) {
-          Alert.alert(
-            'Automatyczne transakcje',
-            periodicResult.message,
-            [{ text: 'OK' }]
-          );
-        }
       }
 
       const transactionsFromDb = await getAllTransactionsSorted(db);
@@ -318,9 +314,29 @@ export default function TransactionListScreen() {
       setCurrentActionType('delete');
       setPeriodicModalVisible(true);
     } else {
-      Alert.alert('Potwierdź usunięcie', 'Czy na pewno chcesz trwale usunąć tę transakcję?', [{ text: 'Anuluj', style: 'cancel' }, { text: 'Usuń', style: 'destructive', onPress: async () => { const result = await deleteTransaction(db, transaction.id, { mode: 'single' }); if (result.success) { eventEmitter.emit('transactionDeleted', { id: transaction.id }); } else { Alert.alert('Błąd', result.message || 'Nie udało się usunąć transakcji.'); } } }]);
+      showDialog({
+        title: 'Potwierdź usunięcie',
+        content: 'Czy na pewno chcesz trwale usunąć tę transakcję?',
+        confirmText: 'Usuń',
+        onConfirm: async () => {
+          const result = await deleteTransaction(db, transaction.id, { mode: 'single' });
+          if (result.success) {
+            eventEmitter.emit('transactionDeleted', { id: transaction.id });
+          } else {
+            showDialog({
+              title: 'Błąd',
+              content: result.message || 'Nie udało się usunąć transakcji.',
+              confirmText: 'OK',
+              onConfirm: () => { },
+              dangerous: false
+            });
+          }
+        },
+        dangerous: true
+      });
     }
-  }, [db]);
+  }, [db, showDialog]);
+
   const handlePeriodicActionSelect = async (mode) => {
     setPeriodicModalVisible(false);
     if (!selectedTransaction || !currentActionType) return;
@@ -543,6 +559,8 @@ export default function TransactionListScreen() {
   const getItemType = useCallback((item) => item.type, []);
   const renderPlaceholder = useCallback(() => <TransactionSkeleton variant="compact" />, []);
 
+  const styles = createStyles(theme);
+
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <View style={styles.searchRow}>
@@ -559,11 +577,11 @@ export default function TransactionListScreen() {
 
       <View style={styles.filterActionsRow}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsScroll}>
-          <Chip icon="filter-variant" mode="outlined" onPress={() => openFilter('main')} onClose={activeFilterCount > 0 ? clearAllFilters : undefined} closeIcon="close" style={styles.chip} compact>
-            <Text style={styles.chipText}>Filtruj{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}</Text>
+          <Chip icon="filter-variant" mode="outlined" onPress={() => openFilter('main')} onClose={activeFilterCount > 0 ? clearAllFilters : undefined} closeIcon="close" style={[styles.chip, { backgroundColor: theme.colors.surface, borderColor: theme.colors.outline }]} compact textStyle={[styles.chipText, { color: theme.colors.onSurface }]}>
+            Filtry{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
           </Chip>
-          {groupedChips.length === 0 ? (<View style={styles.noChipsPlaceholder}><Text style={styles.noChipsText}>Brak aktywnych filtrów</Text></View>) : (
-            groupedChips.map(ch => (<Chip key={ch.key} mode="outlined" onPress={() => openFilter(mapChipKeyToScreen(ch.key))} onClose={ch.onClose} closeIcon="close" style={styles.chip} compact><Text style={styles.chipText}>{ch.label}</Text></Chip>))
+          {groupedChips.length === 0 ? (<View style={styles.noChipsPlaceholder}><Text style={[styles.noChipsText, { color: theme.colors.onSurfaceVariant }]}>Brak aktywnych filtrów</Text></View>) : (
+            groupedChips.map(ch => (<Chip key={ch.key} mode="outlined" onPress={() => openFilter(mapChipKeyToScreen(ch.key))} onClose={ch.onClose} closeIcon="close" style={[styles.chip, { backgroundColor: theme.colors.surface, borderColor: theme.colors.outline }]} compact textStyle={[styles.chipText, { color: theme.colors.onSurface }]}>{ch.label}</Chip>))
           )}
         </ScrollView>
         <IconButton
@@ -595,6 +613,7 @@ export default function TransactionListScreen() {
         </View>
       </RNModal>
       <PeriodicActionChoiceModal visible={periodicModalVisible} onDismiss={() => setPeriodicModalVisible(false)} onSelect={handlePeriodicActionSelect} actionType={currentActionType} />
+      <ConfirmationDialog {...dialog} onDismiss={hideDialog} />
     </View>
   );
 }
@@ -650,7 +669,7 @@ function transactionPassesFilters(transaction, filters) {
   return true;
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   container: { flex: 1 },
   searchRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8 },
   searchbar: { flex: 1, marginVertical: 8, borderRadius: 12 },
@@ -672,10 +691,14 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
 
-  chip: { marginRight: 8, height: 34, justifyContent: 'center' },
-  chipText: { fontSize: 13, color: '#111' },
+  chip: {
+    marginRight: 8,
+    height: 34,
+    justifyContent: 'center'
+  },
+  chipText: { fontSize: 13, fontWeight: '500' },
   noChipsPlaceholder: { justifyContent: 'center', height: 34 },
-  noChipsText: { color: '#7f8c8d', fontSize: 13 },
+  noChipsText: { fontSize: 13, fontStyle: 'italic' },
   transactionsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 15, paddingTop: 10, paddingBottom: 10, backgroundColor: '#f8f9fa' },
   transactionsTitle: { fontSize: 18, fontWeight: 'bold', color: '#2c3e50', flex: 1 },
   sortLabel: { fontSize: 12, color: '#666', marginRight: 8 },

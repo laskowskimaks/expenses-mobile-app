@@ -128,7 +128,7 @@ export const DbProvider = ({ children }) => {
                             console.log(`[DbContext] ${periodicResult.message}`);
                             console.log(`[DbContext] Dodane transakcje:`, periodicResult.addedTransactions.map(t => t.title));
                             if (__DEV__) {
-                                Alert.alert('Dodano nowe transakcje', periodicResult.message);
+                                //Alert.alert('Dodano nowe transakcje', periodicResult.message);
                             }
                         } else {
                             console.log('[DbContext] Sprawdzenie transakcji okresowych zakończone - brak nowych transakcji');
@@ -186,9 +186,9 @@ export const DbProvider = ({ children }) => {
         } catch (e) {
             if (e && e.message && e.message.includes('UNIQUE constraint failed')) {
                 console.log('[DbContext] email już zarejestrowany:', email);
-                alert('Nazwa użytkownika już zajęta');
+                throw new Error('Nazwa użytkownika już zajęta');
             } else {
-                alert('Wystąpił krytyczny błąd podczas rejestracji. Spróbuj ponownie.');
+                throw new Error('Wystąpił krytyczny błąd podczas rejestracji. Spróbuj ponownie.');
             }
 
             setDb(null);
