@@ -168,6 +168,42 @@ export default function HomeScreen() {
       }
     };
 
+    const handleSettingsChange = async (payload) => {
+
+      if (payload?.key === 'savings_goal') {
+        setIsInitialLoading(true);
+        try {
+          const settings = await getAllSettingsAsObject(db);
+          const goal = parseFloat(settings.savings_goal) || 0;
+          setSavingsGoal(goal);
+          await fetchDataForPeriod();
+        } catch (error) {
+          console.error("[HomeScreen] Błąd podczas odświeżania celu oszczędnościowego:", error);
+        } finally {
+          setIsInitialLoading(false);
+        }
+      }
+      if (payload?.key === 'payment_day') {
+        setIsInitialLoading(true);
+        try {
+          const settings = await getAllSettingsAsObject(db);
+          const day = settings.billing_period_start_day || '1';
+          setBillingStartDay(day);
+          const newPeriod = {
+            ...calculatePeriod(new Date(), day),
+            type: 'billing'
+          };
+          setCurrentPeriod(newPeriod);
+
+          await fetchDataForPeriod();
+        } catch (error) {
+          console.error("[HomeScreen] Błąd podczas odświeżania dnia rozpoczęcia okresu:", error);
+        } finally {
+          setIsInitialLoading(false);
+        }
+      }
+    };
+
     eventEmitter.on('transactionAdded', handleTransactionChange);
     eventEmitter.on('transactionEdited', handleTransactionChange);
     eventEmitter.on('transactionDeleted', handleTransactionChange);
@@ -175,6 +211,7 @@ export default function HomeScreen() {
     eventEmitter.on('periodicTransactionAdded', handleTransactionChange);
     eventEmitter.on('categoriesChanged', handleCategoriesChange);
     eventEmitter.on('tagsChanged', handleTagsChange);
+    eventEmitter.on('settingsChanged', handleSettingsChange);
 
     return () => {
       eventEmitter.off('transactionAdded', handleTransactionChange);
@@ -184,6 +221,8 @@ export default function HomeScreen() {
       eventEmitter.off('periodicTransactionAdded', handleTransactionChange);
       eventEmitter.off('categoriesChanged', handleCategoriesChange);
       eventEmitter.off('tagsChanged', handleTagsChange);
+      eventEmitter.off('settingsChanged', handleSettingsChange);
+
     };
   }, [db, fetchDataForPeriod, currentPeriod]);
 

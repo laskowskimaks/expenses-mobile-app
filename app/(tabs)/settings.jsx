@@ -13,6 +13,7 @@ import { insertTestData } from '@/database/insertTestData';
 import ConfirmationDialog from '@/components/ConfirmationDialog';
 import InformationDialog from '@/components/InformationDialog';
 import { useDialog } from '@/utils/useDialog';
+import { eventEmitter } from '@/utils/eventEmitter';
 
 export default function SettingsScreen() {
   const theme = useTheme();
@@ -76,10 +77,21 @@ export default function SettingsScreen() {
       setErrors({ paymentDay: 'Wprowadź liczbę od 1 do 31.' });
       return;
     }
-    await upsertSetting(db, 'billing_period_start_day', String(day));
-    setPaymentDay(String(day));
-    setErrors({});
-    setExpandedAccordion(null);
+    try {
+      await upsertSetting(db, 'billing_period_start_day', String(day));
+      setPaymentDay(String(day));
+      setErrors({});
+      setExpandedAccordion(null);
+    } catch (error) {
+      console.error("[SettingsScreen] Błąd podczas zapisu dnia płatności:", error);
+      showInfoDialog({
+        title: 'Błąd',
+        content: 'Wystąpił błąd podczas zapisywania dnia płatności.',
+        type: 'error'
+      });
+    }
+    eventEmitter.emit('settingsChanged', { key: 'payment_day' });
+
   };
 
   const handleSaveSavingsGoal = async () => {
@@ -88,18 +100,42 @@ export default function SettingsScreen() {
       setErrors({ savingsGoal: 'Wprowadź poprawną, nieujemną kwotę.' });
       return;
     }
-    await upsertSetting(db, 'savings_goal', String(goal));
-    setSavingsGoal(String(goal));
-    setErrors({});
-    setExpandedAccordion(null);
+    try {
+      await upsertSetting(db, 'savings_goal', String(goal));
+      setSavingsGoal(String(goal));
+      setErrors({});
+      setExpandedAccordion(null);
+
+    } catch (error) {
+      console.error("[SettingsScreen] Błąd zapisu celu oszczędności:", error);
+      showInfoDialog({
+        title: 'Błąd',
+        content: 'Wystąpił błąd podczas zapisywania celu oszczędności.',
+        type: 'error'
+      });
+      return;
+    }
+    eventEmitter.emit('settingsChanged', { key: 'savings_goal' });
+
   };
 
   const handleRemoveSavingsGoal = async () => {
-    await upsertSetting(db, 'savings_goal', '0');
-    setSavingsGoal('0');
-    setTempSavingsGoal('');
-    setErrors({});
-    setExpandedAccordion(null);
+    try {
+      await upsertSetting(db, 'savings_goal', '0');
+      setSavingsGoal('0');
+      setTempSavingsGoal('');
+      setErrors({});
+      setExpandedAccordion(null);
+    } catch (error) {
+      console.error("[SettingsScreen] Błąd usuwania celu oszczędności:", error);
+      showInfoDialog({
+        title: 'Błąd',
+        content: 'Wystąpił błąd podczas usuwania celu oszczędności.',
+        type: 'error'
+      });
+    }
+    eventEmitter.emit('settingsChanged', { key: 'savings_goal' });
+
   };
 
   const handleChangeEmail = () => router.push('/(modals)/ChangeEmailModal');
