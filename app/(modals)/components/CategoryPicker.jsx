@@ -53,7 +53,13 @@ const CategoryPicker = ({
 
   const handleCategorySelect = useCallback((category) => {
     onSelectCategory(category);
-    bottomSheetRef.current?.close();
+    if (bottomSheetRef && bottomSheetRef.current && typeof bottomSheetRef.current.close === 'function') {
+      try {
+        bottomSheetRef.current.close();
+      } catch (e) {
+        console.warn('Nie udało się zamknąć CategoryPicker:', e);
+      }
+    }
   }, [onSelectCategory, bottomSheetRef]);
 
   const renderBackdrop = useCallback(
@@ -86,6 +92,14 @@ const CategoryPicker = ({
     index,
   }), []);
 
+  const renderEmptyComponent = () => (
+    <View style={styles.emptyContainer}>
+      <Text style={{ color: theme.colors.onSurfaceVariant, textAlign: 'center', marginTop: 32 }}>
+        Brak kategorii do wyświetlenia.
+      </Text>
+    </View>
+  );
+
   return (
     <BottomSheet
       ref={bottomSheetRef}
@@ -113,6 +127,7 @@ const CategoryPicker = ({
           style={styles.flatListStyle}
           contentContainerStyle={styles.flatListContent}
           accessibilityRole="list"
+          ListEmptyComponent={renderEmptyComponent}
         />
       )}
     </BottomSheet>
@@ -122,11 +137,36 @@ const CategoryPicker = ({
 export default memo(CategoryPicker);
 
 const styles = StyleSheet.create({
-  bottomSheetContent: { flex: 1, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 0 },
-  bottomSheetTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  flatListStyle: { flex: 1 },
-  flatListContent: { flexGrow: 1, paddingBottom: 40 },
+  bottomSheetContent: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 0
+  },
+  bottomSheetTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  flatListStyle: {
+    flex: 1
+  },
+  flatListContent: {
+    flexGrow: 1,
+    paddingBottom: 40
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    minHeight: 120,
+  },
   categoryPickerItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -137,8 +177,21 @@ const styles = StyleSheet.create({
     minHeight: 64,
   },
   categoryIcon: {
-    width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginRight: 12,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.2, shadowRadius: 2, elevation: 2,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
   },
-  categoryName: { flex: 1, fontSize: 16, fontWeight: '500' },
+  categoryName: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '500'
+  },
 });

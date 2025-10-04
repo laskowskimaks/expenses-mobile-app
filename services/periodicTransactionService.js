@@ -162,7 +162,7 @@ export const addPeriodicTransaction = async (dbOrDbTransaction, periodicTransact
             const normalizedAmount = String(periodicTransactionData.amount || '0').replace(',', '.').replace(/[^0-9.]/g, '');
             let finalAmount = parseFloat(normalizedAmount);
             if (isNaN(finalAmount) || finalAmount <= 0) throw new Error('Kwota musi być liczbą większą od 0');
-            if (periodicTransactionData.type === 'expenditure') finalAmount = -Math.abs(finalAmount);
+            if (periodicTransactionData.type === 'expense') finalAmount = -Math.abs(finalAmount);
 
             const startTimestamp = Math.floor(periodicTransactionData.startDate.getTime() / 1000);
             const endTimestamp = periodicTransactionData.endDate ? Math.floor(periodicTransactionData.endDate.getTime() / 1000) : null;
@@ -378,7 +378,7 @@ export const updatePeriodicTransaction = async ({ db, id, data, mode = 'all' }) 
                 const startDateTimestamp = Math.floor(data.startDate.getTime() / 1000);
                 const periodicData = {
                     title: data.title,
-                    amount: data.type === 'expenditure' ? -Math.abs(parseFloat(data.amount)) : Math.abs(parseFloat(data.amount)),
+                    amount: data.type === 'expense' ? -Math.abs(parseFloat(data.amount)) : Math.abs(parseFloat(data.amount)),
                     notes: data.description,
                     categoryId: data.categoryId,
                     repeatInterval: parseInt(data.repeatInterval),

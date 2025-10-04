@@ -13,15 +13,16 @@ const formatInterval = (interval, unit) => {
             case 'week': return 'Co tydzień';
             case 'month': return 'Co miesiąc';
             case 'year': return 'Co rok';
+            default: return `Co ${interval} (${unit || 'nieznana jednostka'})`;
         }
     }
     switch (unit) {
         case 'day': return `Co ${interval} dni`;
-        case 'week': return `Co ${interval} tygodnie`;
-        case 'month': return `Co ${interval} miesiące`;
-        case 'year': return `Co ${interval} lata`;
+        case 'week': return `Co ${interval} tygodni`;
+        case 'month': return `Co ${interval} miesięcy`;
+        case 'year': return `Co ${interval} lat`;
+        default: return `Co ${interval} (${unit || 'nieznana jednostka'})`;
     }
-    return '';
 };
 
 const PeriodicTransactionItem = ({ transaction, onEdit, onDelete, maxVisibleTags = 3 }) => {
@@ -30,12 +31,20 @@ const PeriodicTransactionItem = ({ transaction, onEdit, onDelete, maxVisibleTags
     const swipeableRef = useRef(null);
 
     const handleEdit = () => {
-        swipeableRef.current?.close();
+        try {
+            swipeableRef.current?.close();
+        } catch (e) {
+            console.warn('Błąd podczas zamykania Swipeable przy edycji:', e);
+        }
         onEdit();
     };
 
     const handleDelete = () => {
-        swipeableRef.current?.close();
+        try {
+            swipeableRef.current?.close();
+        } catch (e) {
+            console.warn('Błąd podczas zamykania Swipeable przy usuwaniu:', e);
+        }
         onDelete();
     };
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, Animated, Easing } from 'react-native';
+import { View, StyleSheet, Animated, Easing, Linking, Platform } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -75,7 +75,7 @@ export default function BarcodeScannerScreen() {
                     [{ resize: { width: 900 } }],
                     { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG }
                 );
-                router.replace({
+                router.navigate({
                     pathname: '/(modals)/AddLoyaltyCardModal',
                     params: {
                         barcodeData: null,
@@ -127,11 +127,23 @@ export default function BarcodeScannerScreen() {
     }
 
     if (!permission.granted) {
+        const openSettings = () => {
+            if (Platform.OS === 'ios') {
+                Linking.openURL('app-settings:');
+            } else {
+                Linking.openSettings();
+            }
+        };
         return (
             <Surface style={styles.centered}>
                 <Text variant="headlineSmall" style={styles.permissionText}>Brak dostępu do aparatu</Text>
                 <Text variant="bodyMedium" style={styles.permissionSubText}>Aby skanować kody, zezwól na dostęp w ustawieniach telefonu.</Text>
-                <Button mode="contained" onPress={() => router.back()}>Wróć</Button>
+                <Button mode="contained" onPress={openSettings} style={{ marginBottom: 12 }}>
+                    Otwórz ustawienia
+                </Button>
+                <Button mode="outlined" onPress={() => router.back()}>
+                    Wróć
+                </Button>
             </Surface>
         );
     }

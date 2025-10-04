@@ -63,6 +63,10 @@ export default function ChangeEmailModal() {
       setError('Nowy adres e-mail musi być różny od aktualnego.');
       return;
     }
+    if (!db) {
+      setError('Baza danych nie jest dostępna. Spróbuj ponownie później.');
+      return;
+    }
 
     setIsProcessing(true);
     try {
@@ -78,22 +82,26 @@ export default function ChangeEmailModal() {
       return;
     }
 
-    const result = await changeEmail(newEmail, currentPassword);
-    setIsProcessing(false);
-
-    if (result.success) {
-      setStage(STAGES.AWAITING_CONFIRMATION);
-    } else {
-      if (result.message && result.message.includes('auth/invalid-credential')) {
-        setError('Podano nieprawidłowe hasło.');
-        showInfoDialog({
-          title: 'Podano nieprawidłowe hasło',
-          content: 'Sprawdź podane hasło i spróbuj ponownie.',
-          type: 'warning'
-        });
+    try {
+      const result = await changeEmail(newEmail, currentPassword);
+      if (result.success) {
+        setStage(STAGES.AWAITING_CONFIRMATION);
       } else {
-        setError(result.message || 'Wystąpił błąd podczas zmiany adresu e-mail.');
+        if (result.message && result.message.includes('auth/invalid-credential')) {
+          setError('Podano nieprawidłowe hasło.');
+          showInfoDialog({
+            title: 'Podano nieprawidłowe hasło',
+            content: 'Sprawdź podane hasło i spróbuj ponownie.',
+            type: 'warning'
+          });
+        } else {
+          setError(result.message || 'Wystąpił błąd podczas zmiany adresu e-mail.');
+        }
       }
+    } catch (e) {
+      setError('Wystąpił nieoczekiwany błąd podczas zmiany adresu e-mail.');
+    } finally {
+      setIsProcessing(false);
     }
   };
 

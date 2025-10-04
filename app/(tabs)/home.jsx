@@ -3,7 +3,7 @@ import { useAuth } from '@/context/AuthContext';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import { useDb } from '@/context/DbContext';
 import { getAllSettingsAsObject } from '@/services/authService';
-import { ActivityIndicator, useTheme, Text } from 'react-native-paper';
+import { useTheme, Text } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { getCategoryExpenseData } from '@/services/categoriesChartService';
 import { getSummaryData } from '@/services/summaryService';

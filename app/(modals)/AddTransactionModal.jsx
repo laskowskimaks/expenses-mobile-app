@@ -428,7 +428,7 @@ export default function AddTransactionModal() {
             onValueChange={actions.setType}
             buttons={[
               { value: 'income', label: 'Wpływ', icon: 'arrow-down' },
-              { value: 'expenditure', label: 'Wydatek', icon: 'arrow-up' }
+              { value: 'expense', label: 'Wydatek', icon: 'arrow-up' }
             ]}
             style={styles.formField}
           />

@@ -71,7 +71,25 @@ export default function SettingsScreen() {
     }
   };
 
+  const handlePaymentDayInput = (text) => {
+    const sanitized = text.replace(/[^0-9]/g, '').slice(0, 2);
+    setTempPaymentDay(sanitized);
+  };
+
+  const handleSavingsGoalInput = (text) => {
+    const sanitized = text.replace(/[^0-9.,]/g, '').replace(',', '.').slice(0, 10);
+    setTempSavingsGoal(sanitized);
+  };
+
   const handleSavePaymentDay = async () => {
+    if (!db) {
+      showInfoDialog({
+        title: 'Błąd',
+        content: 'Baza danych nie jest dostępna.',
+        type: 'error'
+      });
+      return;
+    }
     const day = parseInt(tempPaymentDay, 10);
     if (isNaN(day) || day < 1 || day > 31) {
       setErrors({ paymentDay: 'Wprowadź liczbę od 1 do 31.' });
@@ -86,15 +104,22 @@ export default function SettingsScreen() {
       console.error("[SettingsScreen] Błąd podczas zapisu dnia płatności:", error);
       showInfoDialog({
         title: 'Błąd',
-        content: 'Wystąpił błąd podczas zapisywania dnia płatności.',
+        content: `Wystąpił błąd podczas zapisywania dnia płatności: ${error.message || error}`,
         type: 'error'
       });
     }
     eventEmitter.emit('settingsChanged', { key: 'payment_day' });
-
   };
 
   const handleSaveSavingsGoal = async () => {
+    if (!db) {
+      showInfoDialog({
+        title: 'Błąd',
+        content: 'Baza danych nie jest dostępna.',
+        type: 'error'
+      });
+      return;
+    }
     const goal = parseFloat(tempSavingsGoal.replace(',', '.') || '0');
     if (isNaN(goal) || goal < 0) {
       setErrors({ savingsGoal: 'Wprowadź poprawną, nieujemną kwotę.' });
@@ -105,21 +130,27 @@ export default function SettingsScreen() {
       setSavingsGoal(String(goal));
       setErrors({});
       setExpandedAccordion(null);
-
     } catch (error) {
       console.error("[SettingsScreen] Błąd zapisu celu oszczędności:", error);
       showInfoDialog({
         title: 'Błąd',
-        content: 'Wystąpił błąd podczas zapisywania celu oszczędności.',
+        content: `Wystąpił błąd podczas zapisywania celu oszczędności: ${error.message || error}`,
         type: 'error'
       });
       return;
     }
     eventEmitter.emit('settingsChanged', { key: 'savings_goal' });
-
   };
 
   const handleRemoveSavingsGoal = async () => {
+    if (!db) {
+      showInfoDialog({
+        title: 'Błąd',
+        content: 'Baza danych nie jest dostępna.',
+        type: 'error'
+      });
+      return;
+    }
     try {
       await upsertSetting(db, 'savings_goal', '0');
       setSavingsGoal('0');
@@ -130,12 +161,11 @@ export default function SettingsScreen() {
       console.error("[SettingsScreen] Błąd usuwania celu oszczędności:", error);
       showInfoDialog({
         title: 'Błąd',
-        content: 'Wystąpił błąd podczas usuwania celu oszczędności.',
+        content: `Wystąpił błąd podczas usuwania celu oszczędności: ${error.message || error}`,
         type: 'error'
       });
     }
     eventEmitter.emit('settingsChanged', { key: 'savings_goal' });
-
   };
 
   const handleChangeEmail = () => router.push('/(modals)/ChangeEmailModal');
@@ -144,9 +174,16 @@ export default function SettingsScreen() {
   const handleManageCategories = () => router.push('/(modals)/ManageCategoriesModal');
   const handleManageTags = () => router.push('/(modals)/ManageTagsModal');
   const handleManagePeriodic = () => router.push('/(modals)/ManagePeriodicTransactionsModal');
-  const handleManageNotifications = () => console.log('Zarządzaj powiadomieniami');
 
   const handlePerformBackup = async () => {
+    if (!db) {
+      showInfoDialog({
+        title: 'Błąd',
+        content: 'Baza danych nie jest dostępna.',
+        type: 'error'
+      });
+      return;
+    }
     if (isBackupLoading) return;
     setIsBackupLoading(true);
     try {
@@ -160,7 +197,7 @@ export default function SettingsScreen() {
       console.error("[SettingsScreen] Błąd backupu:", error);
       showInfoDialog({
         title: 'Błąd',
-        content: 'Wystąpił błąd podczas tworzenia kopii zapasowej.',
+        content: `Wystąpił błąd podczas tworzenia kopii zapasowej: ${error.message || error}`,
         type: 'error'
       });
     } finally {
@@ -169,6 +206,7 @@ export default function SettingsScreen() {
   };
 
   const performLogout = async () => {
+    if (isLoggingOut) return;
     setIsLoggingOut(true);
     try {
       await logout();
@@ -176,7 +214,7 @@ export default function SettingsScreen() {
       console.error("[SettingsScreen] Błąd wylogowywania:", error);
       showInfoDialog({
         title: 'Błąd',
-        content: 'Wystąpił błąd podczas wylogowywania.',
+        content: `Wystąpił błąd podczas wylogowywania: ${error.message || error}`,
         type: 'error'
       });
     } finally {
@@ -302,7 +340,7 @@ export default function SettingsScreen() {
                 mode="outlined"
                 label="Dzień (1-31)"
                 value={tempPaymentDay}
-                onChangeText={setTempPaymentDay}
+                onChangeText={handlePaymentDayInput}
                 keyboardType="number-pad"
                 maxLength={2}
                 error={!!errors.paymentDay}
@@ -328,7 +366,7 @@ export default function SettingsScreen() {
                 mode="outlined"
                 label="Kwota celu"
                 value={tempSavingsGoal}
-                onChangeText={setTempSavingsGoal}
+                onChangeText={handleSavingsGoalInput}
                 keyboardType="numeric"
                 error={!!errors.savingsGoal}
               />

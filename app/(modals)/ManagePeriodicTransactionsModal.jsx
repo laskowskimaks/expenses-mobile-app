@@ -50,18 +50,38 @@ export default function ManagePeriodicTransactionsModal() {
 
     const fetchTransactions = useCallback(async () => {
         if (db) {
-            const data = await getAllPeriodicTransactions(db);
-            setAllTransactions(data);
+            try {
+                const data = await getAllPeriodicTransactions(db);
+                setAllTransactions(data);
+            } catch (err) {
+                showDialog({
+                    title: "Błąd",
+                    content: "Nie udało się pobrać transakcji cyklicznych.",
+                    confirmText: "OK",
+                    onConfirm: () => {},
+                    dangerous: false
+                });
+            }
         }
-    }, [db]);
+    }, [db, showDialog]);
 
     const loadOptions = useCallback(async () => {
         if (db) {
-            const [cats, tags] = await Promise.all([getAllCategories(db), getAllTags(db)]);
-            setCategoriesOptions(cats);
-            setTagsOptions(tags);
+            try {
+                const [cats, tags] = await Promise.all([getAllCategories(db), getAllTags(db)]);
+                setCategoriesOptions(cats);
+                setTagsOptions(tags);
+            } catch (err) {
+                showDialog({
+                    title: "Błąd",
+                    content: "Nie udało się pobrać kategorii lub tagów.",
+                    confirmText: "OK",
+                    onConfirm: () => {},
+                    dangerous: false
+                });
+            }
         }
-    }, [db]);
+    }, [db, showDialog]);
 
     useFocusEffect(
         useCallback(() => {

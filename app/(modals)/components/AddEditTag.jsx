@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { TextInput, Button, HelperText, useTheme, Text } from 'react-native-paper';
 import { useDb } from '@/context/DbContext';
@@ -18,33 +18,64 @@ const AddEditTag = ({ tag, onSave }) => {
     const [selectedColor, setSelectedColor] = useState(isEditMode ? tag.color : COLOR_PALETTE[0]);
     const [error, setError] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
+    const [existingNames, setExistingNames] = useState([]);
+
+    useEffect(() => {
+        let mounted = true;
+        async function fetchTags() {
+            if (db) {
+                try {
+                    const tags = await db.select().from('tags');
+                    if (mounted) setExistingNames(tags.map(t => t.name.toLowerCase()));
+                } catch (e) {
+                    if (mounted) setExistingNames([]);
+                }
+            }
+        }
+        fetchTags();
+        return () => { mounted = false; };
+    }, [db]);
 
     const handleSave = async () => {
         if (!name.trim()) {
             setError('Nazwa taga jest wymagana.');
             return;
         }
+        const nameLower = name.trim().toLowerCase();
+        if (
+            existingNames.includes(nameLower) &&
+            (!isEditMode || nameLower !== tag.name.trim().toLowerCase())
+        ) {
+            setError('Tag o tej nazwie już istnieje.');
+            return;
+        }
+
         setIsProcessing(true);
         setError('');
+        try {
+            const tagData = { name, color: selectedColor };
+            const result = isEditMode
+                ? await updateTag(db, tag.id, tagData)
+                : await addTag(db, tagData);
 
-        const tagData = { name, color: selectedColor };
-        const result = isEditMode
-            ? await updateTag(db, tag.id, tagData)
-            : await addTag(db, tagData);
-
-        setIsProcessing(false);
-        if (result.success) {
-            onSave();
-        } else {
-            setError(result.message);
+            if (result.success) {
+                onSave();
+            } else {
+                setError(result.message);
+            }
+        } catch (e) {
+            setError('Wystąpił nieoczekiwany błąd podczas zapisu.');
+        } finally {
+            setIsProcessing(false);
         }
     };
 
     const handleDelete = async () => {
         let message = `Czy na pewno chcesz usunąć tag "${tag.name}"?`;
-        if (tag.transactionCount > 0) {
-            const transactionText = tag.transactionCount === 1 ? 'transakcji' : 'transakcjach';
-            message += ` Jest on używany w ${tag.transactionCount} ${transactionText} i zostanie z nich usunięty.`;
+        const count = typeof tag.transactionCount === 'number' ? tag.transactionCount : 0;
+        if (count > 0) {
+            const transactionText = count === 1 ? 'transakcji' : 'transakcjach';
+            message += ` Jest on używany w ${count} ${transactionText} i zostanie z nich usunięty.`;
         }
 
         showDialog({
@@ -53,18 +84,29 @@ const AddEditTag = ({ tag, onSave }) => {
             confirmText: "Usuń",
             onConfirm: async () => {
                 setIsProcessing(true);
-                const result = await deleteTag(db, tag.id);
-                setIsProcessing(false);
-                if (result.success) {
-                    onSave();
-                } else {
+                try {
+                    const result = await deleteTag(db, tag.id);
+                    if (result.success) {
+                        onSave();
+                    } else {
+                        showDialog({
+                            title: "Błąd",
+                            content: result.message,
+                            confirmText: "OK",
+                            onConfirm: () => { },
+                            dangerous: false
+                        });
+                    }
+                } catch (e) {
                     showDialog({
                         title: "Błąd",
-                        content: result.message,
+                        content: "Wystąpił nieoczekiwany błąd podczas usuwania.",
                         confirmText: "OK",
                         onConfirm: () => { },
                         dangerous: false
                     });
+                } finally {
+                    setIsProcessing(false);
                 }
             },
             dangerous: true

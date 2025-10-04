@@ -62,11 +62,32 @@ export default function PeriodicDefinitionActionModal({ visible, onDismiss, onSe
 }
 
 const styles = StyleSheet.create({
-  modalContainer: { padding: 24, margin: 20, borderRadius: 16, alignItems: 'center' },
-  header: { alignItems: 'center', marginBottom: 16 },
-  title: { marginTop: 12, fontWeight: 'bold' },
-  description: { textAlign: 'center', marginBottom: 24, lineHeight: 22 },
-  buttonContainer: { width: '100%' },
-  button: { marginBottom: 12 },
-  cancelButton: { marginTop: 8 },
+  modalContainer: {
+    padding: 24,
+    margin: 20,
+    borderRadius: 16,
+    alignItems: 'center'
+  },
+  header: {
+    alignItems: 'center',
+    marginBottom: 16
+  },
+  title: {
+    marginTop: 12,
+    fontWeight: 'bold'
+  },
+  description: {
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 22
+  },
+  buttonContainer: {
+    width: '100%'
+  },
+  button: {
+    marginBottom: 12
+  },
+  cancelButton: {
+    marginTop: 8
+  },
 });

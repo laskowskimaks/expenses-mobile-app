@@ -126,7 +126,7 @@ export default function EditPeriodicTransactionModal() {
     const { db } = useDb();
 
     const [form, setForm] = useState({
-        title: '', amount: '', type: 'expenditure', selectedCategory: null, tags: [],
+        title: '', amount: '', type: 'expense', selectedCategory: null, tags: [],
         repeatInterval: '1', repeatUnit: 'month', startDate: new Date(), endDate: null, description: '', startTime: new Date()
     });
     const [ui, setUi] = useState({
@@ -140,78 +140,97 @@ export default function EditPeriodicTransactionModal() {
     const debouncedTagSearch = useDebounce(ui.tagSearchText, 300);
     const { dialog, showDialog, hideDialog } = useDialog();
 
+    const validateRepeatInterval = (val) => {
+        const num = parseInt(val, 10);
+        return !isNaN(num) && num >= 1 && num <= 1000;
+    };
+    const validateAmount = (val) => {
+        const num = parseFloat((val || '').replace(',', '.'));
+        return !isNaN(num) && num > 0;
+    };
+
     useEffect(() => {
         const loadInitialData = async () => {
-            if (db && params.transactionId) {
-                const [cats, allTags, transactionData] = await Promise.all([
-                    getAllCategories(db),
-                    getAllTags(db),
-                    getPeriodicTransactionById(db, parseInt(params.transactionId))
-                ]);
-                setCategories(cats);
-                setAvailableTags(allTags);
+            try {
+                if (db && params.transactionId) {
+                    const [cats, allTags, transactionData] = await Promise.all([
+                        getAllCategories(db),
+                        getAllTags(db),
+                        getPeriodicTransactionById(db, parseInt(params.transactionId))
+                    ]);
+                    setCategories(cats);
+                    setAvailableTags(allTags);
 
-                if (transactionData) {
-                    const category = cats.find(c => c.id === transactionData.categoryId);
+                    if (transactionData) {
+                        const category = cats.find(c => c.id === transactionData.categoryId);
 
-                    let startDate, endDate = null;
-                    let startTime;
+                        let startDate, endDate = null;
+                        let startTime;
 
-                    if (params.editMode === 'future') {
-                        const today = new Date();
-                        today.setHours(0, 0, 0, 0);
-                        startDate = today;
+                        if (params.editMode === 'future') {
+                            const today = new Date();
+                            today.setHours(0, 0, 0, 0);
+                            startDate = today;
 
-                        const originalTime = new Date(transactionData.startDate * 1000);
-                        startTime = new Date();
-                        startTime.setHours(originalTime.getHours(), originalTime.getMinutes(), 0, 0);
+                            const originalTime = new Date(transactionData.startDate * 1000);
+                            startTime = new Date();
+                            startTime.setHours(originalTime.getHours(), originalTime.getMinutes(), 0, 0);
 
-                        if (transactionData.endDate) {
-                            const templateStart = new Date(transactionData.startDate * 1000);
-                            templateStart.setHours(0, 0, 0, 0);
+                            if (transactionData.endDate) {
+                                const templateStart = new Date(transactionData.startDate * 1000);
+                                templateStart.setHours(0, 0, 0, 0);
 
-                            const templateEnd = new Date(transactionData.endDate * 1000);
-                            templateEnd.setHours(0, 0, 0, 0);
+                                const templateEnd = new Date(transactionData.endDate * 1000);
+                                templateEnd.setHours(0, 0, 0, 0);
 
-                            const diffDays = Math.round((templateEnd - templateStart) / (1000 * 60 * 60 * 24));
-                            endDate = new Date(today.getTime() + diffDays * 24 * 60 * 60 * 1000);
+                                const diffDays = Math.round((templateEnd - templateStart) / (1000 * 60 * 60 * 24));
+                                endDate = new Date(today.getTime() + diffDays * 24 * 60 * 60 * 1000);
+                            }
+                        } else {
+                            startDate = new Date(transactionData.startDate * 1000);
+                            startDate.setHours(0, 0, 0, 0);
+
+                            const originalDateTime = new Date(transactionData.startDate * 1000);
+                            startTime = new Date();
+                            startTime.setHours(originalDateTime.getHours(), originalDateTime.getMinutes(), 0, 0);
+
+                            if (transactionData.endDate) {
+                                endDate = new Date(transactionData.endDate * 1000);
+                                endDate.setHours(0, 0, 0, 0);
+                            }
                         }
+
+                        setForm({
+                            title: transactionData.title,
+                            amount: String(Math.abs(transactionData.amount)),
+                            type: transactionData.amount < 0 ? 'expense' : 'income',
+                            selectedCategory: category || null,
+                            tags: (transactionData.tags || []).map(t => t.name),
+                            repeatInterval: String(transactionData.repeatInterval),
+                            repeatUnit: transactionData.repeatUnit,
+                            startDate: startDate,
+                            endDate: endDate,
+                            description: transactionData.notes || '',
+                            startTime: startTime
+                        });
                     } else {
-                        startDate = new Date(transactionData.startDate * 1000);
-                        startDate.setHours(0, 0, 0, 0);
-
-                        const originalDateTime = new Date(transactionData.startDate * 1000);
-                        startTime = new Date();
-                        startTime.setHours(originalDateTime.getHours(), originalDateTime.getMinutes(), 0, 0);
-
-                        if (transactionData.endDate) {
-                            endDate = new Date(transactionData.endDate * 1000);
-                            endDate.setHours(0, 0, 0, 0);
-                        }
+                        showDialog({
+                            title: "Błąd",
+                            content: "Nie znaleziono transakcji.",
+                            confirmText: "OK",
+                            onConfirm: () => router.back(),
+                            dangerous: false
+                        });
                     }
-
-                    setForm({
-                        title: transactionData.title,
-                        amount: String(Math.abs(transactionData.amount)),
-                        type: transactionData.amount < 0 ? 'expenditure' : 'income',
-                        selectedCategory: category || null,
-                        tags: (transactionData.tags || []).map(t => t.name),
-                        repeatInterval: String(transactionData.repeatInterval),
-                        repeatUnit: transactionData.repeatUnit,
-                        startDate: startDate,
-                        endDate: endDate,
-                        description: transactionData.notes || '',
-                        startTime: startTime
-                    });
-                } else {
-                    showDialog({
-                        title: "Błąd",
-                        content: "Nie znaleziono transakcji.",
-                        confirmText: "OK",
-                        onConfirm: () => router.back(),
-                        dangerous: false
-                    });
                 }
+            } catch (err) {
+                showDialog({
+                    title: "Błąd",
+                    content: "Wystąpił błąd podczas ładowania danych.",
+                    confirmText: "OK",
+                    onConfirm: () => router.back(),
+                    dangerous: false
+                });
             }
         };
         loadInitialData();
@@ -255,6 +274,36 @@ export default function EditPeriodicTransactionModal() {
             });
             return;
         }
+        if (!validateAmount(form.amount)) {
+            showDialog({
+                title: "Błąd",
+                content: "Kwota musi być dodatnią liczbą.",
+                confirmText: "OK",
+                onConfirm: () => { },
+                dangerous: false
+            });
+            return;
+        }
+        if (!validateRepeatInterval(form.repeatInterval)) {
+            showDialog({
+                title: "Błąd",
+                content: "Interwał powtórzeń musi być liczbą całkowitą od 1 do 1000.",
+                confirmText: "OK",
+                onConfirm: () => { },
+                dangerous: false
+            });
+            return;
+        }
+        if (form.endDate && form.endDate < form.startDate) {
+            showDialog({
+                title: "Błąd",
+                content: "Data zakończenia nie może być wcześniejsza niż data rozpoczęcia.",
+                confirmText: "OK",
+                onConfirm: () => { },
+                dangerous: false
+            });
+            return;
+        }
 
         updateUi('isSaving', true);
 
@@ -266,14 +315,23 @@ export default function EditPeriodicTransactionModal() {
             form.startTime.getMinutes()
         );
 
+        const payload = {
+            title: form.title,
+            amount: parseFloat((form.amount || '').replace(',', '.')),
+            type: form.type,
+            categoryId: form.selectedCategory.id,
+            tags: form.tags,
+            repeatInterval: parseInt(form.repeatInterval, 10),
+            repeatUnit: form.repeatUnit,
+            startDate: finalStartDate,
+            endDate: form.endDate,
+            description: form.description,
+        };
+
         const result = await updatePeriodicTransaction({
             db,
             id: parseInt(params.transactionId),
-            data: {
-                ...form,
-                categoryId: form.selectedCategory.id,
-                startDate: finalStartDate
-            },
+            data: payload,
             mode: params.editMode
         });
         updateUi('isSaving', false);
@@ -314,7 +372,7 @@ export default function EditPeriodicTransactionModal() {
                         onValueChange={updateForm.bind(null, 'type')}
                         buttons={[
                             { value: 'income', label: 'Wpływ', icon: 'arrow-down' },
-                            { value: 'expenditure', label: 'Wydatek', icon: 'arrow-up' }
+                            { value: 'expense', label: 'Wydatek', icon: 'arrow-up' }
                         ]}
                         style={styles.formField}
                     />

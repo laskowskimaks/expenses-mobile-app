@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useNetworkStatus } from '@/context/NetworkContext';
 import { useDialog } from '@/utils/useDialog';
 import InformationDialog from '@/components/InformationDialog';
+import { useDb } from '@/context/DbContext'; 
 
 export default function ChangePasswordModal() {
     const theme = useTheme();
@@ -13,6 +14,7 @@ export default function ChangePasswordModal() {
     const { changePassword } = useAuth();
     const { isConnected } = useNetworkStatus();
     const { infoDialog, showInfoDialog, hideInfoDialog } = useDialog();
+    const { db } = useDb();
 
     const [currentPassword, setCurrentPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
@@ -36,6 +38,11 @@ export default function ChangePasswordModal() {
             return;
         }
 
+        if (!db) {
+            setError('Baza danych nie jest dostępna. Spróbuj ponownie później.');
+            return;
+        }
+
         if (!currentPassword || !newPassword || !confirmPassword) {
             setError('Wszystkie pola są wymagane.');
             return;
@@ -52,24 +59,29 @@ export default function ChangePasswordModal() {
         }
 
         setIsProcessing(true);
-        const result = await changePassword(currentPassword, newPassword);
-        setIsProcessing(false);
-
-        if (result.success) {
-            showInfoDialog({
-                title: 'Sukces',
-                content: 'Hasło zostało pomyślnie zmienione.',
-                type: 'success',
-            });
-        } else {
-            if (result.message === 'auth/invalid-credential') {
+        try {
+            const result = await changePassword(currentPassword, newPassword);
+            if (result.success) {
                 showInfoDialog({
-                    title: 'Nieprawidłowe hasło',
-                    content: 'Sprawdź podane aktualne hasło i spróbuj ponownie.',
-                    type: 'warning'
+                    title: 'Sukces',
+                    content: 'Hasło zostało pomyślnie zmienione.',
+                    type: 'success',
                 });
-                return;
+            } else {
+                if (result.message === 'auth/invalid-credential') {
+                    showInfoDialog({
+                        title: 'Nieprawidłowe hasło',
+                        content: 'Sprawdź podane aktualne hasło i spróbuj ponownie.',
+                        type: 'warning'
+                    });
+                } else {
+                    setError(result.message || 'Wystąpił błąd podczas zmiany hasła.');
+                }
             }
+        } catch (e) {
+            setError('Wystąpił nieoczekiwany błąd podczas zmiany hasła.');
+        } finally {
+            setIsProcessing(false);
         }
     };
 
@@ -157,7 +169,15 @@ const styles = StyleSheet.create({
         width: '100%',
         marginBottom: 12
     },
-    errorText: { textAlign: 'center' },
-    button: { marginTop: 20, width: '100%' },
-    cancelButton: { marginBottom: 20, borderColor: 'transparent' },
+    errorText: {
+        textAlign: 'center'
+    },
+    button: {
+        marginTop: 20,
+        width: '100%'
+    },
+    cancelButton: {
+        marginBottom: 20,
+        borderColor: 'transparent'
+    },
 });

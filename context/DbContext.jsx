@@ -53,7 +53,7 @@ export const DbProvider = ({ children }) => {
                     }
 
                 } catch (closeError) {
-                    console.log('[DbContext] Połączenie było już zamknięte lub wystąpił błąd podczas zamykania (to może być normalne)');
+                    console.log('[DbContext] Połączenie było już zamknięte lub wystąpił błąd podczas zamykania (to może być normalne)', closeError);
                 }
             } else {
                 console.log('[DbContext] Brak aktywnego połączenia do zamknięcia.');
@@ -156,8 +156,11 @@ export const DbProvider = ({ children }) => {
         setIsLoading(true);
         console.log(`[DbContext] Inicjalizacja bazy dla nowego użytkownika: ${email}`);
 
-        await clearDatabase();
-
+        try {
+            await clearDatabase();
+        } catch (e) {
+            console.error('[DbContext] Błąd podczas czyszczenia bazy przed rejestracją:', e);
+        }
         try {
             const { newDrizzleDb, newSqliteConn } = await _openAndMigrateDb();
             const { success, data: userData, error } = await createUser(newDrizzleDb, userId, email, password);
@@ -180,8 +183,11 @@ export const DbProvider = ({ children }) => {
             setDb(newDrizzleDb);
 
             console.log('[DbContext] Nowa, baza danych utworzona i uzupełniona.');
-
-            await performUpload();
+            try {
+                await performUpload();
+            } catch (backupError) {
+                console.error('[DbContext] Błąd podczas tworzenia kopii zapasowej po rejestracji:', backupError);
+            }
 
         } catch (e) {
             if (e && e.message && e.message.includes('UNIQUE constraint failed')) {
@@ -190,9 +196,6 @@ export const DbProvider = ({ children }) => {
             } else {
                 throw new Error('Wystąpił krytyczny błąd podczas rejestracji. Spróbuj ponownie.');
             }
-
-            setDb(null);
-            sqliteConnectionRef.current = null;
 
         } finally {
             setIsLoading(false);

@@ -105,7 +105,7 @@ export const addTransaction = async (db, transactionData) => {
         throw new Error('Kwota musi być liczbą większą od 0');
       }
 
-      if (transactionData.type === 'expenditure') {
+      if (transactionData.type === 'expense') {
         finalAmount = -Math.abs(finalAmount);
       }
 
@@ -129,7 +129,12 @@ export const addTransaction = async (db, transactionData) => {
       const newTransactionId = newTransaction[0].insertedId;
 
       if (transactionData.tags && transactionData.tags.length > 0) {
-        await processTransactionTags(tx, newTransactionId, transactionData.tags);
+        try {
+          await processTransactionTags(tx, newTransactionId, transactionData.tags);
+        } catch (tagError) {
+          throw new Error(`Błąd podczas przypisywania tagów: ${tagError.message || tagError}`);
+        }
+
       }
 
       return { success: true, transactionId: newTransactionId };
@@ -196,7 +201,7 @@ export const updateTransaction = async (db, transactionId, data, options = { mod
       if (isNaN(normalizedAmount) || normalizedAmount <= 0) {
         throw new Error('Kwota musi być dodatnią liczbą.');
       }
-      const finalAmount = data.type === 'expenditure' ? -Math.abs(normalizedAmount) : Math.abs(normalizedAmount);
+      const finalAmount = data.type === 'expense' ? -Math.abs(normalizedAmount) : Math.abs(normalizedAmount);
       const transactionTimestamp = Math.floor(data.date.getTime() / 1000);
 
       if (options.mode === 'single') {

@@ -34,6 +34,7 @@ export default function AddLoyaltyCardModal() {
     const [isSaving, setIsSaving] = useState(false);
     const [imageWidth, setImageWidth] = useState(null);
     const [imageHeight, setImageHeight] = useState(null);
+    const [existingNames, setExistingNames] = useState([]);
 
     useFocusEffect(
         useCallback(() => {
@@ -52,19 +53,43 @@ export default function AddLoyaltyCardModal() {
     );
 
     useEffect(() => {
+        if (db) {
+            const fetchNames = async () => {
+                try {
+                    const cards = await db.select().from('loyalty_cards');
+                    setExistingNames(cards.map(c => c.name.trim().toLowerCase()));
+                } catch (e) {
+                    setExistingNames([]);
+                }
+            };
+            fetchNames();
+        }
+    }, [db]);
+
+    useEffect(() => {
         if (isEditMode && db) {
             const loadCard = async () => {
-                const card = await getLoyaltyCardById(db, cardId);
-                if (card) {
-                    setName(card.name);
-                    setNotes(card.notes || '');
-                    setBarcodeData(card.barcodeData);
-                    setBarcodeFormat(card.barcodeFormat);
-                    setImageUri(card.imageUri);
-                } else {
+                try {
+                    const card = await getLoyaltyCardById(db, cardId);
+                    if (card) {
+                        setName(card.name);
+                        setNotes(card.notes || '');
+                        setBarcodeData(card.barcodeData);
+                        setBarcodeFormat(card.barcodeFormat);
+                        setImageUri(card.imageUri);
+                    } else {
+                        showDialog({
+                            title: 'Błąd',
+                            content: 'Nie znaleziono karty.',
+                            confirmText: 'OK',
+                            onConfirm: () => router.back(),
+                            dangerous: false
+                        });
+                    }
+                } catch (e) {
                     showDialog({
                         title: 'Błąd',
-                        content: 'Nie znaleziono karty.',
+                        content: 'Wystąpił błąd podczas ładowania karty.',
                         confirmText: 'OK',
                         onConfirm: () => router.back(),
                         dangerous: false
@@ -87,6 +112,20 @@ export default function AddLoyaltyCardModal() {
             });
             return;
         }
+        const nameLower = name.trim().toLowerCase();
+        if (
+            existingNames.includes(nameLower) &&
+            (!isEditMode || nameLower !== (params.originalName || '').trim().toLowerCase())
+        ) {
+            showDialog({
+                title: 'Błąd',
+                content: 'Karta o tej nazwie już istnieje.',
+                confirmText: 'OK',
+                onConfirm: () => { },
+                dangerous: false
+            });
+            return;
+        }
         if (!barcodeData && !imageUri) {
             showDialog({
                 title: 'Błąd',
@@ -98,19 +137,32 @@ export default function AddLoyaltyCardModal() {
             return;
         }
         setIsSaving(true);
-        const cardData = { name, notes, barcodeData, barcodeFormat, imageUri };
-        const result = isEditMode ? await updateLoyaltyCard(db, cardId, cardData) : await addLoyaltyCard(db, cardData);
-        setIsSaving(false);
-        if (result.success) {
-            router.back();
-        } else {
+        try {
+            const cardData = { name, notes, barcodeData, barcodeFormat, imageUri };
+            const result = isEditMode
+                ? await updateLoyaltyCard(db, cardId, cardData)
+                : await addLoyaltyCard(db, cardData);
+            if (result.success) {
+                router.back();
+            } else {
+                showDialog({
+                    title: 'Błąd',
+                    content: result.message || 'Nie udało się zapisać karty.',
+                    confirmText: 'OK',
+                    onConfirm: () => { },
+                    dangerous: false
+                });
+            }
+        } catch (e) {
             showDialog({
                 title: 'Błąd',
-                content: result.message || 'Nie udało się zapisać karty.',
+                content: 'Wystąpił nieoczekiwany błąd podczas zapisu karty.',
                 confirmText: 'OK',
                 onConfirm: () => { },
                 dangerous: false
             });
+        } finally {
+            setIsSaving(false);
         }
     };
 

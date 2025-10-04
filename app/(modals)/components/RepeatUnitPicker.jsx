@@ -13,6 +13,14 @@ export default function RepeatUnitPicker({
 
   if (!visible) return null;
 
+  const renderEmptyComponent = () => (
+    <View style={{ padding: 24, alignItems: 'center' }}>
+      <Text style={{ color: theme.colors.onSurfaceVariant, textAlign: 'center' }}>
+        Brak dostępnych jednostek powtarzania.
+      </Text>
+    </View>
+  );
+
   return (
     <View style={styles.absoluteOverlay}>
       <Pressable style={styles.pickerBackdrop} onPress={onClose} accessibilityRole="button" accessibilityLabel="Zamknij wybór jednostki" />
@@ -39,18 +47,62 @@ export default function RepeatUnitPicker({
             );
           }}
           accessibilityRole="list"
+          ListEmptyComponent={renderEmptyComponent}
         />
       </View>
     </View>
   );
 }
 
+
 const styles = StyleSheet.create({
-  absoluteOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, elevation: 1000 },
-  pickerBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
-  pickerContainer: { position: 'absolute', bottom: 0, left: 0, right: 0, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 16, width: '100%', minHeight: 200 },
-  pickerTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
-  pickerItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 16, paddingHorizontal: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#ccc', borderRadius: 8, marginBottom: 4 },
-  itemText: { flex: 1 },
-  checkIcon: { fontSize: 18, fontWeight: 'bold', marginLeft: 12 },
+  absoluteOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 9999,
+    elevation: 1000
+  },
+  pickerBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)'
+  },
+  pickerContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 16,
+    width: '100%',
+    minHeight: 200
+  },
+  pickerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 20,
+    textAlign: 'center'
+  },
+  pickerItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#ccc',
+    borderRadius: 8,
+    marginBottom: 4
+  },
+  itemText: {
+    flex: 1
+  },
+  checkIcon: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginLeft: 12
+  },
 });

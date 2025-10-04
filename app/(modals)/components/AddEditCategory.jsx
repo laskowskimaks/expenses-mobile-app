@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { TextInput, Button, HelperText, useTheme, Text, Icon } from 'react-native-paper';
 import { useDb } from '@/context/DbContext';
@@ -23,24 +23,54 @@ const AddEditCategory = ({ category, onSave }) => {
 
     const isLockedForEditing = isEditMode && !category.isDeletable;
 
+    const [existingNames, setExistingNames] = useState([]);
+    useEffect(() => {
+        let mounted = true;
+        async function fetchCategories() {
+            if (db) {
+                try {
+                    const cats = await db.select().from('categories');
+                    if (mounted) setExistingNames(cats.map(c => c.name.toLowerCase()));
+                } catch (e) {
+                    if (mounted) setExistingNames([]);
+                }
+            }
+        }
+        fetchCategories();
+        return () => { mounted = false; };
+    }, [db]);
+
     const handleSave = async () => {
         if (!name.trim()) {
             setError('Nazwa kategorii jest wymagana.');
             return;
         }
+        const nameLower = name.trim().toLowerCase();
+        if (
+            existingNames.includes(nameLower) &&
+            (!isEditMode || nameLower !== category.name.trim().toLowerCase())
+        ) {
+            setError('Kategoria o tej nazwie już istnieje.');
+            return;
+        }
+
         setIsProcessing(true);
         setError('');
+        try {
+            const categoryData = { name, color: selectedColor, iconName: selectedIcon };
+            const result = isEditMode
+                ? await updateCategory(db, category.id, categoryData)
+                : await addCategory(db, categoryData);
 
-        const categoryData = { name, color: selectedColor, iconName: selectedIcon };
-        const result = isEditMode
-            ? await updateCategory(db, category.id, categoryData)
-            : await addCategory(db, categoryData);
-
-        setIsProcessing(false);
-        if (result.success) {
-            onSave();
-        } else {
-            setError(result.message);
+            if (result.success) {
+                onSave();
+            } else {
+                setError(result.message);
+            }
+        } catch (e) {
+            setError('Wystąpił nieoczekiwany błąd podczas zapisu.');
+        } finally {
+            setIsProcessing(false);
         }
     };
 
@@ -51,18 +81,29 @@ const AddEditCategory = ({ category, onSave }) => {
             confirmText: "Usuń",
             onConfirm: async () => {
                 setIsProcessing(true);
-                const result = await deleteCategory(db, category.id);
-                setIsProcessing(false);
-                if (result.success) {
-                    onSave();
-                } else {
+                try {
+                    const result = await deleteCategory(db, category.id);
+                    if (result.success) {
+                        onSave();
+                    } else {
+                        showDialog({
+                            title: "Błąd",
+                            content: result.message,
+                            confirmText: "OK",
+                            onConfirm: () => { },
+                            dangerous: false
+                        });
+                    }
+                } catch (e) {
                     showDialog({
                         title: "Błąd",
-                        content: result.message,
+                        content: "Wystąpił nieoczekiwany błąd podczas usuwania.",
                         confirmText: "OK",
                         onConfirm: () => { },
                         dangerous: false
                     });
+                } finally {
+                    setIsProcessing(false);
                 }
             },
             dangerous: true
@@ -71,45 +112,47 @@ const AddEditCategory = ({ category, onSave }) => {
 
     return (
         <>
-            <ScrollView contentContainerStyle={[styles.container, { backgroundColor: theme.colors.background }]}>
-                <TextInput
-                    mode="outlined"
-                    label="Nazwa kategorii"
-                    value={name}
-                    onChangeText={setName}
-                    style={{ marginBottom: 16 }}
-                    disabled={isLockedForEditing}
-                />
+            <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+                <ScrollView contentContainerStyle={styles.container}>
+                    <TextInput
+                        mode="outlined"
+                        label="Nazwa kategorii"
+                        value={name}
+                        onChangeText={setName}
+                        style={{ marginBottom: 16 }}
+                        disabled={isLockedForEditing}
+                    />
 
-                <Text style={[styles.label, { color: theme.colors.onSurface }]}>Wybierz kolor</Text>
-                <View style={styles.pickerContainer}>
-                    {COLORS.map(color => (
-                        <TouchableOpacity key={color} onPress={() => setSelectedColor(color)} style={[styles.colorCircle, { backgroundColor: color, borderWidth: selectedColor === color ? 3 : 0, borderColor: theme.colors.primary }]} />
-                    ))}
-                </View>
-
-                <View pointerEvents={isLockedForEditing ? 'none' : 'auto'} style={{ opacity: isLockedForEditing ? 0.5 : 1 }}>
-                    <Text style={[styles.label, { color: theme.colors.onSurface }]}>Wybierz ikonę</Text>
+                    <Text style={[styles.label, { color: theme.colors.onSurface }]}>Wybierz kolor</Text>
                     <View style={styles.pickerContainer}>
-                        {ICONS.map(icon => (
-                            <TouchableOpacity key={icon} onPress={() => setSelectedIcon(icon)} style={[styles.iconBox, { backgroundColor: selectedIcon === icon ? theme.colors.primaryContainer : theme.colors.surfaceVariant }]}>
-                                <Icon source={icon} size={28} color={selectedIcon === icon ? theme.colors.onPrimaryContainer : theme.colors.onSurfaceVariant} />
-                            </TouchableOpacity>
+                        {COLORS.map(color => (
+                            <TouchableOpacity key={color} onPress={() => setSelectedColor(color)} style={[styles.colorCircle, { backgroundColor: color, borderWidth: selectedColor === color ? 3 : 0, borderColor: theme.colors.primary }]} />
                         ))}
                     </View>
-                </View>
 
-                <HelperText type="error" visible={!!error}>{error}</HelperText>
+                    <View pointerEvents={isLockedForEditing ? 'none' : 'auto'} style={{ opacity: isLockedForEditing ? 0.5 : 1 }}>
+                        <Text style={[styles.label, { color: theme.colors.onSurface }]}>Wybierz ikonę</Text>
+                        <View style={styles.pickerContainer}>
+                            {ICONS.map(icon => (
+                                <TouchableOpacity key={icon} onPress={() => setSelectedIcon(icon)} style={[styles.iconBox, { backgroundColor: selectedIcon === icon ? theme.colors.primaryContainer : theme.colors.surfaceVariant }]}>
+                                    <Icon source={icon} size={28} color={selectedIcon === icon ? theme.colors.onPrimaryContainer : theme.colors.onSurfaceVariant} />
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                    </View>
 
-                <Button mode="contained" onPress={handleSave} loading={isProcessing} disabled={isProcessing} style={{ marginTop: 24 }}>
-                    {isEditMode ? "Zapisz zmiany" : "Dodaj kategorię"}
-                </Button>
-                {isEditMode && category.isDeletable && (
-                    <Button textColor={theme.colors.error} onPress={handleDelete} disabled={isProcessing} style={{ marginTop: 12 }}>
-                        Usuń kategorię
+                    <HelperText type="error" visible={!!error}>{error}</HelperText>
+
+                    <Button mode="contained" onPress={handleSave} loading={isProcessing} disabled={isProcessing} style={{ marginTop: 24 }}>
+                        {isEditMode ? "Zapisz zmiany" : "Dodaj kategorię"}
                     </Button>
-                )}
-            </ScrollView>
+                    {isEditMode && category.isDeletable && (
+                        <Button textColor={theme.colors.error} onPress={handleDelete} disabled={isProcessing} style={{ marginTop: 12 }}>
+                            Usuń kategorię
+                        </Button>
+                    )}
+                </ScrollView>
+            </View>
             <ConfirmationDialog {...dialog} onDismiss={hideDialog} />
         </>
     );

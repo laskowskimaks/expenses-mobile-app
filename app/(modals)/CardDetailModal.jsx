@@ -84,7 +84,9 @@ export default function CardDetailModal() {
         });
     };
 
-    if (isLoading) { return <View style={styles.centered}><ActivityIndicator size="large" /></View>; }
+    if (isLoading) {
+        return <View style={styles.centered}><ActivityIndicator size="large" /></View>;
+    }
     if (!card) {
         return (<View style={styles.centered}>
             <Text>Nie znaleziono karty.</Text><Button onPress={() => router.back()} style={{ marginTop: 16 }}>Wróć</Button>

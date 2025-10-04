@@ -263,7 +263,7 @@ const TypeView = ({ setScreen, localFilters, onTypeChange, onPeriodicChange, sty
         <Divider />
         <View style={{ padding: 12 }}>
             <Text style={styles.sectionHeader}>Typ</Text>
-            <SegmentedButtons value={localFilters.transactionType ?? 'all'} onValueChange={onTypeChange} buttons={[{ value: 'all', label: 'Wszystkie' }, { value: 'expenditure', label: 'Wydatki' }, { value: 'income', label: 'Wpływy' }]} />
+            <SegmentedButtons value={localFilters.transactionType ?? 'all'} onValueChange={onTypeChange} buttons={[{ value: 'all', label: 'Wszystkie' }, { value: 'expense', label: 'Wydatki' }, { value: 'income', label: 'Wpływy' }]} />
             <Text style={styles.sectionHeader}>Cykliczna</Text>
             <SegmentedButtons value={localFilters.periodic ?? 'all'} onValueChange={onPeriodicChange} buttons={[{ value: 'all', label: 'Dowolnie' }, { value: 'yes', label: 'Tylko tak' }, { value: 'no', label: 'Tylko nie' }]} />
         </View>

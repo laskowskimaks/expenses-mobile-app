@@ -1,7 +1,7 @@
 import { useReducer, useMemo, useState, useEffect } from 'react';
 
 const initialState = {
-  type: 'expenditure',
+  type: 'expense',
   title: '',
   amount: '',
   description: '',
@@ -151,7 +151,7 @@ function transactionFormReducer(state, action) {
 
       return {
         ...state,
-        type: transactionData.amount > 0 ? 'income' : 'expenditure',
+        type: transactionData.amount > 0 ? 'income' : 'expense',
         title: transactionData.title || '',
         amount: String(Math.abs(transactionData.amount)),
         description: cleanedDescription,

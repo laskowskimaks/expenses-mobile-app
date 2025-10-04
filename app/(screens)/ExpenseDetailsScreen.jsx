@@ -1,10 +1,14 @@
 import React from 'react';
-import { ScrollView, StyleSheet } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Appbar, useTheme } from 'react-native-paper';
+import { Appbar, useTheme, Text } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import CategoryDonutChart from '@/components/charts/CategoryDonutChart';
 import CategoryExpenseList from '@/components/CategoryExpenseList';
+
+function isValidDate(d) {
+    return d instanceof Date && !isNaN(d);
+}
 
 export default function ExpenseDetailsScreen() {
     const theme = useTheme();
@@ -12,26 +16,46 @@ export default function ExpenseDetailsScreen() {
     const router = useRouter();
     const params = useLocalSearchParams();
 
-    const chartData = params.data ? JSON.parse(params.data) : [];
-    const total = params.total ? parseFloat(params.total) : 0;
+    let chartData = [];
+    let total = 0;
+    let parseError = null;
+
+    try {
+        chartData = params.data ? JSON.parse(params.data) : [];
+    } catch (err) {
+        parseError = 'Nieprawidłowe dane wykresu.';
+    }
+
+    if (params.total) {
+        const parsedTotal = parseFloat(params.total);
+        total = isNaN(parsedTotal) ? 0 : parsedTotal;
+    }
+
     const periodText = params.periodText || 'Szczegóły wydatków';
+
     const startDate = params.startDate ? new Date(params.startDate) : null;
     const endDate = params.endDate ? new Date(params.endDate) : null;
+    const validStartDate = isValidDate(startDate) ? startDate : null;
+    const validEndDate = isValidDate(endDate) ? endDate : null;
 
     const handleCategoryPress = (category) => {
-        if (!startDate || !endDate) return;
+        if (!validStartDate || !validEndDate) return;
 
-        const startDateTimestamp = Math.floor(startDate.getTime() / 1000);
-        const endDateTimestamp = Math.floor(endDate.getTime() / 1000);
+        const startDateTimestamp = Math.floor(validStartDate.getTime() / 1000);
+        const endDateTimestamp = Math.floor(validEndDate.getTime() / 1000);
 
-        router.push({
-            pathname: '/(tabs)/transactionListScreen',
-            params: {
-                filterCategoryId: category.id,
-                filterDateFrom: startDateTimestamp,
-                filterDateTo: endDateTimestamp,
-            }
-        });
+        try {
+            router.push({
+                pathname: '/(tabs)/transactionListScreen',
+                params: {
+                    filterCategoryId: category.id,
+                    filterDateFrom: startDateTimestamp,
+                    filterDateTo: endDateTimestamp,
+                }
+            });
+        } catch (error) {
+            console.error('[ExpenseDetailsScreen] Błąd nawigacji:', error);
+        }
     };
 
     return (
@@ -45,18 +69,26 @@ export default function ExpenseDetailsScreen() {
             </Appbar.Header>
 
             <ScrollView style={styles.scrollView}>
-                <CategoryDonutChart
-                    data={chartData}
-                    total={total}
-                    isLoading={false}
-                    compact={false}
-                />
-                <CategoryExpenseList
-                    data={chartData}
-                    total={total}
-                    isLoading={false}
-                    onCategoryPress={handleCategoryPress}
-                />
+                {parseError ? (
+                    <View style={{ padding: 24 }}>
+                        <Text style={{ color: theme.colors.error }}>{parseError}</Text>
+                    </View>
+                ) : (
+                    <>
+                        <CategoryDonutChart
+                            data={chartData}
+                            total={total}
+                            isLoading={false}
+                            compact={false}
+                        />
+                        <CategoryExpenseList
+                            data={chartData}
+                            total={total}
+                            isLoading={false}
+                            onCategoryPress={handleCategoryPress}
+                        />
+                    </>
+                )}
             </ScrollView>
         </SafeAreaView>
     );

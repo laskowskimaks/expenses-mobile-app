@@ -106,14 +106,22 @@ function TagsModal({
 
     const keyExtractor = useCallback((item) => item.id.toString(), []);
 
+    const handleAddNewTag = useCallback(async (tagName) => {
+        try {
+            await onAddNewTag(tagName);
+        } catch (e) {
+            alert('Nie udało się dodać nowego taga. Spróbuj ponownie.');
+        }
+    }, [onAddNewTag]);
+
     const renderEmptyComponent = useCallback(() => (
         <EmptyTagsList
             localSearchText={localSearchText}
             availableTags={availableTags}
             tags={tags}
-            onAddNewTag={onAddNewTag}
+            onAddNewTag={handleAddNewTag}
         />
-    ), [localSearchText, availableTags, tags, onAddNewTag]);
+    ), [localSearchText, availableTags, tags, handleAddNewTag]);
 
     if (!visible) return null;
 
@@ -150,7 +158,7 @@ function TagsModal({
                         localSearchText.trim() &&
                             !availableTags.some(tag => tag.name.toLowerCase() === localSearchText.toLowerCase()) &&
                             !tags.includes(localSearchText.trim()) ? (
-                            <TextInput.Icon icon="plus" onPress={() => onAddNewTag(localSearchText)} accessibilityLabel="Dodaj nowy tag" />
+                            <TextInput.Icon icon="plus" onPress={() => handleAddNewTag(localSearchText)} accessibilityLabel="Dodaj nowy tag" />
                         ) : null
                     }
                 />
@@ -182,8 +190,19 @@ function TagsModal({
 export default memo(TagsModal);
 
 const styles = StyleSheet.create({
-    absoluteOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, elevation: 1000 },
-    pickerBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
+    absoluteOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 9999,
+        elevation: 1000
+    },
+    pickerBackdrop: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)'
+    },
     tagsModalContainer: {
         position: 'absolute',
         bottom: 0,
@@ -217,10 +236,22 @@ const styles = StyleSheet.create({
         lineHeight: 20,
         letterSpacing: 0.1,
     },
-    selectedTagsContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-    selectedChip: { marginRight: 0, marginBottom: 0 },
-    tagSearchInput: { marginBottom: 16 },
-    tagsList: { flex: 1, marginBottom: 16 },
+    selectedTagsContainer: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8
+    },
+    selectedChip: {
+        marginRight: 0,
+        marginBottom: 0
+    },
+    tagSearchInput: {
+        marginBottom: 16
+    },
+    tagsList: {
+        flex: 1,
+        marginBottom: 16
+    },
     tagItem: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -230,16 +261,28 @@ const styles = StyleSheet.create({
         borderBottomWidth: StyleSheet.hairlineWidth,
         borderBottomColor: '#ccc',
     },
-    tagItemSelected: { backgroundColor: '#f0f0f0', opacity: 0.6 },
+    tagItemSelected: {
+        backgroundColor: '#f0f0f0',
+        opacity: 0.6
+    },
     tagItemText: {
         flex: 1,
         fontSize: 16,
         lineHeight: 22,
         letterSpacing: 0.15,
     },
-    tagItemTextSelected: { color: '#666' },
-    tagSelectedIndicator: { color: '#4CAF50', fontWeight: 'bold', fontSize: 16 },
-    emptyTagsContainer: { padding: 20, alignItems: 'center' },
+    tagItemTextSelected: {
+        color: '#666'
+    },
+    tagSelectedIndicator: {
+        color: '#4CAF50',
+        fontWeight: 'bold',
+        fontSize: 16
+    },
+    emptyTagsContainer: {
+        padding: 20,
+        alignItems: 'center'
+    },
     emptyTagsText: {
         textAlign: 'center',
         color: '#666',
@@ -248,7 +291,12 @@ const styles = StyleSheet.create({
         lineHeight: 22,
         letterSpacing: 0.1,
     },
-    createTagButton: { backgroundColor: '#2196F3', paddingVertical: 12, paddingHorizontal: 24, borderRadius: 8 },
+    createTagButton: {
+        backgroundColor: '#2196F3',
+        paddingVertical: 12,
+        paddingHorizontal: 24,
+        borderRadius: 8
+    },
     createTagButtonText: {
         color: 'white',
         fontWeight: 'bold',
@@ -257,5 +305,7 @@ const styles = StyleSheet.create({
         lineHeight: 22,
         letterSpacing: 0.15,
     },
-    closeTagsButton: { marginTop: 8 },
+    closeTagsButton: {
+        marginTop: 8
+    },
 });

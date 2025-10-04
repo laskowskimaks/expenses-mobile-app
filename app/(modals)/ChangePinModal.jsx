@@ -61,15 +61,23 @@ export default function ChangePinModal() {
       setError('PIN musi mieć 4 cyfry.');
       return;
     }
+    if (!db) {
+      setError('Baza danych nie jest dostępna. Spróbuj ponownie później.');
+      return;
+    }
     setIsProcessing(true);
     setError('');
-    const isCorrect = await verifyPin(db, pin);
-    if (isCorrect) {
-      setStage(STAGES.SET_NEW);
-      setPin('');
-    } else {
-      setError('Nieprawidłowy PIN. Spróbuj ponownie.');
-      setPin('');
+    try {
+      const isCorrect = await verifyPin(db, pin);
+      if (isCorrect) {
+        setStage(STAGES.SET_NEW);
+        setPin('');
+      } else {
+        setError('Nieprawidłowy PIN. Spróbuj ponownie.');
+        setPin('');
+      }
+    } catch (e) {
+      setError('Wystąpił błąd podczas weryfikacji PINu.');
     }
     setIsProcessing(false);
   };
@@ -79,14 +87,22 @@ export default function ChangePinModal() {
       setError('Nowy PIN musi mieć 4 cyfry.');
       return;
     }
+    if (!db) {
+      setError('Baza danych nie jest dostępna. Spróbuj ponownie później.');
+      return;
+    }
     setIsProcessing(true);
     setError('');
-    const success = await savePin(db, pin);
-    if (success) {
-      setSuccessMessage('PIN został pomyślnie zmieniony.');
-      setStage(STAGES.SUCCESS);
-      setTimeout(() => router.back(), 2000);
-    } else {
+    try {
+      const success = await savePin(db, pin);
+      if (success) {
+        setSuccessMessage('PIN został pomyślnie zmieniony.');
+        setStage(STAGES.SUCCESS);
+        setTimeout(() => router.back(), 1000);
+      } else {
+        setError('Wystąpił błąd podczas zapisywania PINu.');
+      }
+    } catch (e) {
       setError('Wystąpił błąd podczas zapisywania PINu.');
     }
     setIsProcessing(false);
@@ -98,13 +114,21 @@ export default function ChangePinModal() {
       content: "Aplikacja nie będzie już chroniona kodem PIN przy uruchamianiu. Czy na pewno chcesz kontynuować?",
       confirmText: "Usuń PIN",
       onConfirm: async () => {
+        if (!db) {
+          setError('Baza danych nie jest dostępna. Spróbuj ponownie później.');
+          return;
+        }
         setIsProcessing(true);
-        const success = await removePin(db);
-        if (success) {
-          setSuccessMessage('PIN został pomyślnie usunięty.');
-          setStage(STAGES.SUCCESS);
-          setTimeout(() => router.back(), 2000);
-        } else {
+        try {
+          const success = await removePin(db);
+          if (success) {
+            setSuccessMessage('PIN został pomyślnie usunięty.');
+            setStage(STAGES.SUCCESS);
+            setTimeout(() => router.back(), 2000);
+          } else {
+            setError('Wystąpił błąd podczas usuwania PINu.');
+          }
+        } catch (e) {
           setError('Wystąpił błąd podczas usuwania PINu.');
         }
         setIsProcessing(false);

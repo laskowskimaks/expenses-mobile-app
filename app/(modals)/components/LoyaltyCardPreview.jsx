@@ -15,7 +15,18 @@ export default function LoyaltyCardPreview({
     onImageLoad,
     style,
 }) {
-    const displayableBarcodeFormat = convertScannerFormatToGeneratorFormat(barcodeFormat);
+    let displayableBarcodeFormat = null;
+    try {
+        displayableBarcodeFormat = convertScannerFormatToGeneratorFormat(barcodeFormat);
+    } catch (e) {
+        return (
+            <View style={[{ alignItems: 'center', padding: 16 }, style]}>
+                <RNText style={{ color: 'red', textAlign: 'center' }}>
+                    Wystąpił błąd podczas przetwarzania formatu kodu kreskowego. Kod nie zostanie wyświetlony.
+                </RNText>
+            </View>
+        );
+    }
 
     if (imageUri && typeof imageUri === 'string' && imageUri !== 'null' && imageUri !== '') {
         return (
@@ -32,31 +43,40 @@ export default function LoyaltyCardPreview({
                     onLoad={onImageLoad}
                 />
             </Card>
-
         );
     }
     if (barcodeData && displayableBarcodeFormat) {
-        return (
-            <Card style={styles.barcodeCard}>
-                <Card.Content>
-                    <View style={styles.barcodeContainer}>
-                        {displayableBarcodeFormat === 'QR_CODE' ? (
-                            <QRCode value={barcodeData} size={200} />
-                        ) : (
-                            <Barcode
-                                value={barcodeData}
-                                format={displayableBarcodeFormat}
-                                text={barcodeData}
-                                width={3.5}
-                                height={140}
-                                textColor={theme.colors.onSurface}
-                                lineColor={'#000000'}
-                            />
-                        )}
-                    </View>
-                </Card.Content>
-            </Card>
-        );
+        try {
+            return (
+                <Card style={styles.barcodeCard}>
+                    <Card.Content>
+                        <View style={styles.barcodeContainer}>
+                            {displayableBarcodeFormat === 'QR_CODE' ? (
+                                <QRCode value={barcodeData} size={200} />
+                            ) : (
+                                <Barcode
+                                    value={barcodeData}
+                                    format={displayableBarcodeFormat}
+                                    text={barcodeData}
+                                    width={3.5}
+                                    height={140}
+                                    textColor={theme.colors.onSurface}
+                                    lineColor={'#000000'}
+                                />
+                            )}
+                        </View>
+                    </Card.Content>
+                </Card>
+            );
+        } catch (e) {
+            return (
+                <View style={[{ alignItems: 'center', padding: 16 }, style]}>
+                    <RNText style={{ color: 'red', textAlign: 'center' }}>
+                        Wystąpił błąd podczas renderowania kodu kreskowego. Kod nie zostanie wyświetlony.
+                    </RNText>
+                </View>
+            );
+        }
     }
     if (barcodeData && barcodeFormat) {
         return (
@@ -71,6 +91,15 @@ export default function LoyaltyCardPreview({
 }
 
 const styles = StyleSheet.create({
-    barcodeCard: { marginBottom: 24, paddingVertical: 20, backgroundColor: 'white' },
-    barcodeContainer: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10, minHeight: 120 },
+    barcodeCard: {
+        marginBottom: 24,
+        paddingVertical: 20,
+        backgroundColor: 'white'
+    },
+    barcodeContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 10,
+        minHeight: 120
+    },
 });

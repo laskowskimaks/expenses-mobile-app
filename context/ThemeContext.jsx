@@ -2,14 +2,15 @@ import React, { createContext, useState, useContext, useEffect, useMemo } from '
 import { useColorScheme } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MD3DarkTheme, MD3LightTheme } from 'react-native-paper';
+import { ActivityIndicator } from 'react-native-paper';
 
 const THEME_PREFERENCE_KEY = '@theme_preference';
 
 export const ThemeContext = createContext();
 
 export const ThemeProvider = ({ children }) => {
-  const colorScheme = useColorScheme(); // 'dark', 'light', or null
-  const [themePreference, setThemePreference] = useState('auto'); // 'light', 'dark', 'auto'
+  const colorScheme = useColorScheme();
+  const [themePreference, setThemePreference] = useState('auto');
   const [isThemeLoading, setIsThemeLoading] = useState(true);
 
   useEffect(() => {
@@ -44,12 +45,19 @@ export const ThemeProvider = ({ children }) => {
     if (themePreference === 'dark') {
       return MD3DarkTheme;
     }
-    // 'auto'
     return colorScheme === 'dark' ? MD3DarkTheme : MD3LightTheme;
   }, [themePreference, colorScheme]);
 
   if (isThemeLoading) {
-    return null;
+    return (
+      <ThemeContext.Provider value={{
+        theme: MD3LightTheme,
+        themePreference: 'auto',
+        updateThemePreference: () => { },
+      }}>
+        <ActivityIndicator size="large" style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }} />
+      </ThemeContext.Provider>
+    );
   }
 
   const value = {

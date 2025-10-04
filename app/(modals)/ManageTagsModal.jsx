@@ -14,17 +14,24 @@ export default function ManageTagsModal() {
     const [tags, setTags] = useState([]);
     const [currentView, setCurrentView] = useState('list');
     const [selectedTag, setSelectedTag] = useState(null);
+    const [error, setError] = useState(null);
+
+    const fetchTags = useCallback(async () => {
+        if (db) {
+            try {
+                const data = await getAllTagsWithCount(db);
+                setTags(data);
+                setError(null);
+            } catch (err) {
+                setError("Nie udało się pobrać tagów.");
+            }
+        }
+    }, [db]);
 
     useFocusEffect(
         useCallback(() => {
-            const loadTags = async () => {
-                if (db) {
-                    const data = await getAllTagsWithCount(db);
-                    setTags(data);
-                }
-            };
-            loadTags();
-        }, [db])
+            fetchTags();
+        }, [fetchTags])
     );
 
     const handleAddNew = () => {
@@ -37,16 +44,14 @@ export default function ManageTagsModal() {
         setCurrentView('form');
     };
 
-    const handleBackToList = () => {
+    const handleBackToList = async (saveError) => {
         setCurrentView('list');
         setSelectedTag(null);
-        const loadTags = async () => {
-            if (db) {
-                const data = await getAllTagsWithCount(db);
-                setTags(data);
-            }
-        };
-        loadTags();
+        if (saveError) {
+            setError(saveError);
+            return;
+        }
+        await fetchTags();
     };
 
     const getTitle = () => {
@@ -65,6 +70,12 @@ export default function ManageTagsModal() {
                     )}
                     <Text variant="headlineMedium" style={styles.headerTitle}>{getTitle()}</Text>
                 </View>
+
+                {error && (
+                    <View style={{ padding: 12 }}>
+                        <Text style={{ color: theme.colors.error }}>{error}</Text>
+                    </View>
+                )}
 
                 {currentView === 'list' ? (
                     <View style={styles.content}>
@@ -93,8 +104,20 @@ export default function ManageTagsModal() {
 }
 
 const styles = StyleSheet.create({
-    backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' },
-    modalSheet: { position: 'absolute', bottom: 0, left: 0, right: 0, height: '95%', borderTopLeftRadius: 20, borderTopRightRadius: 20, overflow: 'hidden' },
+    backdrop: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0,0,0,0.5)'
+    },
+    modalSheet: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: '95%',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        overflow: 'hidden'
+    },
     header: {
         flexDirection: 'row',
         alignItems: 'center',

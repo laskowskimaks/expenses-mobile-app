@@ -9,21 +9,31 @@ import { getCategoryDataForTag } from '@/services/summaryTagService';
 import CategoryDonutChart from '@/components/charts/CategoryDonutChart';
 import CategoryExpenseList from '@/components/CategoryExpenseList';
 
+function isValidDate(d) {
+    return d instanceof Date && !isNaN(d);
+}
+
 export default function TagDetailsScreen() {
     const theme = useTheme();
     const router = useRouter();
     const params = useLocalSearchParams();
     const { db } = useDb();
 
-    //console.log('[TagDetailsScreen] Renderowanie z parametrami:', params);
-
-    const tagId = parseInt(params.tagId, 10);
+    const tagId = params.tagId !== undefined && !isNaN(Number(params.tagId)) ? parseInt(params.tagId, 10) : null;
     const tagName = params.tagName;
     const tagColor = params.tagColor;
     const periodText = params.periodText;
 
-    const startDate = useMemo(() => params.startDate ? new Date(params.startDate) : null, [params.startDate]);
-    const endDate = useMemo(() => params.endDate ? new Date(params.endDate) : null, [params.endDate]);
+    const startDate = useMemo(() => {
+        if (!params.startDate) return null;
+        const d = new Date(params.startDate);
+        return isValidDate(d) ? d : null;
+    }, [params.startDate]);
+    const endDate = useMemo(() => {
+        if (!params.endDate) return null;
+        const d = new Date(params.endDate);
+        return isValidDate(d) ? d : null;
+    }, [params.endDate]);
     const styles = createStyles(theme, tagColor);
 
     const [chartData, setChartData] = useState({ data: [], total: 0 });
@@ -31,11 +41,9 @@ export default function TagDetailsScreen() {
 
     useEffect(() => {
         const fetchData = async () => {
-            if (!db || !tagId || !startDate || !endDate) {
-                //console.log('[TagDetailsScreen] Pomijam pobieranie - brak danych (db, tagId, daty)');
+            if (!db || tagId === null || !startDate || !endDate) {
                 return;
             }
-            //console.log(`[TagDetailsScreen] Rozpoczynam pobieranie danych dla taga ID: ${tagId}`);
             setIsLoading(true);
             try {
                 const period = { startDate, endDate };
@@ -45,7 +53,6 @@ export default function TagDetailsScreen() {
                 console.error("[TagDetailsScreen] Błąd podczas pobierania danych:", error);
                 setChartData({ data: [], total: 0 });
             } finally {
-                //console.log('[TagDetailsScreen] Zakończono pobieranie danych.');
                 setIsLoading(false);
             }
         };
@@ -54,34 +61,42 @@ export default function TagDetailsScreen() {
     }, [db, tagId, startDate, endDate]);
 
     const handleShowAllExpenses = () => {
-        if (!startDate || !endDate) return;
-        const startDateTimestamp = Math.floor(startDate.getTime() / 1000);
-        const endDateTimestamp = Math.floor(endDate.getTime() / 1000);
+        if (!startDate || !endDate || tagId === null) return;
+        try {
+            const startDateTimestamp = Math.floor(startDate.getTime() / 1000);
+            const endDateTimestamp = Math.floor(endDate.getTime() / 1000);
 
-        router.push({
-            pathname: '/(tabs)/transactionListScreen',
-            params: {
-                filterTagId: tagId,
-                filterDateFrom: startDateTimestamp,
-                filterDateTo: endDateTimestamp,
-            }
-        });
+            router.push({
+                pathname: '/(tabs)/transactionListScreen',
+                params: {
+                    filterTagId: tagId,
+                    filterDateFrom: startDateTimestamp,
+                    filterDateTo: endDateTimestamp,
+                }
+            });
+        } catch (error) {
+            console.error("[TagDetailsScreen] Błąd podczas przechodzenia do listy transakcji:", error);
+        }
     };
 
     const handleCategoryPress = (category) => {
-        if (!startDate || !endDate) return;
-        const startDateTimestamp = Math.floor(startDate.getTime() / 1000);
-        const endDateTimestamp = Math.floor(endDate.getTime() / 1000);
+        if (!startDate || !endDate || tagId === null) return;
+        try {
+            const startDateTimestamp = Math.floor(startDate.getTime() / 1000);
+            const endDateTimestamp = Math.floor(endDate.getTime() / 1000);
 
-        router.push({
-            pathname: '/(tabs)/transactionListScreen',
-            params: {
-                filterTagId: tagId,
-                filterCategoryId: category.id,
-                filterDateFrom: startDateTimestamp,
-                filterDateTo: endDateTimestamp,
-            }
-        });
+            router.push({
+                pathname: '/(tabs)/transactionListScreen',
+                params: {
+                    filterTagId: tagId,
+                    filterCategoryId: category.id,
+                    filterDateFrom: startDateTimestamp,
+                    filterDateTo: endDateTimestamp,
+                }
+            });
+        } catch (error) {
+            console.error("[TagDetailsScreen] Błąd podczas przechodzenia do listy transakcji z kategorią:", error);
+        }
     };
 
     const HeaderTitle = () => (

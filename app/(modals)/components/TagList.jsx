@@ -8,8 +8,10 @@ const TagList = ({ tags, onSelectTag, onAddNew }) => {
     const getUsageText = (count) => {
         if (count === 0) return null;
         if (count === 1) return "W 1 transakcji";
-        if (count > 1 && count < 5) return `W ${count} transakcjach`;
-        return `W ${count} transakcji`;
+        if (count % 10 >= 2 && count % 10 <= 4 && (count % 100 < 10 || count % 100 >= 20)) {
+            return `W ${count} transakcje`;
+        }
+        return `W ${count} transakcjach`;
     };
 
     const renderItem = ({ item }) => (

@@ -14,17 +14,24 @@ export default function ManageCategoriesModal() {
     const [categories, setCategories] = useState([]);
     const [currentView, setCurrentView] = useState('list'); // 'list' or 'form'
     const [selectedCategory, setSelectedCategory] = useState(null);
+    const [error, setError] = useState(null);
+
+    const fetchCategories = useCallback(async () => {
+        if (db) {
+            try {
+                const data = await getAllCategories(db);
+                setCategories(data);
+                setError(null);
+            } catch (err) {
+                setError("Nie udało się pobrać kategorii.");
+            }
+        }
+    }, [db]);
 
     useFocusEffect(
         useCallback(() => {
-            const fetchCategories = async () => {
-                if (db) {
-                    const data = await getAllCategories(db);
-                    setCategories(data);
-                }
-            };
             fetchCategories();
-        }, [db])
+        }, [fetchCategories])
     );
 
     const handleAddNew = () => {
@@ -37,19 +44,16 @@ export default function ManageCategoriesModal() {
         setCurrentView('form');
     };
 
-    const handleBackToList = () => {
+    const handleBackToList = async (saveError) => {
         setCurrentView('list');
         setSelectedCategory(null);
-        
-        const fetchCategories = async () => {
-            if (db) {
-                const data = await getAllCategories(db);
-                setCategories(data);
-            }
-        };
-        fetchCategories();
+        if (saveError) {
+            setError(saveError);
+            return;
+        }
+        await fetchCategories();
     };
-    
+
     const getTitle = () => {
         if (currentView === 'list') return "Zarządzaj kategoriami";
         if (selectedCategory) return "Edytuj kategorię";
@@ -67,24 +71,33 @@ export default function ManageCategoriesModal() {
                     <Text variant="headlineMedium" style={styles.headerTitle}>{getTitle()}</Text>
                 </View>
 
+                {error && (
+                    <View style={{ padding: 12 }}>
+                        <Text style={{ color: theme.colors.error }}>{error}</Text>
+                    </View>
+                )}
+
                 {currentView === 'list' ? (
                     <View style={styles.content}>
-                        <CategoryList 
-                            categories={categories} 
+                        <CategoryList
+                            categories={categories}
                             onSelectCategory={handleSelectCategory}
                             onAddNew={handleAddNew}
                         />
                     </View>
                 ) : (
                     <View style={styles.content}>
-                        <AddEditCategory category={selectedCategory} onSave={handleBackToList} />
+                        <AddEditCategory
+                            category={selectedCategory}
+                            onSave={(err) => handleBackToList(err)}
+                        />
                     </View>
                 )}
-                
+
                 {currentView === 'list' && (
                     <View style={styles.footer}>
                         <Pressable onPress={() => router.back()}>
-                             <Text style={{color: theme.colors.primary, fontSize: 16}}>Zamknij</Text>
+                            <Text style={{ color: theme.colors.primary, fontSize: 16 }}>Zamknij</Text>
                         </Pressable>
                     </View>
                 )}
@@ -94,8 +107,20 @@ export default function ManageCategoriesModal() {
 }
 
 const styles = StyleSheet.create({
-    backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' },
-    modalSheet: { position: 'absolute', bottom: 0, left: 0, right: 0, height: '95%', borderTopLeftRadius: 20, borderTopRightRadius: 20, overflow: 'hidden' },
+    backdrop: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0,0,0,0.5)'
+    },
+    modalSheet: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: '95%',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        overflow: 'hidden'
+    },
     header: {
         flexDirection: 'row',
         alignItems: 'center',

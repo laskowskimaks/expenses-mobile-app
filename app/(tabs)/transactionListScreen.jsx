@@ -1,4 +1,10 @@
-import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import React, {
+  useEffect,
+  useState,
+  useCallback,
+  useMemo,
+  useRef,
+} from 'react';
 import {
   View,
   Text,
@@ -7,22 +13,34 @@ import {
   Alert,
   ScrollView,
 } from 'react-native';
-import { Searchbar, Chip, IconButton, Menu, useTheme } from 'react-native-paper';
+import {
+  Searchbar,
+  Chip,
+  IconButton,
+  Menu,
+  useTheme,
+} from 'react-native-paper';
 import RNModal from 'react-native-modal';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { FlashList } from '@shopify/flash-list';
 
 import { useDb } from '@/context/DbContext';
 import TransactionItem from '@/components/TransactionItem';
-import TransactionSkeleton from '@/components/skeletons/TransactionSkeleton';
-import { TransactionSkeletonList } from '@/components/skeletons/TransactionSkeleton';
+import TransactionSkeleton, { TransactionSkeletonList } from '@/components/skeletons/TransactionSkeleton';
 import DateSeparator from '@/components/DateSeparator';
-import { getAllTransactionsSorted, deleteTransaction, formatCurrency } from '@/services/transactionService';
+import {
+  getAllTransactionsSorted,
+  deleteTransaction,
+  formatCurrency,
+} from '@/services/transactionService';
 import { eventEmitter } from '@/utils/eventEmitter';
 import useDebounce from '@/utils/useDebounce';
 import { processPeriodicTransactions } from '@/services/periodicTransactionService';
 
-import FilterModal, { getActiveFiltersCount, createDefaultFilters } from '@/components/FilterModal';
+import FilterModal, {
+  getActiveFiltersCount,
+  createDefaultFilters,
+} from '@/components/FilterModal';
 import PeriodicActionChoiceModal from '@/components/PeriodicActionChoiceModal';
 import { getAllCategories } from '@/services/categoryService';
 import { getAllTags } from '@/services/tagService';
@@ -30,25 +48,33 @@ import { useDialog } from '@/utils/useDialog';
 import ConfirmationDialog from '@/components/ConfirmationDialog';
 
 function getDateKey(tx) {
-  const ts = typeof tx.transactionDate === 'number' ? tx.transactionDate * 1000 : Date.now();
+  const ts =
+    typeof tx.transactionDate === 'number'
+      ? tx.transactionDate * 1000
+      : Date.now();
   const d = new Date(ts);
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
 }
+
 function formatDateEuropean(timestamp) {
   if (!timestamp) return '';
   const date = new Date(timestamp * 1000);
   const today = new Date();
   const yesterday = new Date(today);
   yesterday.setDate(today.getDate() - 1);
+
   const dateStr = date.toDateString();
-  const todayStr = today.toDateString();
-  const yesterdayStr = yesterday.toDateString();
-  if (dateStr === todayStr) return 'Dzisiaj';
-  if (dateStr === yesterdayStr) return 'Wczoraj';
-  return date.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  if (dateStr === today.toDateString()) return 'Dzisiaj';
+  if (dateStr === yesterday.toDateString()) return 'Wczoraj';
+
+  return date.toLocaleDateString('pl-PL', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
 }
 
 function flattenTransactionsForDateSort(transactions = []) {
@@ -56,21 +82,26 @@ function flattenTransactionsForDateSort(transactions = []) {
   const flatData = [];
   const stickyHeaderIndices = [];
   let lastDateKey = null;
+
   transactions.forEach(tx => {
     const currentDateKey = getDateKey(tx);
     if (currentDateKey !== lastDateKey) {
       stickyHeaderIndices.push(flatData.length);
-      flatData.push({ type: 'separator', id: `sep-${currentDateKey}`, title: formatDateEuropean(tx.transactionDate) });
+      flatData.push({
+        type: 'separator',
+        id: `sep-${currentDateKey}`,
+        title: formatDateEuropean(tx.transactionDate),
+      });
       lastDateKey = currentDateKey;
     }
     flatData.push({ type: 'transaction', ...tx });
   });
+
   return { data: flatData, stickyHeaderIndices };
 }
 
 function flattenTransactionsForAmountSort(transactions = []) {
   if (transactions.length === 0) return { data: [], stickyHeaderIndices: [] };
-
   const flatData = [];
   const stickyHeaderIndices = [];
   let lastDateKey = null;
@@ -79,15 +110,18 @@ function flattenTransactionsForAmountSort(transactions = []) {
     const currentDateKey = getDateKey(tx);
     if (currentDateKey !== lastDateKey) {
       stickyHeaderIndices.push(flatData.length);
-      flatData.push({ type: 'separator', id: `sep-${currentDateKey}-${tx.id}`, title: formatDateEuropean(tx.transactionDate), });
+      flatData.push({
+        type: 'separator',
+        id: `sep-${currentDateKey}-${tx.id}`,
+        title: formatDateEuropean(tx.transactionDate),
+      });
       lastDateKey = currentDateKey;
     }
-    flatData.push({ type: 'transaction', ...tx, });
+    flatData.push({ type: 'transaction', ...tx });
   });
 
   return { data: flatData, stickyHeaderIndices };
 }
-
 
 export default function TransactionListScreen() {
   const { db } = useDb();
@@ -122,6 +156,7 @@ export default function TransactionListScreen() {
     }
     return createDefaultFilters();
   });
+
   const [sortOption, setSortOption] = useState('date_desc');
   const [sortMenuVisible, setSortMenuVisible] = useState(false);
   const [periodicModalVisible, setPeriodicModalVisible] = useState(false);
@@ -129,6 +164,7 @@ export default function TransactionListScreen() {
   const [currentActionType, setCurrentActionType] = useState(null);
 
   const openSwipeableRef = useRef(null);
+
 
   useEffect(() => {
     if (db) {
@@ -142,7 +178,6 @@ export default function TransactionListScreen() {
     const hasDateFilter = filterDateFrom && filterDateTo;
 
     if ((filterTagId || filterCategoryId) && hasDateFilter) {
-      console.log('[TransactionListScreen] Wykryto parametry nawigacji, aktualizuję filtry...');
       const newFilters = createDefaultFilters();
       newFilters.dateFrom = parseInt(filterDateFrom, 10);
       newFilters.dateTo = parseInt(filterDateTo, 10);
@@ -150,7 +185,12 @@ export default function TransactionListScreen() {
       newFilters.categoryIds = filterCategoryId ? [parseInt(filterCategoryId, 10)] : [];
       setAppliedFilters(newFilters);
     }
-  }, [params.filterTagId, params.filterCategoryId, params.filterDateFrom, params.filterDateTo]);
+  }, [
+    params.filterTagId,
+    params.filterCategoryId,
+    params.filterDateFrom,
+    params.filterDateTo,
+  ]);
 
   useEffect(() => {
     const reload = () => loadFilterOptions();
@@ -166,7 +206,10 @@ export default function TransactionListScreen() {
     };
   }, []);
 
-  const handleDataChange = useCallback(() => { fetchTransactions(false); }, []);
+  const handleDataChange = useCallback(() => {
+    fetchTransactions(false);
+  }, []);
+
   useEffect(() => {
     eventEmitter.on('transactionAdded', handleDataChange);
     eventEmitter.on('periodicTransactionAdded', handleDataChange);
@@ -180,7 +223,7 @@ export default function TransactionListScreen() {
       eventEmitter.off('transactionDeleted', handleDataChange);
       eventEmitter.off('periodicTransactionChanged', handleDataChange);
     };
-  }, [handleDataChange]);
+  }, []);
 
   const { listData, stickyHeaderIndices } = useMemo(() => {
     if (isLoadingTransactions) return { listData: [], stickyHeaderIndices: [] };
@@ -198,10 +241,14 @@ export default function TransactionListScreen() {
     let finalData;
 
     if (sortOption === 'date_desc') {
-      sortedTransactions = [...filteredTransactions].sort((a, b) => (b.transactionDate || 0) - (a.transactionDate || 0));
+      sortedTransactions = [...filteredTransactions].sort(
+        (a, b) => (b.transactionDate || 0) - (a.transactionDate || 0)
+      );
       finalData = flattenTransactionsForDateSort(sortedTransactions);
     } else if (sortOption === 'date_asc') {
-      sortedTransactions = [...filteredTransactions].sort((a, b) => (a.transactionDate || 0) - (b.transactionDate || 0));
+      sortedTransactions = [...filteredTransactions].sort(
+        (a, b) => (a.transactionDate || 0) - (b.transactionDate || 0)
+      );
       finalData = flattenTransactionsForDateSort(sortedTransactions);
     } else {
       sortedTransactions = [...filteredTransactions].sort((a, b) => {
@@ -218,60 +265,63 @@ export default function TransactionListScreen() {
       finalData = flattenTransactionsForAmountSort(sortedTransactions);
     }
 
-    const preComputedTransactions = finalData.data.map(item => {
-      if (item.type === 'transaction') {
-        return {
-          ...item,
-          amountFormatted: formatCurrency(item.amount),
-        };
-      }
-      return item;
-    });
+    const preComputedTransactions = finalData.data.map(item =>
+      item.type === 'transaction'
+        ? { ...item, amountFormatted: formatCurrency(item.amount) }
+        : item
+    );
 
-    return { listData: preComputedTransactions, stickyHeaderIndices: finalData.stickyHeaderIndices };
-
-  }, [debouncedSearchQuery, allTransactions, appliedFilters, isLoadingTransactions, sortOption]);
+    return {
+      listData: preComputedTransactions,
+      stickyHeaderIndices: finalData.stickyHeaderIndices,
+    };
+  }, [
+    debouncedSearchQuery,
+    allTransactions,
+    appliedFilters,
+    isLoadingTransactions,
+    sortOption,
+  ]);
 
 
   const fetchTransactions = async (showLoading = true) => {
-    if (!db) return;
+    if (!db) {
+      Alert.alert('Błąd', 'Baza danych nie jest dostępna. Spróbuj ponownie później.');
+      return;
+    }
     if (showLoading) setIsLoadingTransactions(true);
     try {
-      console.log('[TransactionListScreen] Sprawdzanie zaległych transakcji okresowych...');
       const periodicResult = await processPeriodicTransactions(db);
-
       if (periodicResult.success && periodicResult.addedCount > 0) {
         console.log(`[TransactionListScreen] Dodano ${periodicResult.addedCount} automatycznych transakcji`);
       }
-
       const transactionsFromDb = await getAllTransactionsSorted(db);
       setAllTransactions(transactionsFromDb);
     } catch (error) {
-      console.error('[TransactionListScreen] Błąd podczas pobierania transakcji:', error);
       Alert.alert('Błąd', 'Nie udało się pobrać transakcji');
     } finally {
       if (showLoading) setIsLoadingTransactions(false);
     }
   };
 
-  const normalizeCategory = (cat) => {
-    if (!cat) return null;
-    return {
-      id: cat.id ?? cat.categoryId ?? cat._id ?? null,
-      name: cat.name ?? cat.label ?? cat.categoryName ?? '',
-      iconName: cat.iconName ?? cat.icon ?? cat.categoryIcon ?? null,
-      color: cat.color ?? cat.backgroundColor ?? cat.categoryColor ?? '#cccccc',
-    };
-  };
+  const normalizeCategory = cat =>
+    cat
+      ? {
+        id: cat.id ?? cat.categoryId ?? cat._id ?? null,
+        name: cat.name ?? cat.label ?? cat.categoryName ?? '',
+        iconName: cat.iconName ?? cat.icon ?? cat.categoryIcon ?? null,
+        color: cat.color ?? cat.backgroundColor ?? cat.categoryColor ?? '#cccccc',
+      }
+      : null;
 
-  const normalizeTag = (tag) => {
-    if (!tag) return null;
-    return {
-      id: tag.id ?? tag.tagId ?? tag._id ?? null,
-      name: tag.name ?? tag.label ?? tag.tagName ?? '',
-      color: tag.color ?? '#cccccc',
-    };
-  };
+  const normalizeTag = tag =>
+    tag
+      ? {
+        id: tag.id ?? tag.tagId ?? tag._id ?? null,
+        name: tag.name ?? tag.label ?? tag.tagName ?? '',
+        color: tag.color ?? '#cccccc',
+      }
+      : null;
 
   const loadFilterOptions = async () => {
     try {
@@ -279,12 +329,10 @@ export default function TransactionListScreen() {
         getAllCategories(db),
         getAllTags(db),
       ]);
-      const cats = (catsRaw || []).map(normalizeCategory).filter(Boolean);
-      const tags = (tagsRaw || []).map(normalizeTag).filter(Boolean);
-      setCategoriesOptions(cats);
-      setTagsOptions(tags);
+      setCategoriesOptions((catsRaw || []).map(normalizeCategory).filter(Boolean));
+      setTagsOptions((tagsRaw || []).map(normalizeTag).filter(Boolean));
     } catch (error) {
-      console.error('[TransactionListScreen] Błąd podczas wczytywania opcji filtrów:', error);
+      console.error('[TransactionListScreen] Błąd podczas ładowania opcji filtrów:', error);
     }
   };
 
@@ -298,46 +346,55 @@ export default function TransactionListScreen() {
     setRefreshing(false);
   };
 
-  const handleEdit = useCallback((transaction) => {
-    if (transaction.periodicTransactionId) {
-      setSelectedTransaction(transaction);
-      setCurrentActionType('edit');
-      setPeriodicModalVisible(true);
-    } else {
-      router.push({ pathname: '/(modals)/AddTransactionModal', params: { transactionId: transaction.id, editMode: 'single' } });
-    }
-  }, [router]);
+  const handleEdit = useCallback(
+    transaction => {
+      if (transaction.periodicTransactionId) {
+        setSelectedTransaction(transaction);
+        setCurrentActionType('edit');
+        setPeriodicModalVisible(true);
+      } else {
+        router.push({
+          pathname: '/(modals)/AddTransactionModal',
+          params: { transactionId: transaction.id, editMode: 'single' },
+        });
+      }
+    },
+    [router]
+  );
 
-  const handleDelete = useCallback((transaction) => {
-    if (transaction.periodicTransactionId) {
-      setSelectedTransaction(transaction);
-      setCurrentActionType('delete');
-      setPeriodicModalVisible(true);
-    } else {
-      showDialog({
-        title: 'Potwierdź usunięcie',
-        content: 'Czy na pewno chcesz trwale usunąć tę transakcję?',
-        confirmText: 'Usuń',
-        onConfirm: async () => {
-          const result = await deleteTransaction(db, transaction.id, { mode: 'single' });
-          if (result.success) {
-            eventEmitter.emit('transactionDeleted', { id: transaction.id });
-          } else {
-            showDialog({
-              title: 'Błąd',
-              content: result.message || 'Nie udało się usunąć transakcji.',
-              confirmText: 'OK',
-              onConfirm: () => { },
-              dangerous: false
-            });
-          }
-        },
-        dangerous: true
-      });
-    }
-  }, [db, showDialog]);
+  const handleDelete = useCallback(
+    transaction => {
+      if (transaction.periodicTransactionId) {
+        setSelectedTransaction(transaction);
+        setCurrentActionType('delete');
+        setPeriodicModalVisible(true);
+      } else {
+        showDialog({
+          title: 'Potwierdź usunięcie',
+          content: 'Czy na pewno chcesz trwale usunąć tę transakcję?',
+          confirmText: 'Usuń',
+          onConfirm: async () => {
+            const result = await deleteTransaction(db, transaction.id, { mode: 'single' });
+            if (result.success) {
+              eventEmitter.emit('transactionDeleted', { id: transaction.id });
+            } else {
+              showDialog({
+                title: 'Błąd',
+                content: result.message || 'Nie udało się usunąć transakcji.',
+                confirmText: 'OK',
+                onConfirm: () => { },
+                dangerous: false,
+              });
+            }
+          },
+          dangerous: true,
+        });
+      }
+    },
+    [db, showDialog]
+  );
 
-  const handlePeriodicActionSelect = async (mode) => {
+  const handlePeriodicActionSelect = async mode => {
     setPeriodicModalVisible(false);
     if (!selectedTransaction || !currentActionType) return;
 
@@ -359,47 +416,6 @@ export default function TransactionListScreen() {
     setCurrentActionType(null);
   };
 
-  const getDisplayedTransactionCount = () =>
-    listData.filter(item => item.type === 'transaction').length;
-
-  const renderEmptyComponent = () => {
-    if (allTransactions.length > 0 && debouncedSearchQuery !== '') {
-      return (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>
-            Brak wyników dla frazy "{debouncedSearchQuery}"
-          </Text>
-        </View>
-      );
-    }
-    return (
-      <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>Brak transakcji do wyświetlenia</Text>
-      </View>
-    );
-  };
-
-  const openFilter = useCallback((targetScreen = 'main') => {
-    setFilterInitialScreen(targetScreen || 'main');
-    setFilterVisible(true);
-  }, []);
-
-  const closeFilter = useCallback(() => {
-    setFilterVisible(false);
-    setFilterInitialScreen(null);
-  }, []);
-
-  const applyFilterChanges = useCallback((newFilters) => {
-    setAppliedFilters(newFilters);
-    setFilterVisible(false);
-    setFilterInitialScreen(null);
-  }, []);
-
-  const resetAndApplyFilters = useCallback(() => {
-    const defaults = createDefaultFilters();
-    setAppliedFilters(defaults);
-    setFilterVisible(false);
-  }, []);
 
   const defaults = useMemo(() => createDefaultFilters(), []);
   const removeCategoriesGroup = () =>
@@ -500,7 +516,7 @@ export default function TransactionListScreen() {
     return out;
   }, [appliedFilters, defaults]);
 
-  const mapChipKeyToScreen = (key) => {
+  const mapChipKeyToScreen = key => {
     switch (key) {
       case 'categories':
         return 'categories';
@@ -521,7 +537,7 @@ export default function TransactionListScreen() {
 
   const openSortMenu = () => setSortMenuVisible(true);
   const closeSortMenu = () => setSortMenuVisible(false);
-  const selectSort = (option) => {
+  const selectSort = option => {
     setSortOption(option);
     closeSortMenu();
   };
@@ -541,47 +557,190 @@ export default function TransactionListScreen() {
     }
   }, [sortOption]);
 
-  const renderItem = useCallback(({ item }) => {
-    if (item.type === 'separator') {
-      return <DateSeparator title={item.title} />;
+  const renderItem = useCallback(
+    ({ item }) =>
+      item.type === 'separator' ? (
+        <DateSeparator title={item.title} />
+      ) : (
+        <TransactionItem
+          transaction={item}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+          openSwipeableRef={openSwipeableRef}
+        />
+      ),
+    [handleEdit, handleDelete]
+  );
+
+  const keyExtractor = useCallback(item => item.id.toString(), []);
+  const getItemType = useCallback(item => item.type, []);
+  const renderPlaceholder = useCallback(
+    () => <TransactionSkeleton variant="compact" />,
+    []
+  );
+
+  const renderEmptyComponent = () => {
+    if (allTransactions.length > 0 && debouncedSearchQuery !== '') {
+      return (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>
+            Brak wyników dla frazy "{debouncedSearchQuery}"
+          </Text>
+        </View>
+      );
     }
     return (
-      <TransactionItem
-        transaction={item}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-        openSwipeableRef={openSwipeableRef}
-      />
+      <View style={styles.emptyContainer}>
+        <Text style={styles.emptyText}>Brak transakcji do wyświetlenia</Text>
+      </View>
     );
-  }, [handleEdit, handleDelete]);
+  };
 
-  const keyExtractor = useCallback((item) => item.id.toString(), []);
-  const getItemType = useCallback((item) => item.type, []);
-  const renderPlaceholder = useCallback(() => <TransactionSkeleton variant="compact" />, []);
+  const openFilter = useCallback(
+    (targetScreen = 'main') => {
+      setFilterInitialScreen(targetScreen || 'main');
+      setFilterVisible(true);
+    },
+    []
+  );
+
+  const closeFilter = useCallback(() => {
+    setFilterVisible(false);
+    setFilterInitialScreen(null);
+  }, []);
+
+  const applyFilterChanges = useCallback(newFilters => {
+    setAppliedFilters(newFilters);
+    setFilterVisible(false);
+    setFilterInitialScreen(null);
+  }, []);
+
+  const resetAndApplyFilters = useCallback(() => {
+    const defaults = createDefaultFilters();
+    setAppliedFilters(defaults);
+    setFilterVisible(false);
+  }, []);
 
   const styles = createStyles(theme);
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <View style={styles.searchRow}>
-        <Searchbar placeholder="Szukaj" onChangeText={setSearchInput} value={searchInput} style={styles.searchbar} elevation={1} />
+        <Searchbar
+          placeholder="Szukaj"
+          onChangeText={setSearchInput}
+          value={searchInput}
+          style={styles.searchbar}
+          elevation={1}
+        />
         <View style={styles.sortMenuWrapper}>
-          <Menu visible={sortMenuVisible} onDismiss={closeSortMenu} anchor={<IconButton icon="sort" size={26} onPress={openSortMenu} accessibilityLabel="Sortuj" />}>
-            <Menu.Item onPress={() => selectSort('date_desc')} title="Data (najnowsze)" leadingIcon="arrow-down" titleStyle={sortOption === 'date_desc' ? { fontWeight: 'bold', color: '#2196F3' } : {}} />
-            <Menu.Item onPress={() => selectSort('date_asc')} title="Data (najstarsze)" leadingIcon="arrow-up" titleStyle={sortOption === 'date_asc' ? { fontWeight: 'bold', color: '#2196F3' } : {}} />
-            <Menu.Item onPress={() => selectSort('amount_desc')} title="Kwota (największe pierwsze)" leadingIcon="arrow-down" titleStyle={sortOption === 'amount_desc' ? { fontWeight: 'bold', color: '#2196F3' } : {}} />
-            <Menu.Item onPress={() => selectSort('amount_asc')} title="Kwota (najmniejsze pierwsze)" leadingIcon="arrow-up" titleStyle={sortOption === 'amount_asc' ? { fontWeight: 'bold', color: '#2196F3' } : {}} />
+          <Menu
+            visible={sortMenuVisible}
+            onDismiss={closeSortMenu}
+            anchor={
+              <IconButton
+                icon="sort"
+                size={26}
+                onPress={openSortMenu}
+                accessibilityLabel="Sortuj"
+              />
+            }
+          >
+            <Menu.Item
+              onPress={() => selectSort('date_desc')}
+              title="Data (najnowsze)"
+              leadingIcon="arrow-down"
+              titleStyle={
+                sortOption === 'date_desc'
+                  ? { fontWeight: 'bold', color: '#2196F3' }
+                  : {}
+              }
+            />
+            <Menu.Item
+              onPress={() => selectSort('date_asc')}
+              title="Data (najstarsze)"
+              leadingIcon="arrow-up"
+              titleStyle={
+                sortOption === 'date_asc'
+                  ? { fontWeight: 'bold', color: '#2196F3' }
+                  : {}
+              }
+            />
+            <Menu.Item
+              onPress={() => selectSort('amount_desc')}
+              title="Kwota (największe pierwsze)"
+              leadingIcon="arrow-down"
+              titleStyle={
+                sortOption === 'amount_desc'
+                  ? { fontWeight: 'bold', color: '#2196F3' }
+                  : {}
+              }
+            />
+            <Menu.Item
+              onPress={() => selectSort('amount_asc')}
+              title="Kwota (najmniejsze pierwsze)"
+              leadingIcon="arrow-up"
+              titleStyle={
+                sortOption === 'amount_asc'
+                  ? { fontWeight: 'bold', color: '#2196F3' }
+                  : {}
+              }
+            />
           </Menu>
         </View>
       </View>
 
       <View style={styles.filterActionsRow}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsScroll}>
-          <Chip icon="filter-variant" mode="outlined" onPress={() => openFilter('main')} onClose={activeFilterCount > 0 ? clearAllFilters : undefined} closeIcon="close" style={[styles.chip, { backgroundColor: theme.colors.surface, borderColor: theme.colors.outline }]} compact textStyle={[styles.chipText, { color: theme.colors.onSurface }]}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chipsScroll}
+        >
+          <Chip
+            icon="filter-variant"
+            mode="outlined"
+            onPress={() => openFilter('main')}
+            onClose={activeFilterCount > 0 ? clearAllFilters : undefined}
+            closeIcon="close"
+            style={[
+              styles.chip,
+              {
+                backgroundColor: theme.colors.surface,
+                borderColor: theme.colors.outline,
+              },
+            ]}
+            compact
+            textStyle={[styles.chipText, { color: theme.colors.onSurface }]}
+          >
             Filtry{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
           </Chip>
-          {groupedChips.length === 0 ? (<View style={styles.noChipsPlaceholder}><Text style={[styles.noChipsText, { color: theme.colors.onSurfaceVariant }]}>Brak aktywnych filtrów</Text></View>) : (
-            groupedChips.map(ch => (<Chip key={ch.key} mode="outlined" onPress={() => openFilter(mapChipKeyToScreen(ch.key))} onClose={ch.onClose} closeIcon="close" style={[styles.chip, { backgroundColor: theme.colors.surface, borderColor: theme.colors.outline }]} compact textStyle={[styles.chipText, { color: theme.colors.onSurface }]}>{ch.label}</Chip>))
+          {groupedChips.length === 0 ? (
+            <View style={styles.noChipsPlaceholder}>
+              <Text style={[styles.noChipsText, { color: theme.colors.onSurfaceVariant }]}>
+                Brak aktywnych filtrów
+              </Text>
+            </View>
+          ) : (
+            groupedChips.map(ch => (
+              <Chip
+                key={ch.key}
+                mode="outlined"
+                onPress={() => openFilter(mapChipKeyToScreen(ch.key))}
+                onClose={ch.onClose}
+                closeIcon="close"
+                style={[
+                  styles.chip,
+                  {
+                    backgroundColor: theme.colors.surface,
+                    borderColor: theme.colors.outline,
+                  },
+                ]}
+                compact
+                textStyle={[styles.chipText, { color: theme.colors.onSurface }]}
+              >
+                {ch.label}
+              </Chip>
+            ))
           )}
         </ScrollView>
         <IconButton
@@ -592,13 +751,18 @@ export default function TransactionListScreen() {
           style={styles.refreshButton}
         />
       </View>
-      {isLoadingTransactions ? (<TransactionSkeletonList count={6} />) : (
+
+      {isLoadingTransactions ? (
+        <TransactionSkeletonList count={6} />
+      ) : (
         <FlashList
           data={listData}
           keyExtractor={keyExtractor}
           renderItem={renderItem}
           contentContainerStyle={styles.listContainer}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
           ListEmptyComponent={renderEmptyComponent}
           showsVerticalScrollIndicator={false}
           estimatedItemSize={110}
@@ -607,12 +771,46 @@ export default function TransactionListScreen() {
           getItemType={getItemType}
         />
       )}
-      <RNModal isVisible={filterVisible} onBackdropPress={closeFilter} onBackButtonPress={closeFilter} style={{ margin: 0, justifyContent: 'flex-end' }} avoidKeyboard={true} useNativeDriver={true} propagateSwipe={true}>
-        <View style={{ height: '90%', backgroundColor: 'white', borderTopLeftRadius: 12, borderTopRightRadius: 12, overflow: 'hidden' }}>
-          <FilterModal visible={filterVisible} initialFilters={appliedFilters} initialScreen={filterInitialScreen || 'main'} categoriesOptions={categoriesOptions} tagsOptions={tagsOptions} allTransactions={allTransactions} onApply={applyFilterChanges} onResetAndApply={resetAndApplyFilters} onClose={closeFilter} />
+
+      <RNModal
+        isVisible={filterVisible}
+        onBackdropPress={closeFilter}
+        onBackButtonPress={closeFilter}
+        style={{ margin: 0, justifyContent: 'flex-end' }}
+        avoidKeyboard={true}
+        useNativeDriver={true}
+        propagateSwipe={true}
+      >
+        <View
+          style={{
+            height: '90%',
+            backgroundColor: 'white',
+            borderTopLeftRadius: 12,
+            borderTopRightRadius: 12,
+            overflow: 'hidden',
+          }}
+        >
+          <FilterModal
+            visible={filterVisible}
+            initialFilters={appliedFilters}
+            initialScreen={filterInitialScreen || 'main'}
+            categoriesOptions={categoriesOptions}
+            tagsOptions={tagsOptions}
+            allTransactions={allTransactions}
+            onApply={applyFilterChanges}
+            onResetAndApply={resetAndApplyFilters}
+            onClose={closeFilter}
+          />
         </View>
       </RNModal>
-      <PeriodicActionChoiceModal visible={periodicModalVisible} onDismiss={() => setPeriodicModalVisible(false)} onSelect={handlePeriodicActionSelect} actionType={currentActionType} />
+
+      <PeriodicActionChoiceModal
+        visible={periodicModalVisible}
+        onDismiss={() => setPeriodicModalVisible(false)}
+        onSelect={handlePeriodicActionSelect}
+        actionType={currentActionType}
+      />
+
       <ConfirmationDialog {...dialog} onDismiss={hideDialog} />
     </View>
   );
@@ -644,15 +842,23 @@ function transactionPassesFilters(transaction, filters) {
   if (filters.transactionType === 'income' && !(transaction.amount > 0)) {
     return false;
   }
-  if (filters.transactionType === 'expenditure' && !(transaction.amount < 0)) {
+  if (filters.transactionType === 'expense' && !(transaction.amount < 0)) {
     return false;
   }
 
   const absAmount = Math.abs(Number(transaction.amount || 0));
-  if (filters.amountMin != null && !isNaN(filters.amountMin) && absAmount < Number(filters.amountMin)) {
+  if (
+    filters.amountMin != null &&
+    !isNaN(filters.amountMin) &&
+    absAmount < Number(filters.amountMin)
+  ) {
     return false;
   }
-  if (filters.amountMax != null && !isNaN(filters.amountMax) && absAmount > Number(filters.amountMax)) {
+  if (
+    filters.amountMax != null &&
+    !isNaN(filters.amountMax) &&
+    absAmount > Number(filters.amountMax)
+  ) {
     return false;
   }
 
@@ -669,40 +875,90 @@ function transactionPassesFilters(transaction, filters) {
   return true;
 }
 
-const createStyles = (theme) => StyleSheet.create({
-  container: { flex: 1 },
-  searchRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8 },
-  searchbar: { flex: 1, marginVertical: 8, borderRadius: 12 },
-  sortMenuWrapper: { marginLeft: 4, marginRight: 6 },
 
-  filterActionsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingLeft: 12,
-    paddingVertical: 4,
-  },
-  chipsScroll: {
-    alignItems: 'center',
-    paddingVertical: 6,
-    paddingRight: 16,
-  },
-  refreshButton: {
-    marginLeft: 'auto',
-    marginRight: 6,
-  },
-
-  chip: {
-    marginRight: 8,
-    height: 34,
-    justifyContent: 'center'
-  },
-  chipText: { fontSize: 13, fontWeight: '500' },
-  noChipsPlaceholder: { justifyContent: 'center', height: 34 },
-  noChipsText: { fontSize: 13, fontStyle: 'italic' },
-  transactionsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 15, paddingTop: 10, paddingBottom: 10, backgroundColor: '#f8f9fa' },
-  transactionsTitle: { fontSize: 18, fontWeight: 'bold', color: '#2c3e50', flex: 1 },
-  sortLabel: { fontSize: 12, color: '#666', marginRight: 8 },
-  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, marginTop: 50 },
-  emptyText: { fontSize: 16, color: '#7f8c8d', textAlign: 'center', marginBottom: 10 },
-  listContainer: { paddingBottom: 75 },
-});
+const createStyles = theme =>
+  StyleSheet.create({
+    container: { flex: 1 },
+    searchRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 8,
+    },
+    searchbar: {
+      flex: 1,
+      marginVertical: 8,
+      borderRadius: 12
+    },
+    sortMenuWrapper: {
+      marginLeft: 4,
+      marginRight: 6
+    },
+    filterActionsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingLeft: 12,
+      paddingVertical: 4,
+    },
+    chipsScroll: {
+      alignItems: 'center',
+      paddingVertical: 6,
+      paddingRight: 16,
+    },
+    refreshButton: {
+      marginLeft: 'auto',
+      marginRight: 6,
+    },
+    chip: {
+      marginRight: 8,
+      height: 34,
+      justifyContent: 'center',
+    },
+    chipText: {
+      fontSize: 13,
+      fontWeight: '500'
+    },
+    noChipsPlaceholder: {
+      justifyContent: 'center',
+      height: 34
+    },
+    noChipsText: {
+      fontSize: 13,
+      fontStyle: 'italic'
+    },
+    transactionsHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: 15,
+      paddingTop: 10,
+      paddingBottom: 10,
+      backgroundColor: '#f8f9fa',
+    },
+    transactionsTitle: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: '#2c3e50',
+      flex: 1,
+    },
+    sortLabel: {
+      fontSize: 12,
+      color: '#666',
+      marginRight: 8
+    },
+    emptyContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 20,
+      marginTop: 50,
+    },
+    emptyText: {
+      fontSize: 16,
+      color: '#7f8c8d',
+      textAlign: 'center',
+      marginBottom: 10,
+    },
+    listContainer: {
+      paddingBottom: 75
+    },
+  });

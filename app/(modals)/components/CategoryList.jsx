@@ -1,6 +1,6 @@
 import React from 'react';
 import { FlatList, View, StyleSheet } from 'react-native';
-import { List, Icon, useTheme, Divider } from 'react-native-paper';
+import { List, Icon, useTheme, Divider, Text } from 'react-native-paper';
 
 const CategoryList = ({ categories, onSelectCategory, onAddNew }) => {
     const theme = useTheme();
@@ -36,14 +36,22 @@ const CategoryList = ({ categories, onSelectCategory, onAddNew }) => {
             <Divider />
         </>
     );
+    const ListEmptyComponent = () => (
+        <View style={styles.emptyContainer}>
+            <Text style={{ color: theme.colors.onSurfaceVariant, textAlign: 'center', marginTop: 32 }}>
+                Brak kategorii do wyświetlenia.
+            </Text>
+        </View>
+    );
 
     return (
         <FlatList
             data={categories}
-            keyExtractor={(item) => item.id.toString()}
+            keyExtractor={(item) => (item.id !== undefined && item.id !== null ? item.id.toString() : Math.random().toString())}
             renderItem={renderItem}
             ItemSeparatorComponent={() => <Divider />}
             ListHeaderComponent={ListHeader}
+            ListEmptyComponent={ListEmptyComponent}
             contentContainerStyle={styles.listContent}
         />
     );
@@ -60,7 +68,15 @@ const styles = StyleSheet.create({
     },
     listContent: {
         paddingHorizontal: 16,
-    }
+        paddingBottom: 32,
+        flexGrow: 1,
+    },
+    emptyContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        minHeight: 120,
+    },
 });
 
 export default CategoryList;

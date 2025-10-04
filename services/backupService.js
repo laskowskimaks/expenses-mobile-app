@@ -45,9 +45,14 @@ async function _openTempDbConnection(readOnly = true) {
 }
 
 async function _ensureDirectoryExists(directoryPath) {
-    const dirInfo = await FileSystem.getInfoAsync(directoryPath);
-    if (!dirInfo.exists) {
-        await FileSystem.makeDirectoryAsync(directoryPath, { intermediates: true });
+    try {
+        const dirInfo = await FileSystem.getInfoAsync(directoryPath);
+        if (!dirInfo.exists) {
+            await FileSystem.makeDirectoryAsync(directoryPath, { intermediates: true });
+        }
+    } catch (error) {
+        console.error(`[BackupService] Błąd podczas sprawdzania/tworzenia katalogu: ${directoryPath}`, error);
+        throw error;
     }
 }
 
@@ -60,32 +65,44 @@ async function _withTempDbConnection(asyncWork, readOnly = true) {
         }
         tempConn = tempSqliteConn;
         return await asyncWork(tempDrizzleDb);
+    } catch (error) {
+        console.error("[BackupService] Błąd podczas pracy z tymczasową bazą danych:", error);
+        throw error;
     } finally {
         if (tempConn && typeof tempConn.closeSync === 'function') {
-            tempConn.closeSync();
+            try {
+                tempConn.closeSync();
+            } catch (closeError) {
+                console.error("[BackupService] Błąd podczas zamykania połączenia z bazą:", closeError);
+            }
         }
     }
 }
 
 async function _findNewestRemoteBackup(userBackupsRef) {
-    const listResult = await listAll(userBackupsRef);
-    if (listResult.items.length === 0) {
-        return null;
-    }
-
-    let newestBackup = { ref: null, timestamp: 0 };
-
-    listResult.items.forEach(itemRef => {
-        const nameParts = itemRef.name.split('_');
-        if (nameParts.length === 3 && nameParts[0] === 'app' && nameParts[1] === 'database') {
-            const timestamp = parseInt(nameParts[2].split('.')[0], 10);
-            if (!isNaN(timestamp) && timestamp > newestBackup.timestamp) {
-                newestBackup = { ref: itemRef, timestamp };
-            }
+    try {
+        const listResult = await listAll(userBackupsRef);
+        if (listResult.items.length === 0) {
+            return null;
         }
-    });
 
-    return newestBackup.ref ? newestBackup : null;
+        let newestBackup = { ref: null, timestamp: 0 };
+
+        listResult.items.forEach(itemRef => {
+            const nameParts = itemRef.name.split('_');
+            if (nameParts.length === 3 && nameParts[0] === 'app' && nameParts[1] === 'database') {
+                const timestamp = parseInt(nameParts[2].split('.')[0], 10);
+                if (!isNaN(timestamp) && timestamp > newestBackup.timestamp) {
+                    newestBackup = { ref: itemRef, timestamp };
+                }
+            }
+        });
+
+        return newestBackup.ref ? newestBackup : null;
+    } catch (error) {
+        console.error("[BackupService] Błąd podczas wyszukiwania najnowszego backupu:", error);
+        throw error;
+    }
 }
 
 export async function performUpload() {
@@ -98,6 +115,9 @@ export async function performUpload() {
     try {
         const result = await uploadPromise;
         return result;
+    } catch (e) {
+        console.error("[BackupService] Błąd podczas uploadu backupu:", e);
+        return null;
     } finally {
         uploadPromise = null;
     }
@@ -234,8 +254,13 @@ export async function uploadBackupIfOlderThan(thresholdInMilliseconds = 7 * 24 *
     const thresholdTimestamp = Date.now() - thresholdInMilliseconds;
     if (newestRemoteTimestamp < thresholdTimestamp) {
         console.log(`[ConditionalBackup] Najnowszy backup jest starszy niż próg. Rozpoczynam upload.`);
-        const uploadResult = await performUpload();
-        return { uploaded: !!uploadResult, reason: uploadResult ? "Backup successful." : "Upload process failed." };
+        try {
+            const uploadResult = await performUpload();
+            return { uploaded: !!uploadResult, reason: uploadResult ? "Backup successful." : "Upload process failed." };
+        } catch (error) {
+            console.error("[ConditionalBackup] Błąd podczas uploadu:", error);
+            return { uploaded: false, reason: "Error during upload" };
+        }
     } else {
         console.log(`[ConditionalBackup] Najnowszy zdalny backup jest wystarczająco świeży.`);
         return { uploaded: false, reason: "Existing backup is recent enough." };
