@@ -4,8 +4,8 @@ import { useTheme, Text, IconButton } from 'react-native-paper';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useDb } from '@/context/DbContext';
 import { getAllTagsWithCount } from '@/services/tagService';
-import TagList from './components/TagList';
-import AddEditTag from './components/AddEditTag';
+import TagList from '../../components/lists/TagList';
+import AddEditTag from '../../components/AddEditTag';
 
 export default function ManageTagsModal() {
     const theme = useTheme();

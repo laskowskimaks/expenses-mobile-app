@@ -3,10 +3,10 @@ import { View, StyleSheet, ActivityIndicator, Pressable, TextInput as RNTextInpu
 import { useDb } from '../context/DbContext';
 import { useAuth } from '../context/AuthContext';
 import { generateSalt, hashData } from '@/utils/hashUtils';
-import { deleteSetting, upsertSetting } from '@/services/authService';
+import { deleteSetting, upsertSetting } from '@/services/settingService';
 import { Text, Button, useTheme, Surface } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import ConfirmationDialog from '@/components/ConfirmationDialog';
+import ConfirmationDialog from '@/components/dialogs/ConfirmationDialog';
 import { useDialog } from '@/utils/useDialog';
 
 export default function PinSettingScreen() {

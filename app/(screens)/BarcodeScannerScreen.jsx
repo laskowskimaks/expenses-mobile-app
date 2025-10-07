@@ -7,7 +7,7 @@ import { IconButton, Button, Text, useTheme, Surface } from 'react-native-paper'
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { useAuth } from '@/context/AuthContext';
-import ConfirmationDialog from '@/components/ConfirmationDialog';
+import ConfirmationDialog from '@/components/dialogs/ConfirmationDialog';
 import { useDialog } from '@/utils/useDialog';
 
 const FRAME_WIDTH_PERCENT = 80;

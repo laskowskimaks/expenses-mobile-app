@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useNetworkStatus } from '@/context/NetworkContext';
 import { useDialog } from '@/utils/useDialog';
-import InformationDialog from '@/components/InformationDialog';
+import InformationDialog from '@/components/dialogs/InformationDialog';
 import { useDb } from '@/context/DbContext'; 
 
 export default function ChangePasswordModal() {

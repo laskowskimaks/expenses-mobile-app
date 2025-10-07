@@ -4,7 +4,7 @@ import { TextInput, Button, HelperText, useTheme, Text, Icon } from 'react-nativ
 import { useDb } from '@/context/DbContext';
 import { addCategory, updateCategory, deleteCategory } from '@/services/categoryService';
 import { useDialog } from '@/utils/useDialog';
-import ConfirmationDialog from '@/components/ConfirmationDialog';
+import ConfirmationDialog from '@/components/dialogs/ConfirmationDialog';
 
 const COLORS = ['#e74c3c', '#3498db', '#2ecc71', '#f1c40f', '#9b59b6', '#e67e22', '#1abc9c', '#34495e'];
 const ICONS = ['home', 'car', 'food-fork-drink', 'shopping', 'theater', 'school', 'heart-pulse', 'finance', 'shape-outline', 'airplane', 'train', 'bus', 'gas-station', 'cart', 'tshirt-crew', 'basketball', 'book-open-variant', 'briefcase', 'cash'];

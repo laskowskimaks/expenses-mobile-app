@@ -6,9 +6,9 @@ import * as Brightness from 'expo-brightness';
 
 import { useDb } from '@/context/DbContext';
 import { getLoyaltyCardById, deleteLoyaltyCard } from '@/services/loyaltyCardService';
-import LoyaltyCardPreview from './components/LoyaltyCardPreview';
+import LoyaltyCardPreview from '../../components/cards/LoyaltyCardPreview';
 import { useDialog } from '@/utils/useDialog';
-import ConfirmationDialog from '@/components/ConfirmationDialog';
+import ConfirmationDialog from '@/components/dialogs/ConfirmationDialog';
 
 export default function CardDetailModal() {
     const theme = useTheme();

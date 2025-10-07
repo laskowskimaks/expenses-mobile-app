@@ -12,11 +12,11 @@ import { getAllCategories } from '@/services/categoryService';
 import { getAllTags } from '@/services/tagService';
 import { eventEmitter } from '@/utils/eventEmitter';
 
-import CategoryPicker from './components/CategoryPicker';
-import TagsModal from './components/TagsModal';
-import RepeatUnitPicker from './components/RepeatUnitPicker';
+import CategoryPicker from '../../components/pickers/CategoryPicker';
+import TagsModal from './TagsModal';
+import RepeatUnitPicker from '../../components/pickers/RepeatUnitPicker';
 import { useTransactionForm, ACTIONS } from '@/utils/useTransactionForm';
-import ConfirmationDialog from '@/components/ConfirmationDialog';
+import ConfirmationDialog from '@/components/dialogs/ConfirmationDialog';
 import { useDialog } from '@/utils/useDialog';
 
 const REPEAT_UNITS = [
@@ -36,7 +36,12 @@ const PeriodicSection = ({ state, actions, getRepeatUnitLabel }) => {
             mode="outlined"
             label="Co ile"
             value={state.repeatInterval}
-            onChangeText={actions.setRepeatInterval}
+            onChangeText={(val) => {
+              const numericValue = val.replace(/[^0-9]/g, '');
+              if (numericValue === '' || (parseInt(numericValue, 10) >= 1 && parseInt(numericValue, 10) <= 1000)) {
+                actions.setRepeatInterval(numericValue);
+              }
+            }}
             keyboardType="numeric"
             placeholder="1"
             accessibilityLabel="Interwał powtarzania"

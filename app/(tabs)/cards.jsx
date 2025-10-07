@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useDb } from '@/context/DbContext';
 import { getAllLoyaltyCards } from '@/services/loyaltyCardService';
-import LoyaltyCardItem from '@/components/LoyaltyCardItem';
+import LoyaltyCardItem from '@/components/cards/LoyaltyCardItem';
 import { eventEmitter } from '@/utils/eventEmitter';
 
 export default function CardsScreen() {

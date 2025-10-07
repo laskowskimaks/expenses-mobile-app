@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Appbar, useTheme, Text } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import CategoryDonutChart from '@/components/charts/CategoryDonutChart';
-import CategoryExpenseList from '@/components/CategoryExpenseList';
+import CategoryExpenseList from '@/components/lists/CategoryExpenseList';
 
 function isValidDate(d) {
     return d instanceof Date && !isNaN(d);

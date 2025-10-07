@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { ActivityIndicator, Text, useTheme, Subheading } from 'react-native-paper';
-import CategoryListItem from './CategoryListItem';
+import CategoryListItem from '../items/CategoryListItem';
 
 const CategoryExpenseList = ({ data, total, isLoading, onCategoryPress }) => {
   const theme = useTheme();

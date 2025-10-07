@@ -5,13 +5,12 @@ import * as schema from '@/database/schema';
 import { checkAndRestoreBackup, performUpload } from '@/services/backupService';
 import { migrate } from 'drizzle-orm/expo-sqlite/migrator';
 import migrations from '@/drizzle/migrations';
-import { createUser } from '@/services/authService';
+import { createUser } from '@/services/settingService';
 import { openDatabaseSync } from 'expo-sqlite';
 import StudioInitializer from '@/database/StudioInitializer';
 import { initializeNewUserDatabase } from '@/database/defaultData';
 import { processPeriodicTransactions } from '@/services/periodicTransactionService';
 import { shouldCheckPeriodicTransactions, markPeriodicCheckCompleted } from '@/utils/periodicChecker';
-import { Alert } from 'react-native';
 
 export const DATABASE_NAME = 'database.db';
 const DB_PATH = `${FileSystem.documentDirectory}SQLite/${DATABASE_NAME}`;

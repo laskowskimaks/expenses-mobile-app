@@ -8,11 +8,11 @@ import { useDb } from '@/context/DbContext';
 import { getPeriodicTransactionById, updatePeriodicTransaction } from '@/services/periodicTransactionService';
 import { getAllCategories } from '@/services/categoryService';
 import { getAllTags } from '@/services/tagService';
-import CategoryPicker from './components/CategoryPicker';
-import TagsModal from './components/TagsModal';
-import RepeatUnitPicker from './components/RepeatUnitPicker';
+import CategoryPicker from '../../components/pickers/CategoryPicker';
+import TagsModal from './TagsModal';
+import RepeatUnitPicker from '../../components/pickers/RepeatUnitPicker';
 import useDebounce from '@/utils/useDebounce';
-import ConfirmationDialog from '@/components/ConfirmationDialog';
+import ConfirmationDialog from '@/components/dialogs/ConfirmationDialog';
 import { useDialog } from '@/utils/useDialog';
 
 const REPEAT_UNITS = [
@@ -46,7 +46,12 @@ const PeriodicSection = ({ form, updateForm, updateUi }) => {
                         mode="outlined"
                         label="Co ile"
                         value={form.repeatInterval}
-                        onChangeText={(val) => updateForm('repeatInterval', val)}
+                        onChangeText={(val) => {
+                            const numericValue = val.replace(/[^0-9]/g, '');
+                            if (numericValue === '' || (parseInt(numericValue, 10) >= 1 && parseInt(numericValue, 10) <= 1000)) {
+                                updateForm('repeatInterval', numericValue);
+                            }
+                        }}
                         keyboardType="numeric"
                         placeholder="1"
                         accessibilityLabel="Interwał powtarzania"
@@ -141,8 +146,11 @@ export default function EditPeriodicTransactionModal() {
     const { dialog, showDialog, hideDialog } = useDialog();
 
     const validateRepeatInterval = (val) => {
+        if (val.includes('.') || val.includes(',')) {
+            return false;
+        }
         const num = parseInt(val, 10);
-        return !isNaN(num) && num >= 1 && num <= 1000;
+        return !isNaN(num) && num >= 1 && num <= 1000 && val === String(num);
     };
     const validateAmount = (val) => {
         const num = parseFloat((val || '').replace(',', '.'));

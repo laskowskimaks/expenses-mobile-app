@@ -16,7 +16,7 @@ import { DB_TIMESTAMP_KEY, performUpload } from '@/services/backupService';
 import { resetPeriodicCheckTime } from '@/utils/periodicChecker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useDb } from './DbContext';
-import { getUserEmail, updateLocalEmail } from '@/services/authService';
+import { getUserEmail, updateLocalEmail } from '@/services/settingService';
 import { useNetworkStatus } from './NetworkContext';
 
 export const AuthContext = createContext();

@@ -7,7 +7,7 @@ import { Foundation } from '@expo/vector-icons';
 import { useDb } from '@/context/DbContext';
 import { getCategoryDataForTag } from '@/services/summaryTagService';
 import CategoryDonutChart from '@/components/charts/CategoryDonutChart';
-import CategoryExpenseList from '@/components/CategoryExpenseList';
+import CategoryExpenseList from '@/components/lists/CategoryExpenseList';
 
 function isValidDate(d) {
     return d instanceof Date && !isNaN(d);

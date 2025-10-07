@@ -8,9 +8,9 @@ import * as ImageManipulator from 'expo-image-manipulator';
 
 import { useDb } from '@/context/DbContext';
 import { getLoyaltyCardById, addLoyaltyCard, updateLoyaltyCard } from '@/services/loyaltyCardService';
-import LoyaltyCardPreview from './components/LoyaltyCardPreview';
+import LoyaltyCardPreview from '../../components/cards/LoyaltyCardPreview';
 import { useAuth } from '@/context/AuthContext';
-import ConfirmationDialog from '@/components/ConfirmationDialog';
+import ConfirmationDialog from '@/components/dialogs/ConfirmationDialog';
 import { useDialog } from '@/utils/useDialog';
 
 export default function AddLoyaltyCardModal() {

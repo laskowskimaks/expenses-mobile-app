@@ -5,7 +5,7 @@ import { useDb } from '@/context/DbContext';
 import { addTag, updateTag, deleteTag } from '@/services/tagService';
 import { COLOR_PALETTE } from '@/services/tagService';
 import { useDialog } from '@/utils/useDialog';
-import ConfirmationDialog from '@/components/ConfirmationDialog';
+import ConfirmationDialog from '@/components/dialogs/ConfirmationDialog';
 
 
 const AddEditTag = ({ tag, onSave }) => {

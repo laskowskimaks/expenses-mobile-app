@@ -7,13 +7,13 @@ import { useDb } from '@/context/DbContext';
 import { getAllPeriodicTransactions, deletePeriodicTransaction } from '@/services/periodicTransactionService';
 import { getAllCategories } from '@/services/categoryService';
 import { getAllTags } from '@/services/tagService';
-import PeriodicTransactionItem from './components/PeriodicTransactionItem';
+import PeriodicTransactionItem from '../../components/items/PeriodicTransactionItem';
 import SearchBar from '@/components/SearchBar';
 import useDebounce from '@/utils/useDebounce';
 import PeriodicFilterModal, { createDefaultPeriodicFilters } from './PeriodicFilterModal';
 import PeriodicDefinitionActionModal from './PeriodicDefinitionActionModal';
 import { getCurrentTimestamp } from '@/utils/dateUtils';
-import ConfirmationDialog from '@/components/ConfirmationDialog';
+import ConfirmationDialog from '@/components/dialogs/ConfirmationDialog';
 import { useDialog } from '@/utils/useDialog';
 
 const getActiveFiltersCount = (filters) => {

@@ -25,7 +25,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { FlashList } from '@shopify/flash-list';
 
 import { useDb } from '@/context/DbContext';
-import TransactionItem from '@/components/TransactionItem';
+import TransactionItem from '@/components/items/TransactionItem';
 import TransactionSkeleton, { TransactionSkeletonList } from '@/components/skeletons/TransactionSkeleton';
 import DateSeparator from '@/components/DateSeparator';
 import {
@@ -40,12 +40,12 @@ import { processPeriodicTransactions } from '@/services/periodicTransactionServi
 import FilterModal, {
   getActiveFiltersCount,
   createDefaultFilters,
-} from '@/components/FilterModal';
-import PeriodicActionChoiceModal from '@/components/PeriodicActionChoiceModal';
+} from '@/app/(modals)/FilterModal';
+import PeriodicActionChoiceModal from '@/app/(modals)/PeriodicActionChoiceModal';
 import { getAllCategories } from '@/services/categoryService';
 import { getAllTags } from '@/services/tagService';
 import { useDialog } from '@/utils/useDialog';
-import ConfirmationDialog from '@/components/ConfirmationDialog';
+import ConfirmationDialog from '@/components/dialogs/ConfirmationDialog';
 
 function getDateKey(tx) {
   const ts =

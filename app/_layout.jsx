@@ -6,7 +6,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { DbProvider, useDb } from '@/context/DbContext';
 import { NetworkProvider, useNetworkStatus } from '@/context/NetworkContext';
-import { getHashedPin } from '@/services/authService';
+import { getHashedPin } from '@/services/pinService';
 import { PaperProvider, Text, useTheme } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemeProvider, useThemeContext } from '@/context/ThemeContext';

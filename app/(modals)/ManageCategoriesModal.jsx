@@ -4,8 +4,8 @@ import { useTheme, Text, IconButton } from 'react-native-paper';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useDb } from '@/context/DbContext';
 import { getAllCategories } from '@/services/categoryService';
-import CategoryList from './components/CategoryList';
-import AddEditCategory from './components/AddEditCategory';
+import CategoryList from '../../components/lists/CategoryList';
+import AddEditCategory from '../../components/AddEditCategory';
 
 export default function ManageCategoriesModal() {
     const theme = useTheme();

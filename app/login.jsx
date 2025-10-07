@@ -6,7 +6,7 @@ import { useNetworkStatus } from '../context/NetworkContext';
 import { useRouter } from 'expo-router';
 import { Text, TextInput, Button, useTheme, Card, IconButton } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import InformationDialog from '@/components/InformationDialog';
+import InformationDialog from '@/components/dialogs/InformationDialog';
 import { useDialog } from '@/utils/useDialog';
 
 export default function LoginScreen() {

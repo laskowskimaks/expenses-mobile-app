@@ -3,13 +3,13 @@ import { View, StyleSheet, Pressable, TextInput as RNTextInput } from 'react-nat
 import { useAuth } from '../context/AuthContext';
 import { useDb } from '../context/DbContext';
 import { useRouter } from 'expo-router';
-import { getHashedPin, getPinSalt } from '@/services/authService';
+import { getHashedPin, getPinSalt } from '@/services/pinService';
 import { useNetworkStatus } from '../context/NetworkContext';
 import { hashData } from '@/utils/hashUtils';
 import { Text, Button, useTheme, Surface } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import ConfirmationDialog from '@/components/ConfirmationDialog';
-import InformationDialog from '@/components/InformationDialog';
+import ConfirmationDialog from '@/components/dialogs/ConfirmationDialog';
+import InformationDialog from '@/components/dialogs/InformationDialog';
 import { useDialog } from '@/utils/useDialog';
 
 export default function PinCheckingScreen() {

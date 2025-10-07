@@ -3,8 +3,8 @@ import { View, StyleSheet, Pressable, TextInput as RNTextInput } from 'react-nat
 import { Text, Button, useTheme, ActivityIndicator, HelperText, Surface } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { useDb } from '@/context/DbContext';
-import { getHashedPin, verifyPin, savePin, removePin } from '@/services/authService';
-import ConfirmationDialog from '@/components/ConfirmationDialog';
+import { getHashedPin, verifyPin, savePin, removePin } from '@/services/pinService';
+import ConfirmationDialog from '@/components/dialogs/ConfirmationDialog';
 import { useDialog } from '@/utils/useDialog';
 
 const STAGES = {

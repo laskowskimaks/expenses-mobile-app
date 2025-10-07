@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { Text, TextInput, Button, useTheme, Card, IconButton } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import InformationDialog from '@/components/InformationDialog';
+import InformationDialog from '@/components/dialogs/InformationDialog';
 import { useDialog } from '@/utils/useDialog';
 import { validateEmail } from '@/utils/validation';
 

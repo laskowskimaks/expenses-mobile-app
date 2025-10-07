@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet } from 'react-native';
 import { useTheme, Card, Title, Text } from 'react-native-paper';
-import TagSummaryItem from './TagSummaryItem';
+import TagSummaryItem from '../items/TagSummaryItem';
 import TagsSummaryCardSkeleton from '@/components/skeletons/TagsSummaryCardSkeleton';
 
 const TagsSummaryCard = ({ data, totalExpenses, isLoading, onTagPress }) => {

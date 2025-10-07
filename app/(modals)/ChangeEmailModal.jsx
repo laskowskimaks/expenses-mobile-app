@@ -5,10 +5,10 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useDb } from '@/context/DbContext';
 import { useNetworkStatus } from '@/context/NetworkContext';
-import { updateLocalEmail } from '@/services/authService';
+import { updateLocalEmail } from '@/services/settingService';
 import { performUpload } from '@/services/backupService';
-import ConfirmationDialog from '@/components/ConfirmationDialog';
-import InformationDialog from '@/components/InformationDialog';
+import ConfirmationDialog from '@/components/dialogs/ConfirmationDialog';
+import InformationDialog from '@/components/dialogs/InformationDialog';
 import { useDialog } from '@/utils/useDialog';
 import { validateEmail } from '@/utils/validation';
 

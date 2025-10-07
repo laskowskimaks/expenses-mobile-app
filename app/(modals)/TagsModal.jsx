@@ -1,4 +1,4 @@
-import React, { useState, useEffect, memo, useCallback } from 'react';
+import React, { memo, useCallback } from 'react';
 import { View, FlatList, TouchableOpacity, StyleSheet, Pressable } from 'react-native';
 import { Text, TextInput, Button, Chip, useTheme } from 'react-native-paper';
 
@@ -55,7 +55,12 @@ const EmptyTagsList = memo(({ localSearchText, availableTags, tags, onAddNewTag 
                 </Text>
                 {!availableTags.some(tag => tag.name.toLowerCase() === localSearchText.toLowerCase()) &&
                     !tags.includes(localSearchText.trim()) && (
-                        <TouchableOpacity style={styles.createTagButton} onPress={() => onAddNewTag(localSearchText.trim())} accessibilityRole="button" accessibilityLabel={`Utwórz tag ${localSearchText}`}>
+                        <TouchableOpacity
+                            style={styles.createTagButton}
+                            onPress={() => onAddNewTag(localSearchText.trim())}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Utwórz tag ${localSearchText}`}
+                        >
                             <Text style={styles.createTagButtonText}>
                                 + Utwórz tag "{localSearchText.trim()}"
                             </Text>
@@ -81,21 +86,6 @@ function TagsModal({
 }) {
     const theme = useTheme();
 
-    const [localSearchText, setLocalSearchText] = useState(tagSearchText);
-
-    useEffect(() => {
-        setLocalSearchText(tagSearchText);
-    }, [tagSearchText]);
-
-    useEffect(() => {
-        const timeoutId = setTimeout(() => {
-            if (localSearchText !== tagSearchText) {
-                onTagSearchChange(localSearchText);
-            }
-        }, 300);
-        return () => clearTimeout(timeoutId);
-    }, [localSearchText, tagSearchText, onTagSearchChange]);
-
     const handleRemoveTag = useCallback((tagToRemove) => {
         onSelectTag(tagToRemove);
     }, [onSelectTag]);
@@ -116,12 +106,12 @@ function TagsModal({
 
     const renderEmptyComponent = useCallback(() => (
         <EmptyTagsList
-            localSearchText={localSearchText}
+            localSearchText={tagSearchText}
             availableTags={availableTags}
             tags={tags}
             onAddNewTag={handleAddNewTag}
         />
-    ), [localSearchText, availableTags, tags, handleAddNewTag]);
+    ), [tagSearchText, availableTags, tags, handleAddNewTag]);
 
     if (!visible) return null;
 
@@ -146,42 +136,43 @@ function TagsModal({
                     </View>
                 )}
 
-
                 <TextInput
                     mode="outlined"
                     label="Wyszukaj lub wpisz nowy tag"
-                    value={localSearchText}
-                    onChangeText={setLocalSearchText}
+                    value={tagSearchText}
+                    onChangeText={onTagSearchChange}
                     style={styles.tagSearchInput}
                     accessibilityLabel="Wyszukaj lub wpisz nowy tag"
                     right={
-                        localSearchText.trim() &&
-                            !availableTags.some(tag => tag.name.toLowerCase() === localSearchText.toLowerCase()) &&
-                            !tags.includes(localSearchText.trim()) ? (
-                            <TextInput.Icon icon="plus" onPress={() => handleAddNewTag(localSearchText)} accessibilityLabel="Dodaj nowy tag" />
+                        tagSearchText.trim() &&
+                            !availableTags.some(tag => tag.name.toLowerCase() === tagSearchText.toLowerCase()) &&
+                            !tags.includes(tagSearchText.trim()) ? (
+                            <TextInput.Icon
+                                icon="plus"
+                                onPress={() => handleAddNewTag(tagSearchText.trim())}
+                            />
                         ) : null
                     }
                 />
 
                 <FlatList
                     data={filteredTags}
-                    keyExtractor={keyExtractor}
                     renderItem={renderTagItem}
+                    keyExtractor={keyExtractor}
                     style={styles.tagsList}
                     ListEmptyComponent={renderEmptyComponent}
-                    windowSize={10}
-                    maxToRenderPerBatch={10}
-                    initialNumToRender={10}
-                    removeClippedSubviews={true}
-                    getItemLayout={(data, index) => ({
-                        length: 48,
-                        offset: 48 * index,
-                        index,
-                    })}
-                    accessibilityRole="list"
+                    showsVerticalScrollIndicator={false}
                 />
-
-                <Button mode="outlined" onPress={onClose} style={styles.closeTagsButton} accessibilityLabel="Zamknij wybór tagów">Zamknij</Button>
+                <View style={styles.footer}>
+                    <Button
+                        mode="outlined"
+                        onPress={onClose}
+                        style={styles.closeButton}
+                        accessibilityLabel="Zamknij wybór tagów"
+                    >
+                        Zamknij
+                    </Button>
+                </View>
             </View>
         </View>
     );
@@ -307,5 +298,14 @@ const styles = StyleSheet.create({
     },
     closeTagsButton: {
         marginTop: 8
+    },
+    footer: {
+        paddingTop: 16,
+        borderTopWidth: StyleSheet.hairlineWidth,
+        borderTopColor: '#E0E0E0',
+        alignItems: 'center',
+    },
+    closeButton: {
+        minWidth: '80%',
     },
 });

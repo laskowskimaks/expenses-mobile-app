@@ -8,10 +8,10 @@ import { useDb } from '@/context/DbContext';
 import { useNetworkStatus } from '@/context/NetworkContext';
 import { useThemeContext } from '@/context/ThemeContext';
 import { performUpload } from '@/services/backupService';
-import { upsertSetting, getPaymentDay, getSavingsGoal } from '@/services/authService';
-import { insertTestData } from '@/database/insertTestData';
-import ConfirmationDialog from '@/components/ConfirmationDialog';
-import InformationDialog from '@/components/InformationDialog';
+import { upsertSetting, getPaymentDay, getSavingsGoal } from '@/services/settingService';
+import { insertTestData } from '@/utils/insertTestData';
+import ConfirmationDialog from '@/components/dialogs/ConfirmationDialog';
+import InformationDialog from '@/components/dialogs/InformationDialog';
 import { useDialog } from '@/utils/useDialog';
 import { eventEmitter } from '@/utils/eventEmitter';
 
