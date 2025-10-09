@@ -35,7 +35,8 @@ CREATE TABLE `periodic_transactions` (
 	`end_date` integer,
 	`notes` text,
 	`category_id` integer,
-	FOREIGN KEY (`category_id`) REFERENCES `categories`(`id`) ON UPDATE no action ON DELETE set null
+	FOREIGN KEY (`category_id`) REFERENCES `categories`(`id`) ON UPDATE no action ON DELETE no action,
+	CONSTRAINT "check_repeat_unit" CHECK("periodic_transactions"."repeat_unit" in ('day', 'week', 'month', 'year'))
 );
 --> statement-breakpoint
 CREATE TABLE `settings` (
@@ -66,6 +67,8 @@ CREATE TABLE `transactions` (
 	`notes` text,
 	`location` text,
 	`periodic_transaction_id` integer,
-	`category_id` integer,
-	FOREIGN KEY (`category_id`) REFERENCES `categories`(`id`) ON UPDATE no action ON DELETE set null
+	`category_id` integer NOT NULL,
+	FOREIGN KEY (`category_id`) REFERENCES `categories`(`id`) ON UPDATE no action ON DELETE no action
 );
+--> statement-breakpoint
+CREATE INDEX `transaction_date_idx` ON `transactions` (`transaction_date`);

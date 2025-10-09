@@ -75,14 +75,16 @@ export default function BarcodeScannerScreen() {
                     [{ resize: { width: 900 } }],
                     { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG }
                 );
-                router.navigate({
-                    pathname: '/(modals)/AddLoyaltyCardModal',
-                    params: {
-                        barcodeData: null,
-                        barcodeType: null,
-                        imageUri: manipResult.uri,
-                    }
-                });
+                if (router.canGoBack()) {
+                    router.back();
+                    setTimeout(() => {
+                        router.setParams({
+                            barcodeData: null,
+                            barcodeType: null,
+                            imageUri: manipResult.uri,
+                        });
+                    }, 100);
+                }
             }
         } catch (error) {
             showDialog({

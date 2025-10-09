@@ -1,13 +1,13 @@
-import { sqliteTable, text, integer, real, primaryKey } from 'drizzle-orm/sqlite-core';
-import { relations } from 'drizzle-orm';
+import { sqliteTable,index, text, integer,check, real, primaryKey } from 'drizzle-orm/sqlite-core';
+import { relations, sql } from 'drizzle-orm';
 
-// Tabela 1: Ustawienia Aplikacji (Klucz-Wartość)
+// Ustawienia Aplikacji (Klucz-Wartość)
 export const settings = sqliteTable('settings', {
   key: text('key').primaryKey(),
   value: text('value').notNull(),
 });
 
-// Tabela 2: Kategorie
+// Kategorie
 export const categories = sqliteTable('categories', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   name: text('name').notNull().unique(),
@@ -16,14 +16,14 @@ export const categories = sqliteTable('categories', {
   isDeletable: integer('is_deletable', { mode: 'boolean' }).notNull().default(true),
 });
 
-// Tabela 3: Tagi
+// Tagi
 export const tags = sqliteTable('tags', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   name: text('name').notNull().unique(),
   color: text('color').notNull(),
 });
 
-// Tabela 4: Transakcje
+// Transakcje
 export const transactions = sqliteTable('transactions', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   amount: real('amount').notNull(),
@@ -32,25 +32,31 @@ export const transactions = sqliteTable('transactions', {
   notes: text('notes'),
   location: text('location'),
   periodicTransactionId: integer('periodic_transaction_id'),
-  // Definicja klucza obcego wskazującego na kategorie
-  categoryId: integer('category_id').references(() => categories.id, { onDelete: 'set null' }),
-});
 
-// Tabela 5: Transakcje Cykliczne
+  categoryId: integer('category_id').notNull().references(() => categories.id),
+
+}, (table) => ({
+  transactionDateIdx: index('transaction_date_idx').on(table.transactionDate),
+}));
+
+// Transakcje Cykliczne
 export const periodicTransactions = sqliteTable('periodic_transactions', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   amount: real('amount').notNull(),
   title: text('title').notNull(),
   repeatInterval: integer('repeat_interval').notNull(),
-  repeatUnit: text('repeat_unit').notNull(), // 'day', 'week', 'month', 'year'
-  startDate: integer('start_date').notNull(), 
+  repeatUnit: text('repeat_unit').notNull(),
+  startDate: integer('start_date').notNull(),
   nextOccurrenceDate: integer('next_occurrence_date').notNull(),
   endDate: integer('end_date'),
   notes: text('notes'),
-  categoryId: integer('category_id').references(() => categories.id, { onDelete: 'set null' }),
-});
 
-// Tabela 6: Karty Lojalnościowe
+  categoryId: integer('category_id').references(() => categories.id),
+}, (table) => ({
+  checkRepeatUnit: check('check_repeat_unit', sql`${table.repeatUnit} in ('day', 'week', 'month', 'year')`),
+}));
+
+// Karty Lojalnościowe
 export const loyaltyCards = sqliteTable('loyalty_cards', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   name: text('name').notNull(),
@@ -63,7 +69,7 @@ export const loyaltyCards = sqliteTable('loyalty_cards', {
 
 // === TABELE ŁĄCZĄCE (RELACJE WIELE-DO-WIELU) ===
 
-// Tabela 7: Powiązania Transakcji z Tagami
+// Powiązania Transakcji z Tagami
 export const transactionTags = sqliteTable('transaction_tags', {
   transactionId: integer('transaction_id').notNull().references(() => transactions.id, { onDelete: 'cascade' }),
   tagId: integer('tag_id').notNull().references(() => tags.id, { onDelete: 'cascade' }),
@@ -71,7 +77,7 @@ export const transactionTags = sqliteTable('transaction_tags', {
   pk: primaryKey({ columns: [table.transactionId, table.tagId] }),
 }));
 
-// Tabela 8: Powiązania Transakcji Cyklicznych z Tagami
+// Powiązania Transakcji Cyklicznych z Tagami
 export const periodicTransactionTags = sqliteTable('periodic_transaction_tags', {
   periodicTransactionId: integer('periodic_transaction_id').notNull().references(() => periodicTransactions.id, { onDelete: 'cascade' }),
   tagId: integer('tag_id').notNull().references(() => tags.id, { onDelete: 'cascade' }),
@@ -90,7 +96,7 @@ export const categoriesRelations = relations(categories, ({ many }) => ({
 
 // Relacje dla tabeli `tags`
 export const tagsRelations = relations(tags, ({ many }) => ({
-  transactionTags: many(transactionTags), // Jeden tag może być w wielu powiązaniach z transakcjami
+  transactionTags: many(transactionTags), // Jeden tag w wielu powiązaniach z transakcjami
   periodicTransactionTags: many(periodicTransactionTags),
 }));
 

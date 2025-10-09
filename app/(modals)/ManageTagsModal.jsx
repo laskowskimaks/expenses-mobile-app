@@ -47,10 +47,11 @@ export default function ManageTagsModal() {
     const handleBackToList = async (saveError) => {
         setCurrentView('list');
         setSelectedTag(null);
-        if (saveError) {
+        if (saveError && typeof saveError === 'string') {
             setError(saveError);
             return;
         }
+        setError(null);
         await fetchTags();
     };
 

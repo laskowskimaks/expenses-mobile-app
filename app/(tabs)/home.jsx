@@ -11,7 +11,7 @@ import CategoryDonutChart from '@/components/charts/CategoryDonutChart';
 import BillingPeriodSelector from '@/components/pickers/BillingPeriodSelector';
 import DateRangeModal from '@/app/(modals)/DateRangeModal';
 import SummaryCard from '@/components/cards/SummaryCard';
-import { getTransactionDateRange } from '@/services/transactionService';
+import { getTransactionDateRange, getTransactionsForPeriod } from '@/services/transactionService';
 import { calculatePeriod, getNextPeriod, getPreviousPeriod, formatPeriodForDisplay } from '@/services/periodService';
 import KeyIndicatorsCard from '@/components/cards/KeyIndicatorsCard';
 import { getKeyIndicatorsData } from '@/services/keyIndicatorsService';
@@ -85,6 +85,16 @@ export default function HomeScreen() {
 
     try {
       const periodForQuery = period.type === 'all' ? null : period;
+
+      let transactionsForPeriod;
+      if (periodForQuery && periodForQuery.startDate && periodForQuery.endDate) {
+        transactionsForPeriod = await getTransactionsForPeriod(db, periodForQuery.startDate, periodForQuery.endDate);
+      } else {
+        // Dla typu 'all' pobierz wszystkie transakcje
+        transactionsForPeriod = await getTransactionsForPeriod(db);
+      }
+
+      console.log(`[HomeScreen] Pobrano ${transactionsForPeriod.length} transakcji dla okresu ${period.type}`);
 
       const [chartResult, summaryResult, indicatorsResult, tagsResult] = await Promise.all([
         getCategoryExpenseData(db, periodForQuery),

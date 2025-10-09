@@ -1,4 +1,4 @@
-import { categories, transactions } from '../database/schema';
+import { categories, periodicTransactions, transactions } from '../database/schema';
 import { eq, and, sql, not, desc } from 'drizzle-orm';
 import { eventEmitter } from '@/utils/eventEmitter';
 
@@ -86,6 +86,10 @@ export const deleteCategory = async (db, id) => {
       await tx.update(transactions)
         .set({ categoryId: otherCategory.id })
         .where(eq(transactions.categoryId, id));
+
+      await tx.update(periodicTransactions)
+        .set({ categoryId: otherCategory.id })
+        .where(eq(periodicTransactions.categoryId, id));
 
       await tx.delete(categories).where(eq(categories.id, id));
     });

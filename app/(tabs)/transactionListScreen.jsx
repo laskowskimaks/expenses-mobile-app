@@ -29,9 +29,9 @@ import TransactionItem from '@/components/items/TransactionItem';
 import TransactionSkeleton, { TransactionSkeletonList } from '@/components/skeletons/TransactionSkeleton';
 import DateSeparator from '@/components/DateSeparator';
 import {
-  getAllTransactionsSorted,
   deleteTransaction,
   formatCurrency,
+  getTransactionsForPeriod,
 } from '@/services/transactionService';
 import { eventEmitter } from '@/utils/eventEmitter';
 import useDebounce from '@/utils/useDebounce';
@@ -225,6 +225,13 @@ export default function TransactionListScreen() {
     };
   }, []);
 
+  useEffect(() => {
+    if (db) {
+      console.log('[TransactionListScreen] Filtry dat się zmieniły, przeładowuję transakcje...');
+      fetchTransactions(false);
+    }
+  }, [appliedFilters.dateFrom, appliedFilters.dateTo, db]);
+
   const { listData, stickyHeaderIndices } = useMemo(() => {
     if (isLoadingTransactions) return { listData: [], stickyHeaderIndices: [] };
 
@@ -295,7 +302,17 @@ export default function TransactionListScreen() {
       if (periodicResult.success && periodicResult.addedCount > 0) {
         console.log(`[TransactionListScreen] Dodano ${periodicResult.addedCount} automatycznych transakcji`);
       }
-      const transactionsFromDb = await getAllTransactionsSorted(db);
+      let transactionsFromDb;
+      if (appliedFilters.dateFrom && appliedFilters.dateTo) {
+        const startDate = new Date(appliedFilters.dateFrom * 1000);
+        const endDate = new Date(appliedFilters.dateTo * 1000);
+
+        transactionsFromDb = await getTransactionsForPeriod(db, startDate, endDate);
+      } else {
+        console.log(`[TransactionListScreen] Pobieranie wszystkich transakcji (brak filtrów dat)`);
+        transactionsFromDb = await getTransactionsForPeriod(db);
+      }
+
       setAllTransactions(transactionsFromDb);
     } catch (error) {
       Alert.alert('Błąd', 'Nie udało się pobrać transakcji');

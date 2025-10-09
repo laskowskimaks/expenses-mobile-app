@@ -1,5 +1,6 @@
 import { transactions, categories, tags, transactionTags, periodicTransactions } from '@/database/schema';
-import { eq, desc, and, gte, inArray, sql, min, max } from 'drizzle-orm';
+import { eq, desc, and, gte, lte, inArray, sql, min, max, } from 'drizzle-orm';
+
 import { processTransactionTags } from './tagService';
 import { addPeriodicTransaction, processPeriodicTransactions, endPeriodicSeries as endPeriodicSeriesUtil, getPeriodicTransactionDefinition } from './periodicTransactionService';
 import { eventEmitter } from '@/utils/eventEmitter';
@@ -322,6 +323,87 @@ export const deleteTransaction = async (db, transactionId, options = { mode: 'si
   } catch (err) {
     console.error('[transactionService] deleteTransaction error', err);
     return { success: false, message: err.message || 'Błąd podczas usuwania transakcji.' };
+  }
+};
+
+export const getTransactionsForPeriod = async (db, startDate = null, endDate = null) => {
+  if (!db) {
+    console.error('[TransactionService] Baza danych jest null');
+    return [];
+  }
+
+  try {
+    console.log(`[TransactionService] Pobieranie transakcji dla okresu: ${startDate ? startDate.toISOString() : 'brak startDate'} - ${endDate ? endDate.toISOString() : 'brak endDate'}`);
+
+    let query = db
+      .select({
+        id: transactions.id,
+        amount: transactions.amount,
+        title: transactions.title,
+        transactionDate: transactions.transactionDate,
+        notes: transactions.notes,
+        location: transactions.location,
+        periodicTransactionId: transactions.periodicTransactionId,
+        categoryId: transactions.categoryId,
+        categoryName: categories.name,
+        categoryColor: categories.color,
+        categoryIcon: categories.iconName,
+      })
+      .from(transactions)
+      .leftJoin(categories, eq(transactions.categoryId, categories.id));
+
+    if (startDate && endDate) {
+      const startTimestamp = Math.floor(startDate.getTime() / 1000);
+      const endTimestamp = Math.floor(endDate.getTime() / 1000);
+
+      query = query.where(and(
+        gte(transactions.transactionDate, startTimestamp),
+        lte(transactions.transactionDate, endTimestamp)
+      ));
+    }
+
+    const periodTransactions = await query.orderBy(desc(transactions.transactionDate));
+
+    const transactionIds = periodTransactions.map(tx => tx.id);
+    let tagsByTransaction = {};
+
+    if (transactionIds.length > 0) {
+      const periodTags = await db
+        .select({
+          transactionId: transactionTags.transactionId,
+          tagId: tags.id,
+          tagName: tags.name,
+          tagColor: tags.color,
+        })
+        .from(transactionTags)
+        .innerJoin(tags, eq(transactionTags.tagId, tags.id))
+        .where(inArray(transactionTags.transactionId, transactionIds))
+        .orderBy(sql`lower(${tags.name})`);
+
+      tagsByTransaction = periodTags.reduce((acc, tagRow) => {
+        if (!acc[tagRow.transactionId]) acc[tagRow.transactionId] = [];
+        acc[tagRow.transactionId].push({
+          id: tagRow.tagId,
+          name: tagRow.tagName,
+          color: tagRow.tagColor,
+        });
+        return acc;
+      }, {});
+    }
+
+    const transactionsWithTags = periodTransactions.map(tx => ({
+      ...tx,
+      tags: tagsByTransaction[tx.id] || []
+    }));
+
+    const periodInfo = startDate && endDate ? `dla okresu (${transactionsWithTags.length} transakcji)` : `wszystkie (${transactionsWithTags.length} transakcji)`;
+    console.log(`[TransactionService] Pobrano ${periodInfo}`);
+
+    return transactionsWithTags;
+
+  } catch (error) {
+    console.error('[TransactionService] Błąd podczas pobierania transakcji:', error);
+    return [];
   }
 };
 

@@ -96,7 +96,6 @@ export const updateLoyaltyCard = async (db, cardId, cardData) => {
         const oldCard = await getLoyaltyCardById(db, cardId);
         let permanentImageUri = oldCard.imageUri;
 
-        // Jeśli URI obrazu się zmieniło, zapisz nowy i usuń stary
         if (cardData.imageUri && cardData.imageUri !== oldCard.imageUri) {
             permanentImageUri = await saveImagePermanently(cardData.imageUri);
              if (!permanentImageUri) {

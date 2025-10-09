@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "4fc1cf1f-3e36-47c7-ae80-c4eabf8b462d",
+  "id": "db1e55c3-1d3e-4568-82de-06b3c3277540",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "categories": {
@@ -255,13 +255,18 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "set null",
+          "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraints": {
+        "check_repeat_unit": {
+          "name": "check_repeat_unit",
+          "value": "\"periodic_transactions\".\"repeat_unit\" in ('day', 'week', 'month', 'year')"
+        }
+      }
     },
     "settings": {
       "name": "settings",
@@ -441,11 +446,19 @@
           "name": "category_id",
           "type": "integer",
           "primaryKey": false,
-          "notNull": false,
+          "notNull": true,
           "autoincrement": false
         }
       },
-      "indexes": {},
+      "indexes": {
+        "transaction_date_idx": {
+          "name": "transaction_date_idx",
+          "columns": [
+            "transaction_date"
+          ],
+          "isUnique": false
+        }
+      },
       "foreignKeys": {
         "transactions_category_id_categories_id_fk": {
           "name": "transactions_category_id_categories_id_fk",
@@ -457,7 +470,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "set null",
+          "onDelete": "no action",
           "onUpdate": "no action"
         }
       },

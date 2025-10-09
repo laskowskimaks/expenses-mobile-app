@@ -12,7 +12,7 @@ export default function ManageCategoriesModal() {
     const router = useRouter();
     const { db } = useDb();
     const [categories, setCategories] = useState([]);
-    const [currentView, setCurrentView] = useState('list'); // 'list' or 'form'
+    const [currentView, setCurrentView] = useState('list'); // 'list'/ 'form'
     const [selectedCategory, setSelectedCategory] = useState(null);
     const [error, setError] = useState(null);
 
@@ -47,10 +47,11 @@ export default function ManageCategoriesModal() {
     const handleBackToList = async (saveError) => {
         setCurrentView('list');
         setSelectedCategory(null);
-        if (saveError) {
+        if (saveError && typeof saveError === 'string') {
             setError(saveError);
             return;
         }
+        setError(null);
         await fetchCategories();
     };
 
