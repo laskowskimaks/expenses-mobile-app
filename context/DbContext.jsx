@@ -7,7 +7,6 @@ import { migrate } from 'drizzle-orm/expo-sqlite/migrator';
 import migrations from '@/drizzle/migrations';
 import { createUser } from '@/services/settingService';
 import { openDatabaseSync } from 'expo-sqlite';
-import StudioInitializer from '@/database/StudioInitializer';
 import { initializeNewUserDatabase } from '@/database/defaultData';
 import { processPeriodicTransactions } from '@/services/periodicTransactionService';
 import { shouldCheckPeriodicTransactions, markPeriodicCheckCompleted } from '@/utils/periodicChecker';
@@ -233,10 +232,6 @@ export const DbProvider = ({ children }) => {
     }), [db, isLoading, initializeDatabase, clearDatabase, handleNewRegistration]);
 
     return <DbContext.Provider value={value}>
-        {/* Uruchom Drizzle Studio tylko w DEV i gdy połączenie istnieje */}
-        {__DEV__ && sqliteConnectionRef.current && (
-            <StudioInitializer sqliteConn={sqliteConnectionRef.current} />
-        )}
         {children}
     </DbContext.Provider>;
 };

@@ -11,7 +11,6 @@ import { PaperProvider, Text, useTheme } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemeProvider, useThemeContext } from '@/context/ThemeContext';
 
-SplashScreen.preventAutoHideAsync();
 
 const OfflineBanner = () => {
   const theme = useTheme();
@@ -35,6 +34,71 @@ function RootLayoutNav() {
   const appState = useRef(AppState.currentState);
   const shouldShowBanner = !isConnected && !user;
 
+  useEffect(() => {
+    let mounted = true;
+    let splashHidden = false;
+
+    async function handleStateChange() {
+      try {
+        await SplashScreen.preventAutoHideAsync();
+
+        const withTimeout = (p, ms = 7000) =>
+          Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]);
+
+        if (isAuthLoading) return;
+
+        if (!user) {
+          if (db && !isDbLoading) {
+            await withTimeout(clearDatabase(), 5000);
+          }
+          const protectedRoutes = ['/pinSetting', '/pinChecking'];
+          const isInsideTabs = pathname.startsWith('/(tabs)');
+          if (isInsideTabs || protectedRoutes.includes(pathname)) {
+            router.replace('/');
+          }
+          return;
+        }
+
+        if (needsPinSetup) {
+          if (pathname !== '/pinSetting') router.replace('/pinSetting');
+          return;
+        }
+
+        if (!db) {
+          if (!isDbLoading) {
+            await withTimeout(initializeDatabase(user.uid), 7000).catch(e => console.warn('DB init', e));
+          }
+          return;
+        }
+
+        if (isLocked) {
+          const storedPin = await withTimeout(getHashedPin(db), 3000).catch(() => null);
+          if (storedPin) {
+            if (pathname !== '/pinChecking') router.push('/pinChecking');
+          } else {
+            unlockApp();
+          }
+          return;
+        }
+
+        const pagesToRedirectFrom = ['/', '/login', '/register', '/pinSetting'];
+        if (pagesToRedirectFrom.includes(pathname)) {
+          router.replace('/(tabs)/home');
+        }
+      } catch (e) {
+        console.warn('Init error', e);
+      } finally {
+        if (mounted && !splashHidden) {
+          splashHidden = true;
+          await SplashScreen.hideAsync().catch(() => { });
+        }
+      }
+    }
+
+    handleStateChange();
+
+    return () => { mounted = false; };
+  }, [user, isAuthLoading, isDbLoading, db, needsPinSetup, isLocked, pathname]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', nextAppState => {
@@ -51,64 +115,18 @@ function RootLayoutNav() {
   }, [lockApp, isExternalActivity]);
 
   useEffect(() => {
-    const handleStateChange = async () => {
-      if (isAuthLoading) {
-        return;
-      }
-
-      if (!user) {
-        if (db && !isDbLoading) {
-          clearDatabase();
-        }
-
-        const protectedRoutes = ['/pinSetting', '/pinChecking'];
-        const isInsideTabs = pathname.startsWith('/(tabs)');
-        if (isInsideTabs || protectedRoutes.includes(pathname)) {
-          router.replace('/');
-        }
+    // Bezpieczny timeout - wymuszaj ukrycie splash po 10 sekundach
+    const emergencyTimeout = setTimeout(async () => {
+      console.log('[Emergency] Wymuszam ukrycie splash screen');
+      try {
         await SplashScreen.hideAsync();
-        return;
+      } catch (e) {
+        console.error('[Emergency] Błąd ukrywania splash:', e);
       }
+    }, 10000);
 
-      if (needsPinSetup) {
-        if (pathname !== '/pinSetting') {
-          router.replace('/pinSetting');
-        }
-        await SplashScreen.hideAsync();
-        return;
-      }
-
-      if (!db) {
-        if (!isDbLoading) {
-          initializeDatabase(user.uid);
-        }
-        return;
-      }
-
-      if (isLocked) {
-        const storedPin = await getHashedPin(db);
-        if (storedPin) {
-          if (pathname !== '/pinChecking') {
-            router.push('/pinChecking');
-          }
-        } else {
-          unlockApp();
-        }
-        await SplashScreen.hideAsync();
-        return;
-      }
-
-      const pagesToRedirectFrom = ['/', '/login', '/register', '/pinSetting'];
-      if (pagesToRedirectFrom.includes(pathname)) {
-        router.replace('/(tabs)/home');
-      }
-
-      await SplashScreen.hideAsync();
-    };
-
-    handleStateChange();
-
-  }, [user, isAuthLoading, isDbLoading, db, needsPinSetup, isLocked, pathname]);
+    return () => clearTimeout(emergencyTimeout);
+  }, []);
 
   if (isAuthLoading || isDbLoading) {
     return (
