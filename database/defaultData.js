@@ -13,11 +13,9 @@ const DEFAULT_CATEGORIES = [
     { name: 'Żywność', color: '#ff9f43', iconName: 'food-fork-drink', isDeletable: false },
 ];
 
-const getDefaultSettings = (userId, email, hashedPassword, passwordSalt) => ([
+const getDefaultSettings = (userId, email) => ([
     { key: 'userId', value: userId },
     { key: 'email', value: email },
-    { key: 'password', value: hashedPassword },
-    { key: 'passwordSalt', value: passwordSalt },
     { key: 'billing_period_start_day', value: '1' },
     { key: 'savings_goal', value: '0' },
     { key: 'pin', value: '' },
@@ -25,9 +23,9 @@ const getDefaultSettings = (userId, email, hashedPassword, passwordSalt) => ([
     { key: 'database_initialized_at', value: new Date().toISOString() },
 ]);
 
-export const initializeNewUserDatabase = async (db, userId, email, hashedPassword, passwordSalt) => {
+export const initializeNewUserDatabase = async (db, userId, email) => {
     try {
-        const initialSettings = getDefaultSettings(userId, email, hashedPassword, passwordSalt);
+        const initialSettings = getDefaultSettings(userId, email);
 
         await db.transaction(async (tx) => {
             await tx.insert(settings).values(initialSettings);

@@ -5,7 +5,6 @@ import * as schema from '@/database/schema';
 import { checkAndRestoreBackup, performUpload } from '@/services/backupService';
 import { migrate } from 'drizzle-orm/expo-sqlite/migrator';
 import migrations from '@/drizzle/migrations';
-import { createUser } from '@/services/settingService';
 import { openDatabaseSync } from 'expo-sqlite';
 import { initializeNewUserDatabase } from '@/database/defaultData';
 import { processPeriodicTransactions } from '@/services/periodicTransactionService';
@@ -150,7 +149,7 @@ export const DbProvider = ({ children }) => {
         isInitializingRef.current = false;
     }, [clearDatabase]);
 
-    const handleNewRegistration = useCallback(async (userId, email, password) => {
+    const handleNewRegistration = useCallback(async (userId, email) => {
         setIsLoading(true);
         console.log(`[DbContext] Inicjalizacja bazy dla nowego użytkownika: ${email}`);
 
@@ -161,19 +160,8 @@ export const DbProvider = ({ children }) => {
         }
         try {
             const { newDrizzleDb, newSqliteConn } = await _openAndMigrateDb();
-            const { success, data: userData, error } = await createUser(newDrizzleDb, userId, email, password);
 
-            if (!success) {
-                throw error || new Error("Nie udało się przygotować danych uwierzytelniających.");
-            }
-
-            await initializeNewUserDatabase(
-                newDrizzleDb,
-                userData.userId,
-                userData.email,
-                userData.hashedPassword,
-                userData.passwordSalt
-            );
+            await initializeNewUserDatabase(newDrizzleDb, userId, email);
 
             console.log(`[DbContext] Baza dla użytkownika ${email} zainicjalizowana pomyślnie.`);
 

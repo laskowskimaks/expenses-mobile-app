@@ -34,8 +34,6 @@ export const _getSetting = async (db, key) => {
 };
 
 export const getUserEmail = (db) => _getSetting(db, 'email');
-export const getHashedPassword = (db) => _getSetting(db, 'password');
-export const getPasswordSalt = (db) => _getSetting(db, 'passwordSalt');
 export const getPaymentDay = (db) => _getSetting(db, 'billing_period_start_day');
 export const getSavingsGoal = (db) => _getSetting(db, 'savings_goal');
 
@@ -63,25 +61,5 @@ export const getAllSettingsAsObject = async (db) => {
   } catch (error) {
     console.error('[settingsService:getAllSettingsAsObject] Błąd podczas pobierania wszystkich ustawień:', error);
     return null;
-  }
-};
-
-export const createUser = async (db, userId, email, plainPassword) => {
-  try {
-    const passwordSalt = generateSalt();
-    const hashedPassword = await hashData(plainPassword, passwordSalt);
-
-    return {
-      success: true,
-      data: {
-        userId,
-        email,
-        hashedPassword,
-        passwordSalt,
-      },
-    };
-  } catch (error) {
-    console.error('[settingsService] Przygotowanie danych użytkownika nie powiodło się:', error);
-    return { success: false, error };
   }
 };

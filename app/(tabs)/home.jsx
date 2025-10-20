@@ -90,7 +90,6 @@ export default function HomeScreen() {
       if (periodForQuery && periodForQuery.startDate && periodForQuery.endDate) {
         transactionsForPeriod = await getTransactionsForPeriod(db, periodForQuery.startDate, periodForQuery.endDate);
       } else {
-        // Dla typu 'all' pobierz wszystkie transakcje
         transactionsForPeriod = await getTransactionsForPeriod(db);
       }
 

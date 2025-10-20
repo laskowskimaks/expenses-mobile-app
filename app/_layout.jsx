@@ -115,7 +115,6 @@ function RootLayoutNav() {
   }, [lockApp, isExternalActivity]);
 
   useEffect(() => {
-    // Bezpieczny timeout - wymuszaj ukrycie splash po 10 sekundach
     const emergencyTimeout = setTimeout(async () => {
       console.log('[Emergency] Wymuszam ukrycie splash screen');
       try {
