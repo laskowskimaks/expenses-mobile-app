@@ -49,31 +49,62 @@ export const AuthProvider = ({ children }) => {
   };
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(firebaseAuth, async (firebaseUser) => {
-      if (firebaseUser) {
-        console.log('[AuthContext] Użytkownik zalogowany (Firebase):', firebaseUser.email);
-        const userData = { uid: firebaseUser.uid, email: firebaseUser.email };
-        setUser(userData);
-        await SecureStore.setItemAsync('lastUser', JSON.stringify(userData));
-
-        if (db) {
-          const localEmail = await getUserEmail(db);
-          if (localEmail && localEmail !== firebaseUser.email) {
-            console.log(`[AuthContext] Wykryto zmianę e-maila. Aktualizuję lokalną bazę...`);
-            await updateLocalEmail(db, firebaseUser.email);
+    const initAuth = async () => {
+      if (!isConnected) {
+        try {
+          const lastUserData = await SecureStore.getItemAsync('lastUser');
+          if (lastUserData) {
+            const userData = JSON.parse(lastUserData);
+            setUser(userData);
+            console.log('[AuthContext] Załadowano ostatniego użytkownika z cache (offline)');
           }
+        } catch (err) {
+          console.error('[AuthContext] Błąd ładowania cache offline:', err);
         }
-
-      } else {
-        await SecureStore.deleteItemAsync('lastUser');
-        setNeedsPinSetup(false);
-        setUser(null);
+        setAuthIsLoading(false);
+        return;
       }
-      setAuthIsLoading(false);
-    });
 
-    return () => unsubscribe();
-  }, [db]);
+      const unsubscribe = onAuthStateChanged(firebaseAuth, async (firebaseUser) => {
+        if (firebaseUser) {
+          console.log('[AuthContext] Użytkownik zalogowany (Firebase):', firebaseUser.email);
+          const userData = { uid: firebaseUser.uid, email: firebaseUser.email };
+          setUser(userData);
+          try {
+            await SecureStore.setItemAsync('lastUser', JSON.stringify(userData));
+          } catch (err) {
+            console.error('[AuthContext] Błąd zapisu do SecureStore:', err);
+          }
+
+        } else {
+          await SecureStore.deleteItemAsync('lastUser');
+          setNeedsPinSetup(false);
+          setUser(null);
+        }
+        setAuthIsLoading(false);
+      });
+
+      return () => {
+        unsubscribe();
+      };
+    };
+
+    initAuth();
+  }, [isConnected]);
+
+  useEffect(() => {
+    const updateEmailIfNeeded = async () => {
+      if (db && user) {
+        const localEmail = await getUserEmail(db);
+        if (localEmail && localEmail !== user.email) {
+          console.log(`[AuthContext] Wykryto zmianę e-maila. Aktualizuję lokalną bazę...`);
+          await updateLocalEmail(db, user.email);
+        }
+      }
+    };
+
+    updateEmailIfNeeded();
+  }, [db, user?.email]);
 
   const lockApp = () => {
     if (user) {
