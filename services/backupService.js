@@ -225,7 +225,7 @@ export async function uploadBackupIfOlderThan(thresholdInMilliseconds = 7 * 24 *
     const storage = getStorage();
     const userId = auth.currentUser?.uid;
     if (!userId) {
-        console.warn("[ConditionalBackup] Użytkownik nie jest zalogowany.");
+        console.warn("[BackupService] Użytkownik nie jest zalogowany.");
         return { uploaded: false, reason: "User not logged in" };
     }
 
@@ -233,36 +233,36 @@ export async function uploadBackupIfOlderThan(thresholdInMilliseconds = 7 * 24 *
     let newestRemoteTimestamp = 0;
 
     try {
-        console.log(`[ConditionalBackup] Sprawdzanie istniejących backupów dla użytkownika ${userId}`);
+        console.log(`[BackupService] Sprawdzanie istniejących backupów dla użytkownika ${userId}`);
         const newestBackup = await _findNewestRemoteBackup(userBackupsRef);
 
         if (newestBackup) {
             newestRemoteTimestamp = newestBackup.timestamp;
-            console.log(`[ConditionalBackup] Najnowszy zdalny backup ma timestamp: ${newestRemoteTimestamp}`);
+            console.log(`[BackupService] Najnowszy zdalny backup ma timestamp: ${newestRemoteTimestamp}`);
         } else {
-            console.log("[ConditionalBackup] Brak zdalnych backupów. Należy utworzyć pierwszy backup.");
+            console.log("[BackupService] Brak zdalnych backupów. Należy utworzyć pierwszy backup.");
         }
     } catch (error) {
         if (error.code === 'storage/object-not-found' || (error.message && error.message.includes("No object found"))) {
-            console.log("[ConditionalBackup] Katalog backupów użytkownika nie istnieje. Należy utworzyć pierwszy backup.");
+            console.log("[BackupService] Katalog backupów użytkownika nie istnieje. Należy utworzyć pierwszy backup.");
         } else {
-            console.error("[ConditionalBackup] Błąd podczas listowania zdalnych backupów:", error);
+            console.error("[BackupService] Błąd podczas listowania zdalnych backupów:", error);
             return { uploaded: false, reason: "Error listing remote backups" };
         }
     }
 
     const thresholdTimestamp = Date.now() - thresholdInMilliseconds;
     if (newestRemoteTimestamp < thresholdTimestamp) {
-        console.log(`[ConditionalBackup] Najnowszy backup jest starszy niż próg. Rozpoczynam upload.`);
+        console.log(`[BackupService] Najnowszy backup jest starszy niż próg. Rozpoczynam upload.`);
         try {
             const uploadResult = await performUpload();
             return { uploaded: !!uploadResult, reason: uploadResult ? "Backup successful." : "Upload process failed." };
         } catch (error) {
-            console.error("[ConditionalBackup] Błąd podczas uploadu:", error);
+            console.error("[BackupService] Błąd podczas uploadu:", error);
             return { uploaded: false, reason: "Error during upload" };
         }
     } else {
-        console.log(`[ConditionalBackup] Najnowszy zdalny backup jest wystarczająco świeży.`);
+        console.log(`[BackupService] Najnowszy zdalny backup jest wystarczająco świeży.`);
         return { uploaded: false, reason: "Existing backup is recent enough." };
     }
 }

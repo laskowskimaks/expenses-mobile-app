@@ -92,7 +92,10 @@ export default function PinCheckingScreen() {
             title: "Resetowanie PINu",
             content: "Resetowanie PINu wymaga wylogowania. Spowoduje to usunięcie lokalnych danych i synchronizację z chmurą przy następnym logowaniu. Czy na pewno chcesz kontynuować?",
             confirmText: "Wyloguj i zresetuj",
-            onConfirm: async () => await logout(),
+            onConfirm: async () => {
+                await logout();
+                router.replace('/');
+            },
             dangerous: true
         });
     };

@@ -10,7 +10,7 @@ import { getHashedPin } from '@/services/pinService';
 import { PaperProvider, Text, useTheme } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemeProvider, useThemeContext } from '@/context/ThemeContext';
-
+import * as FileSystem from 'expo-file-system';
 
 const OfflineBanner = () => {
   const theme = useTheme();
@@ -66,7 +66,20 @@ function RootLayoutNav() {
 
         if (!db) {
           if (!isDbLoading) {
-            await withTimeout(initializeDatabase(user.uid), 7000).catch(e => console.warn('DB init', e));
+            try {
+              const DB_PATH = `${FileSystem.documentDirectory}SQLite/database.db`;
+              const dbFileInfo = await FileSystem.getInfoAsync(DB_PATH);
+
+              if (dbFileInfo.exists && user?.uid) {
+                console.log('[RootLayoutNav] Plik bazy istnieje, pomijam sprawdzanie backup\'u');
+                await withTimeout(initializeDatabase(user.uid, true), 7000).catch(e => console.warn('DB init fast', e));
+              } else {
+                console.log('[RootLayoutNav] Plik bazy nie istnieje, pełna inicjalizacja z backup\'em');
+                await withTimeout(initializeDatabase(user.uid, false), 7000).catch(e => console.warn('DB init full', e));
+              }
+            } catch (error) {
+              console.error('[RootLayoutNav] Błąd podczas inicjalizacji bazy danych:', error);
+            }
           }
           return;
         }

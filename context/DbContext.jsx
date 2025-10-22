@@ -8,7 +8,8 @@ import migrations from '@/drizzle/migrations';
 import { openDatabaseSync } from 'expo-sqlite';
 import { initializeNewUserDatabase } from '@/database/defaultData';
 import { processPeriodicTransactions } from '@/services/periodicTransactionService';
-import { shouldCheckPeriodicTransactions, markPeriodicCheckCompleted } from '@/utils/periodicChecker';
+import { shouldCheckPeriodicTransactions, markPeriodicCheckCompleted, shouldCheckBackup, performBackupCheck } from '@/utils/periodicChecker';
+import { useNetworkStatus } from './NetworkContext';
 
 export const DATABASE_NAME = 'database.db';
 const DB_PATH = `${FileSystem.documentDirectory}SQLite/${DATABASE_NAME}`;
@@ -19,6 +20,7 @@ export const DbProvider = ({ children }) => {
     const [db, setDb] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
     const [isReady, setIsReady] = useState(false);
+    const { isConnected } = useNetworkStatus();
 
     const sqliteConnectionRef = useRef(null);
     const isClearingRef = useRef(false);
@@ -81,7 +83,6 @@ export const DbProvider = ({ children }) => {
 
         setIsLoading(true);
         console.log('[DbContext] Inicjalizacja bazy danych po logowaniu...');
-
         if (sqliteConnectionRef.current) {
             try {
                 sqliteConnectionRef.current.closeSync();
@@ -93,7 +94,7 @@ export const DbProvider = ({ children }) => {
         sqliteConnectionRef.current = null;
 
         try {
-            if (!skipRestore) {
+            if (!skipRestore && isConnected) {
                 console.log('[DbContext] Sprawdzanie i przywracanie kopii zapasowej bazy danych...');
                 await checkAndRestoreBackup(uid);
             }
@@ -124,9 +125,7 @@ export const DbProvider = ({ children }) => {
                         if (periodicResult.addedCount > 0) {
                             console.log(`[DbContext] ${periodicResult.message}`);
                             console.log(`[DbContext] Dodane transakcje:`, periodicResult.addedTransactions.map(t => t.title));
-                            if (__DEV__) {
-                                //Alert.alert('Dodano nowe transakcje', periodicResult.message);
-                            }
+
                         } else {
                             console.log('[DbContext] Sprawdzenie transakcji okresowych zakończone - brak nowych transakcji');
                         }
@@ -135,6 +134,25 @@ export const DbProvider = ({ children }) => {
                     }
                 } else {
                     console.log('[DbContext] Transakcje okresowe sprawdzane niedawno, pomijam sprawdzenie');
+                }
+
+                if (isConnected) {
+                    const shouldCheckBackupNow = await shouldCheckBackup();
+                    if (shouldCheckBackupNow) {
+                        try {
+                            const backupResult = await performBackupCheck();
+                            if (backupResult.uploaded) {
+                            } else {
+                                console.log(`[DbContext] Backup nie był potrzebny: ${backupResult.reason}`);
+                            }
+                        } catch (backupError) {
+                            console.error('[DbContext] Błąd podczas sprawdzania backup\'u:', backupError);
+                        }
+                    } else {
+                        console.log('[DbContext] Backup sprawdzany niedawno (< 24h), pomijam.');
+                    }
+                } else {
+                    console.log('[DbContext] Brak połączenia z internetem, pomijam sprawdzanie backup\'u.');
                 }
 
             } catch (periodicError) {
@@ -147,7 +165,7 @@ export const DbProvider = ({ children }) => {
         }
         setIsLoading(false);
         isInitializingRef.current = false;
-    }, [clearDatabase]);
+    }, [clearDatabase, isConnected]);
 
     const handleNewRegistration = useCallback(async (userId, email) => {
         setIsLoading(true);
