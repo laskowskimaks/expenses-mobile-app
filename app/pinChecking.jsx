@@ -81,23 +81,28 @@ export default function PinCheckingScreen() {
 
     const handleForgotPin = async () => {
         if (!isConnected) {
-            showInfoDialog({
-                title: "Brak internetu",
-                content: "Nie możesz zresetować PINu bez połączenia z internetem, bo możesz utracić dane. Połącz się z internetem i spróbuj ponownie.",
-                type: 'warning'
+            showDialog({
+                title: "Resetowanie PINu offline",
+                content: "Brak połączenia z internetem. Resetowanie PINu spowoduje próbę wykonania kopii zapasowej, wylogowanie i usunięcie wszystkich lokalnych danych. Czy na pewno chcesz kontynuować?",
+                confirmText: "Wyloguj mimo to",
+                onConfirm: async () => {
+                    await logout();
+                    router.replace('/');
+                },
+                dangerous: true
             });
-            return;
+        } else {
+            showDialog({
+                title: "Resetowanie PINu",
+                content: "Resetowanie PINu wymaga wylogowania. Spowoduje to usunięcie lokalnych danych. Czy na pewno chcesz kontynuować?",
+                confirmText: "Wyloguj i zresetuj",
+                onConfirm: async () => {
+                    await logout();
+                    router.replace('/');
+                },
+                dangerous: true
+            });
         }
-        showDialog({
-            title: "Resetowanie PINu",
-            content: "Resetowanie PINu wymaga wylogowania. Spowoduje to usunięcie lokalnych danych i synchronizację z chmurą przy następnym logowaniu. Czy na pewno chcesz kontynuować?",
-            confirmText: "Wyloguj i zresetuj",
-            onConfirm: async () => {
-                await logout();
-                router.replace('/');
-            },
-            dangerous: true
-        });
     };
 
     const pinDigits = Array.from({ length: 4 });

@@ -3,7 +3,7 @@ import { View, StyleSheet, Pressable, TextInput as RNTextInput } from 'react-nat
 import { Text, Button, useTheme, ActivityIndicator, HelperText, Surface } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { useDb } from '@/context/DbContext';
-import { getHashedPin, verifyPin, savePin, removePin } from '@/services/pinService';
+import { getHashedPin, savePin, removePin } from '@/services/pinService';
 import ConfirmationDialog from '@/components/dialogs/ConfirmationDialog';
 import { useDialog } from '@/utils/useDialog';
 
@@ -36,7 +36,7 @@ export default function ChangePinModal() {
           const existingPin = await getHashedPin(db);
           if (existingPin) {
             setHasPinInitially(true);
-            setStage(STAGES.VERIFY);
+            setStage(STAGES.SET_NEW);
           } else {
             setHasPinInitially(false);
             setStage(STAGES.SET_NEW);
@@ -51,36 +51,10 @@ export default function ChangePinModal() {
   }, [db]);
 
   useEffect(() => {
-    if (stage === STAGES.VERIFY || stage === STAGES.SET_NEW) {
+    if (stage === STAGES.SET_NEW) { 
       pinInputRef.current?.focus();
     }
   }, [stage]);
-
-  const handleVerify = async () => {
-    if (pin.length !== 4) {
-      setError('PIN musi mieć 4 cyfry.');
-      return;
-    }
-    if (!db) {
-      setError('Baza danych nie jest dostępna. Spróbuj ponownie później.');
-      return;
-    }
-    setIsProcessing(true);
-    setError('');
-    try {
-      const isCorrect = await verifyPin(db, pin);
-      if (isCorrect) {
-        setStage(STAGES.SET_NEW);
-        setPin('');
-      } else {
-        setError('Nieprawidłowy PIN. Spróbuj ponownie.');
-        setPin('');
-      }
-    } catch (e) {
-      setError('Wystąpił błąd podczas weryfikacji PINu.');
-    }
-    setIsProcessing(false);
-  };
 
   const handleSave = async () => {
     if (pin.length !== 4) {
@@ -139,7 +113,6 @@ export default function ChangePinModal() {
 
   const getTitle = () => {
     switch (stage) {
-      case STAGES.VERIFY: return 'Wprowadź aktualny PIN';
       case STAGES.SET_NEW: return hasPinInitially ? 'Ustaw nowy PIN' : 'Ustaw swój PIN';
       case STAGES.SUCCESS: return 'Sukces!';
       default: return 'Zmień PIN';
@@ -148,7 +121,7 @@ export default function ChangePinModal() {
 
   const getButtonAction = () => {
     if (pin.length === 4) {
-      return stage === STAGES.VERIFY ? handleVerify : handleSave;
+      return handleSave;
     }
     return () => { };
   };
@@ -160,7 +133,7 @@ export default function ChangePinModal() {
     if (stage === STAGES.SUCCESS) {
       return <Text variant="titleMedium" style={styles.successText}>{successMessage}</Text>;
     }
-    if ([STAGES.VERIFY, STAGES.SET_NEW].includes(stage)) {
+    if (stage === STAGES.SET_NEW) {
       const pinDigits = Array.from({ length: 4 });
       return (
         <>
@@ -192,16 +165,15 @@ export default function ChangePinModal() {
             disabled={isProcessing || pin.length !== 4}
             style={styles.button}
           >
-            {stage === STAGES.VERIFY ? 'Potwierdź' : 'Zapisz PIN'}
+            Zapisz PIN
           </Button>
 
-          {hasPinInitially && stage === STAGES.SET_NEW && (
+          {hasPinInitially && (
             <Button
               mode="text"
               onPress={handleRemovePin}
               disabled={isProcessing}
               style={styles.removeButton}
-              textColor={theme.colors.error}
             >
               Usuń i nie używaj PINu
             </Button>
