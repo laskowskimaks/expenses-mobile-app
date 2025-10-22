@@ -121,7 +121,9 @@ export default function ChangeEmailModal() {
     if (result.success && result.currentUser?.email === newEmail) {
       await updateLocalEmail(db, newEmail);
       setStage(STAGES.SUCCESS);
-      setTimeout(() => router.back(), 2000);
+      setTimeout(() => {
+        logoutAfterAction();
+      }, 2000);
       return;
     }
 
@@ -309,6 +311,7 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     marginBottom: 20,
-    borderColor: 'transparent'
+    borderColor: 'transparent',
+    position: 'absolute',
   },
 });
