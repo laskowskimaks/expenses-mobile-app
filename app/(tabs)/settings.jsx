@@ -17,7 +17,7 @@ import { eventEmitter } from '@/utils/eventEmitter';
 
 export default function SettingsScreen() {
   const theme = useTheme();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const { db } = useDb();
   const { isConnected } = useNetworkStatus();
   const router = useRouter();
@@ -176,16 +176,9 @@ export default function SettingsScreen() {
   const handleManagePeriodic = () => router.push('/(modals)/ManagePeriodicTransactionsModal');
 
   const handlePerformBackup = async () => {
-    if (!db) {
-      showInfoDialog({
-        title: 'Błąd',
-        content: 'Baza danych nie jest dostępna.',
-        type: 'error'
-      });
-      return;
-    }
     if (isBackupLoading) return;
     setIsBackupLoading(true);
+
     try {
       await performUpload();
       showInfoDialog({
@@ -195,11 +188,13 @@ export default function SettingsScreen() {
       });
     } catch (error) {
       console.error("[SettingsScreen] Błąd backupu:", error);
+      setIsBackupLoading(false);
       showInfoDialog({
         title: 'Błąd',
-        content: `Wystąpił błąd podczas tworzenia kopii zapasowej: ${error.message || error}`,
+        content: `Wystąpił błąd: ${error.message || error}`,
         type: 'error'
       });
+      return;
     } finally {
       setIsBackupLoading(false);
     }
@@ -208,13 +203,58 @@ export default function SettingsScreen() {
   const performLogout = async () => {
     if (isLoggingOut) return;
     setIsLoggingOut(true);
+
     try {
-      await logout();
+      if (user && isConnected) {
+        try {
+          await Promise.race([
+            performUpload(),
+            new Promise((_, reject) =>
+              setTimeout(() => reject(new Error('Backup timeout')), 12000)
+            )
+          ]);
+
+          await logout();
+        } catch (backupError) {
+          console.error('[Settings] Błąd backupu podczas wylogowania:', backupError);
+
+          setIsLoggingOut(false);
+
+          showDialog({
+            title: 'Błąd synchronizacji',
+            content: 'Nie udało się zsynchronizować najnowszych danych z chmurą. Mogą zostać utracone. Czy mimo to chcesz się wylogować?',
+            confirmText: 'Wyloguj mimo to',
+            cancelText: 'Anuluj',
+            onConfirm: async () => {
+              setIsLoggingOut(true);
+              try {
+                await logout();
+              } catch (logoutError) {
+                console.error('[Settings] Błąd wylogowania:', logoutError);
+                showInfoDialog({
+                  title: 'Błąd',
+                  content: 'Wystąpił błąd podczas wylogowywania.',
+                  type: 'error'
+                });
+              } finally {
+                setIsLoggingOut(false);
+              }
+            },
+            onCancel: () => {
+              console.log('[Settings] Użytkownik anulował wylogowanie');
+            },
+            dangerous: true
+          });
+          return;
+        }
+      } else {
+        await logout();
+      }
     } catch (error) {
-      console.error("[SettingsScreen] Błąd wylogowywania:", error);
+      console.error('[Settings] Błąd wylogowywania:', error);
       showInfoDialog({
         title: 'Błąd',
-        content: `Wystąpił błąd podczas wylogowywania: ${error.message || error}`,
+        content: 'Wystąpił błąd podczas wylogowywania.',
         type: 'error'
       });
     } finally {
@@ -444,7 +484,11 @@ export default function SettingsScreen() {
       </ScrollView>
 
       <Portal>
-        <Modal visible={isLoggingOut} dismissable={false} contentContainerStyle={[styles.loadingModal, { backgroundColor: theme.colors.surface }]}>
+        <Modal
+          visible={isLoggingOut}
+          dismissable={false}
+          contentContainerStyle={[styles.loadingModal, { backgroundColor: theme.colors.surface }]}
+        >
           <View style={styles.loadingContent}>
             <ActivityIndicator size="large" color={theme.colors.primary} />
             <Text variant="titleMedium" style={[styles.loadingText, { color: theme.colors.onSurface }]}>
@@ -452,6 +496,23 @@ export default function SettingsScreen() {
             </Text>
             <Text variant="bodyMedium" style={[styles.loadingSubtext, { color: theme.colors.onSurfaceVariant }]}>
               Synchronizacja danych z chmurą
+            </Text>
+          </View>
+        </Modal>
+
+
+        <Modal
+          visible={isBackupLoading}
+          dismissable={false}
+          contentContainerStyle={[styles.loadingModal, { backgroundColor: theme.colors.surface }]}
+        >
+          <View style={styles.loadingContent}>
+            <ActivityIndicator size="large" color={theme.colors.primary} />
+            <Text variant="titleMedium" style={[styles.loadingText, { color: theme.colors.onSurface }]}>
+              Tworzenie kopii zapasowej...
+            </Text>
+            <Text variant="bodyMedium" style={[styles.loadingSubtext, { color: theme.colors.onSurfaceVariant }]}>
+              Proszę czekać
             </Text>
           </View>
         </Modal>
@@ -489,20 +550,18 @@ const styles = StyleSheet.create({
   },
   loadingModal: {
     margin: 20,
-    borderRadius: 16,
-    padding: 24,
+    borderRadius: 12,
+    padding: 32,
+    alignItems: 'center',
   },
   loadingContent: {
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 16,
   },
   loadingText: {
-    marginTop: 16,
-    fontWeight: 'bold',
     textAlign: 'center',
   },
   loadingSubtext: {
-    marginTop: 8,
     textAlign: 'center',
   },
 });

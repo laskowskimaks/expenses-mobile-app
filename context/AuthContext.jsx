@@ -18,6 +18,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useDb } from './DbContext';
 import { getUserEmail, updateLocalEmail } from '@/services/settingService';
 import { useNetworkStatus } from './NetworkContext';
+import { useDialog } from '@/utils/useDialog';
 
 export const AuthContext = createContext();
 
@@ -234,36 +235,52 @@ export const AuthProvider = ({ children }) => {
     try {
       if (firebaseAuth.currentUser && isConnected) {
         try {
-          await performUpload();
+          await Promise.race([
+            performUpload(),
+            new Promise((_, reject) =>
+              setTimeout(() => reject(new Error('Backup timeout')), 12000)
+            )
+          ]);
+          console.log('[AuthContext] Backup zakończony sukcesem');
         } catch (err) {
           console.error('[AuthContext] Błąd podczas uploadu backupu:', err);
         }
       } else if (!isConnected) {
         console.log('[AuthContext] Brak internetu - pomijam upload backupu.');
       }
-      await resetPeriodicCheckTime();
-      await AsyncStorage.removeItem(DB_TIMESTAMP_KEY);
-      try {
-        await SecureStore.deleteItemAsync('lastUser');
-      } catch (err) {
-        console.error('[AuthContext] Błąd usuwania z SecureStore podczas logout:', err);
-      }
+
+      await performLogoutCleanup();
     } catch (error) {
       console.log('[AuthContext] Błąd podczas operacji przed wylogowaniem:', error);
-    } finally {
-      try {
-        await signOut(firebaseAuth);
-        console.log('[AuthContext] Użytkownik wylogowany z Firebase.');
-      } catch (err) {
-        console.error('[AuthContext] Błąd podczas wylogowania z Firebase:', err);
-      }
-      setUser(null);
+      await performLogoutCleanup();
     }
+  };
+
+  const performLogoutCleanup = async () => {
+    await resetPeriodicCheckTime();
+    await AsyncStorage.removeItem(DB_TIMESTAMP_KEY);
+    try {
+      await SecureStore.deleteItemAsync('lastUser');
+    } catch (err) {
+      console.error('[AuthContext] Błąd usuwania z SecureStore podczas logout:', err);
+    }
+
+    try {
+      await signOut(firebaseAuth);
+      console.log('[AuthContext] Użytkownik wylogowany z Firebase.');
+    } catch (err) {
+      console.error('[AuthContext] Błąd podczas wylogowania z Firebase:', err);
+    }
+    setUser(null);
   };
 
   const value = { user, isAuthLoading, needsPinSetup, register, login, logout, logoutAfterAction, isLocked, lockApp, unlockApp, completeRegistration, forgotPassword, changePassword, changeEmail, refreshUser, isExternalActivity, setIsExternalActivity };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
 };
 
 export const useAuth = () => useContext(AuthContext);

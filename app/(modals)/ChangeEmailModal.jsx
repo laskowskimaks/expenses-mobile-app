@@ -107,34 +107,57 @@ export default function ChangeEmailModal() {
 
   const handleCheckVerification = async () => {
     setIsProcessing(true);
-    const result = await refreshUser();
+    setError('');
+    
+    try {
+      const result = await refreshUser();
 
-    if (result.error && result.error.code === 'auth/user-token-expired') {
-      await updateLocalEmail(db, newEmail);
-      setStage(STAGES.SUCCESS);
-      setTimeout(() => {
-        logoutAfterAction();
-      }, 4000);
-      return;
+      if (result.error && result.error.code === 'auth/user-token-expired') {
+        try {
+          await updateLocalEmail(db, newEmail);
+          setStage(STAGES.SUCCESS);
+          setTimeout(() => {
+            logoutAfterAction();
+          }, 4000);
+        } catch (dbError) {
+          console.error('Błąd aktualizacji lokalnego emaila:', dbError);
+          setError('Nie udało się zaktualizować danych lokalnie. Spróbuj ponownie.');
+        }
+        return;
+      }
+
+      if (result.success && result.currentUser?.email === newEmail) {
+        try {
+          await updateLocalEmail(db, newEmail);
+          setStage(STAGES.SUCCESS);
+          setTimeout(() => {
+            logoutAfterAction();
+          }, 2000);
+        } catch (dbError) {
+          console.error('Błąd aktualizacji lokalnego emaila:', dbError);
+          setError('Nie udało się zaktualizować danych lokalnie. Spróbuj ponownie.');
+        }
+        return;
+      }
+
+      showDialog({
+        title: "Oczekiwanie na weryfikację",
+        content: "Wygląda na to, że Twój nowy adres e-mail nie został jeszcze potwierdzony. Sprawdź swoją skrzynkę pocztową i kliknij w link, a następnie spróbuj ponownie.",
+        confirmText: "OK",
+        onConfirm: () => { },
+        dangerous: false
+      });
+    } catch (error) {
+      console.error('Błąd podczas sprawdzania weryfikacji:', error);
+      setError('Wystąpił błąd podczas sprawdzania weryfikacji. Spróbuj ponownie.');
+      showInfoDialog({
+        title: 'Błąd weryfikacji',
+        content: 'Nie udało się sprawdzić statusu weryfikacji. Sprawdź połączenie z internetem i spróbuj ponownie.',
+        type: 'error'
+      });
+    } finally {
+      setIsProcessing(false);
     }
-
-    if (result.success && result.currentUser?.email === newEmail) {
-      await updateLocalEmail(db, newEmail);
-      setStage(STAGES.SUCCESS);
-      setTimeout(() => {
-        logoutAfterAction();
-      }, 2000);
-      return;
-    }
-
-    showDialog({
-      title: "Oczekiwanie na weryfikację",
-      content: "Wygląda na to, że Twój nowy adres e-mail nie został jeszcze potwierdzony. Sprawdź swoją skrzynkę pocztową i kliknij w link, a następnie spróbuj ponownie.",
-      confirmText: "OK",
-      onConfirm: () => { },
-      dangerous: false
-    });
-    setIsProcessing(false);
   };
 
   const renderContent = () => {

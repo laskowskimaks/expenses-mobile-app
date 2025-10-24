@@ -12,21 +12,37 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const LOCAL_DB_DIR = FileSystem.documentDirectory + 'SQLite/';
 const LOCAL_DB_PATH = LOCAL_DB_DIR + 'database.db';
 const LOCAL_IMAGES_DIR = FileSystem.documentDirectory + 'loyalty_card_images/';
-const RETRY_COUNT = 3;
-const RETRY_DELAY = 1000;
-const COMPRESSION_SIZE_THRESHOLD_BYTES = 200 * 1024; // 200 KB
+const OPERATION_TIMEOUT = 8000;
+const RETRY_COUNT = 2;
+const RETRY_DELAY = 500;
+const COMPRESSION_SIZE_THRESHOLD_BYTES = 200 * 1024;
 export const DB_TIMESTAMP_KEY = 'DB_TIMESTAMP_KEY';
 
 let uploadPromise = null;
 
+async function _withTimeout(operation, timeoutMs = OPERATION_TIMEOUT) {
+    return Promise.race([
+        operation(),
+        new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Firebase operation timeout')), timeoutMs)
+        )
+    ]);
+}
+
 async function _retryOperation(operation, attempt = 1) {
     try {
-        return await operation();
+        return await _withTimeout(operation);
     } catch (error) {
         if (attempt >= RETRY_COUNT) {
             console.error(`[BackupService:_retry] Operacja nieudana po ${RETRY_COUNT} próbach. Błąd:`, error);
             throw error;
         }
+
+        if (error.message.includes('timeout') || error.message.includes('network')) {
+            console.warn(`[BackupService:_retry] Timeout/network error - przerywam retry`);
+            throw error;
+        }
+
         console.warn(`[BackupService:_retry] Próba ${attempt} nieudana. Ponawiam za ${RETRY_DELAY}ms...`);
         await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
         return _retryOperation(operation, attempt + 1);
