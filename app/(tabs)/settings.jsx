@@ -274,7 +274,7 @@ export default function SettingsScreen() {
     } else {
       showDialog({
         title: 'Brak połączenia z internetem',
-        content: 'Nie można wykonać synchronizacji. Wszystkie zmiany wprowadzone od ostatniego backupu mogą zostać utracone. Czy na pewno chcesz kontynuować?',
+        content: 'Nie można wykonać synchronizacji. Wszystkie zmiany wprowadzone od ostatniego backupu zostaną utracone. Czy na pewno chcesz kontynuować?',
         confirmText: 'Wyloguj mimo to',
         onConfirm: performLogout,
         dangerous: true

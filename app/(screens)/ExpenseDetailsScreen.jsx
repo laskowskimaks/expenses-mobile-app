@@ -46,7 +46,7 @@ export default function ExpenseDetailsScreen() {
 
         try {
             router.push({
-                pathname: '/(tabs)/transactionListScreen',
+                pathname: '/(tabs)/transactionList',
                 params: {
                     filterCategoryId: category.id,
                     filterDateFrom: startDateTimestamp,

@@ -380,8 +380,8 @@ export const insertTestData = async (db) => {
       await db.insert(transactionTags).values(txTag).execute();
     }
 
-    console.log('[TestData] Dane z zrzutu SQL zostały dodane pomyślnie z poprawnym mapowaniem tagów!');
-    return { success: true, message: 'Dane z zrzutu SQL zostały dodane pomyślnie z poprawnym mapowaniem tagów!' };
+    console.log('[TestData] Dane z zrzutu SQL zostały dodane pomyślnie ');
+    return { success: true, message: 'Dane z zrzutu SQL zostały dodane pomyślnie ' };
 
   } catch (error) {
     console.error('[TestData] Błąd podczas dodawania danych z zrzutu:', error);

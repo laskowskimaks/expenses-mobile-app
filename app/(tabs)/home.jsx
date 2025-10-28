@@ -371,7 +371,7 @@ export default function HomeScreen() {
             expenses={summaryData.expenses}
             income={summaryData.income}
             isLoading={isDataLoading}
-            savingsGoal={savingsGoal}
+            savingsGoal={currentPeriod?.type === 'billing' ? savingsGoal : 0}
             skeleton={<SummaryCardSkeleton />}
           />
 

@@ -20,7 +20,7 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name='transactionListScreen'
+        name='transactionList'
         options={{
           title: 'Transakcje',
           tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="format-list-bulleted" color={color} size={size} />,

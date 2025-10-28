@@ -67,7 +67,7 @@ export default function TagDetailsScreen() {
             const endDateTimestamp = Math.floor(endDate.getTime() / 1000);
 
             router.push({
-                pathname: '/(tabs)/transactionListScreen',
+                pathname: '/(tabs)/transactionList',
                 params: {
                     filterTagId: tagId,
                     filterDateFrom: startDateTimestamp,
@@ -86,7 +86,7 @@ export default function TagDetailsScreen() {
             const endDateTimestamp = Math.floor(endDate.getTime() / 1000);
 
             router.push({
-                pathname: '/(tabs)/transactionListScreen',
+                pathname: '/(tabs)/transactionList',
                 params: {
                     filterTagId: tagId,
                     filterCategoryId: category.id,

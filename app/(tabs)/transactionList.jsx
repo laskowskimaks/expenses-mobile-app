@@ -123,7 +123,7 @@ function flattenTransactionsForAmountSort(transactions = []) {
   return { data: flatData, stickyHeaderIndices };
 }
 
-export default function TransactionListScreen() {
+export default function transactionList() {
   const { db } = useDb();
   const theme = useTheme();
   const router = useRouter();
@@ -227,7 +227,7 @@ export default function TransactionListScreen() {
 
   useEffect(() => {
     if (db) {
-      console.log('[TransactionListScreen] Filtry dat się zmieniły, przeładowuję transakcje...');
+      console.log('[transactionList] Filtry dat się zmieniły, przeładowuję transakcje...');
       fetchTransactions(false);
     }
   }, [appliedFilters.dateFrom, appliedFilters.dateTo, db]);
@@ -300,7 +300,7 @@ export default function TransactionListScreen() {
     try {
       const periodicResult = await processPeriodicTransactions(db);
       if (periodicResult.success && periodicResult.addedCount > 0) {
-        console.log(`[TransactionListScreen] Dodano ${periodicResult.addedCount} automatycznych transakcji`);
+        console.log(`[transactionList] Dodano ${periodicResult.addedCount} automatycznych transakcji`);
       }
       let transactionsFromDb;
       if (appliedFilters.dateFrom && appliedFilters.dateTo) {
@@ -309,7 +309,7 @@ export default function TransactionListScreen() {
 
         transactionsFromDb = await getTransactionsForPeriod(db, startDate, endDate);
       } else {
-        console.log(`[TransactionListScreen] Pobieranie wszystkich transakcji (brak filtrów dat)`);
+        console.log(`[transactionList] Pobieranie wszystkich transakcji (brak filtrów dat)`);
         transactionsFromDb = await getTransactionsForPeriod(db);
       }
 
@@ -349,7 +349,7 @@ export default function TransactionListScreen() {
       setCategoriesOptions((catsRaw || []).map(normalizeCategory).filter(Boolean));
       setTagsOptions((tagsRaw || []).map(normalizeTag).filter(Boolean));
     } catch (error) {
-      console.error('[TransactionListScreen] Błąd podczas ładowania opcji filtrów:', error);
+      console.error('[transactionList] Błąd podczas ładowania opcji filtrów:', error);
     }
   };
 

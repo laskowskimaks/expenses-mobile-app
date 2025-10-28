@@ -74,9 +74,9 @@ export const DbProvider = ({ children }) => {
     }, [db]);
 
 
-    const initializeDatabase = useCallback(async (uid, skipRestore = false) => {
+    const setupDatabaseConnection = useCallback(async (uid, skipRestore = false) => {
         if (isInitializingRef.current) {
-            console.log('[DbContext] initializeDatabase już trwa, pomijam.');
+            console.log('[DbContext] setupDatabaseConnection już trwa, pomijam.');
             return;
         }
         isInitializingRef.current = true;
@@ -232,10 +232,10 @@ export const DbProvider = ({ children }) => {
     const value = useMemo(() => ({
         db,
         isLoading,
-        initializeDatabase,
+        setupDatabaseConnection,
         clearDatabase,
         handleNewRegistration
-    }), [db, isLoading, initializeDatabase, clearDatabase, handleNewRegistration]);
+    }), [db, isLoading, setupDatabaseConnection, clearDatabase, handleNewRegistration]);
 
     return <DbContext.Provider value={value}>
         {children}

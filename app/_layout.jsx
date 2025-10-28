@@ -1,13 +1,13 @@
 import React, { useEffect, useRef } from 'react';
 import { Stack, useRouter, usePathname } from 'expo-router';
-import { AppState, View, StyleSheet, ActivityIndicator } from 'react-native';
+import { AppState, View, StyleSheet } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { DbProvider, useDb } from '@/context/DbContext';
 import { NetworkProvider, useNetworkStatus } from '@/context/NetworkContext';
 import { getHashedPin } from '@/services/pinService';
-import { PaperProvider, Text, useTheme } from 'react-native-paper';
+import { PaperProvider, Text, useTheme, ActivityIndicator} from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemeProvider, useThemeContext } from '@/context/ThemeContext';
 import * as FileSystem from 'expo-file-system';
@@ -27,7 +27,7 @@ function RootLayoutNav() {
   const styles = createGlobalStyles(theme);
   const { user, isAuthLoading, isLocked, lockApp, unlockApp, needsPinSetup, isExternalActivity } = useAuth();
   const { isConnected } = useNetworkStatus();
-  const { db, initializeDatabase, clearDatabase, isLoading: isDbLoading } = useDb();
+  const { db, setupDatabaseConnection, clearDatabase, isLoading: isDbLoading } = useDb();
 
   const router = useRouter();
   const pathname = usePathname();
@@ -72,10 +72,10 @@ function RootLayoutNav() {
 
               if (dbFileInfo.exists && user?.uid) {
                 console.log('[RootLayoutNav] Plik bazy istnieje, pomijam sprawdzanie backup\'u');
-                await withTimeout(initializeDatabase(user.uid, true), 7000).catch(e => console.warn('DB init fast', e));
+                setupDatabaseConnection(user.uid, true);
               } else {
                 console.log('[RootLayoutNav] Plik bazy nie istnieje, pełna inicjalizacja z backup\'em');
-                await withTimeout(initializeDatabase(user.uid, false), 7000).catch(e => console.warn('DB init full', e));
+                setupDatabaseConnection(user.uid, false);
               }
             } catch (error) {
               console.error('[RootLayoutNav] Błąd podczas inicjalizacji bazy danych:', error);
