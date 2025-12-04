@@ -1,13 +1,11 @@
 import { sqliteTable,index, text, integer,check, real, primaryKey } from 'drizzle-orm/sqlite-core';
 import { relations, sql } from 'drizzle-orm';
 
-// Ustawienia Aplikacji (Klucz-Wartość)
 export const settings = sqliteTable('settings', {
   key: text('key').primaryKey(),
   value: text('value').notNull(),
 });
 
-// Kategorie
 export const categories = sqliteTable('categories', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   name: text('name').notNull().unique(),
@@ -16,14 +14,12 @@ export const categories = sqliteTable('categories', {
   isDeletable: integer('is_deletable', { mode: 'boolean' }).notNull().default(true),
 });
 
-// Tagi
 export const tags = sqliteTable('tags', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   name: text('name').notNull().unique(),
   color: text('color').notNull(),
 });
 
-// Transakcje
 export const transactions = sqliteTable('transactions', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   amount: real('amount').notNull(),
@@ -39,7 +35,6 @@ export const transactions = sqliteTable('transactions', {
   transactionDateIdx: index('transaction_date_idx').on(table.transactionDate),
 }));
 
-// Transakcje Cykliczne
 export const periodicTransactions = sqliteTable('periodic_transactions', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   amount: real('amount').notNull(),
@@ -56,7 +51,6 @@ export const periodicTransactions = sqliteTable('periodic_transactions', {
   checkRepeatUnit: check('check_repeat_unit', sql`${table.repeatUnit} in ('day', 'week', 'month', 'year')`),
 }));
 
-// Karty Lojalnościowe
 export const loyaltyCards = sqliteTable('loyalty_cards', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   name: text('name').notNull(),
@@ -67,9 +61,6 @@ export const loyaltyCards = sqliteTable('loyalty_cards', {
 });
 
 
-// === TABELE ŁĄCZĄCE (RELACJE WIELE-DO-WIELU) ===
-
-// Powiązania Transakcji z Tagami
 export const transactionTags = sqliteTable('transaction_tags', {
   transactionId: integer('transaction_id').notNull().references(() => transactions.id, { onDelete: 'cascade' }),
   tagId: integer('tag_id').notNull().references(() => tags.id, { onDelete: 'cascade' }),
@@ -77,7 +68,6 @@ export const transactionTags = sqliteTable('transaction_tags', {
   pk: primaryKey({ columns: [table.transactionId, table.tagId] }),
 }));
 
-// Powiązania Transakcji Cyklicznych z Tagami
 export const periodicTransactionTags = sqliteTable('periodic_transaction_tags', {
   periodicTransactionId: integer('periodic_transaction_id').notNull().references(() => periodicTransactions.id, { onDelete: 'cascade' }),
   tagId: integer('tag_id').notNull().references(() => tags.id, { onDelete: 'cascade' }),
@@ -86,37 +76,29 @@ export const periodicTransactionTags = sqliteTable('periodic_transaction_tags', 
 }));
 
 
-// === DEFINICJE RELACJI ===
 
-// Relacje dla tabeli `categories`
 export const categoriesRelations = relations(categories, ({ many }) => ({
-  transactions: many(transactions), // Jedna kategoria może mieć wiele transakcji
+  transactions: many(transactions), 
   periodicTransactions: many(periodicTransactions),
 }));
 
-// Relacje dla tabeli `tags`
 export const tagsRelations = relations(tags, ({ many }) => ({
-  transactionTags: many(transactionTags), // Jeden tag w wielu powiązaniach z transakcjami
+  transactionTags: many(transactionTags), 
   periodicTransactionTags: many(periodicTransactionTags),
 }));
 
-// Relacje dla tabeli `transactions`
 export const transactionsRelations = relations(transactions, ({ one, many }) => ({
-  // Relacja jeden-do-wielu (odwrócona): każda transakcja ma jedną kategorię
   category: one(categories, {
     fields: [transactions.categoryId],
     references: [categories.id],
   }),
-  // Relacja do definicji transakcji cyklicznych
   periodicTransaction: one(periodicTransactions, {
     fields: [transactions.periodicTransactionId],
     references: [periodicTransactions.id],
   }),
-  // Relacja wiele-do-wielu: każda transakcja może mieć wiele tagów poprzez tabelę łączącą
   transactionTags: many(transactionTags),
 }));
 
-// Relacje dla tabeli `periodicTransactions`
 export const periodicTransactionsRelations = relations(periodicTransactions, ({ one, many }) => ({
   category: one(categories, {
     fields: [periodicTransactions.categoryId],
@@ -125,21 +107,17 @@ export const periodicTransactionsRelations = relations(periodicTransactions, ({ 
   periodicTransactionTags: many(periodicTransactionTags),
 }));
 
-// Relacje dla tabeli łączącej `transactionTags`
 export const transactionTagsRelations = relations(transactionTags, ({ one }) => ({
-  // Każde powiązanie odnosi się do jednej transakcji
   transaction: one(transactions, {
     fields: [transactionTags.transactionId],
     references: [transactions.id],
   }),
-  // Każde powiązanie odnosi się do jednego taga
   tag: one(tags, {
     fields: [transactionTags.tagId],
     references: [tags.id],
   }),
 }));
 
-// Relacje dla tabeli łączącej `periodicTransactionTags`
 export const periodicTransactionTagsRelations = relations(periodicTransactionTags, ({ one }) => ({
   periodicTransaction: one(periodicTransactions, {
     fields: [periodicTransactionTags.periodicTransactionId],

@@ -52,7 +52,7 @@ export const DbProvider = ({ children }) => {
                     }
 
                 } catch (closeError) {
-                    console.log('[DbContext] Połączenie było już zamknięte lub wystąpił błąd podczas zamykania (to może być normalne)', closeError);
+                    console.log('[DbContext] Połączenie zamknięte lub wystąpił błąd');
                 }
             } else {
                 console.log('[DbContext] Brak aktywnego połączenia do zamknięcia.');
